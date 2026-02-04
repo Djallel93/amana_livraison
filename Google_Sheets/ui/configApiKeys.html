@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: 'Google Sans', Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      color: #1a73e8;
+      margin-top: 0;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border-left: 4px solid #1a73e8;
+    }
+
+    .section h3 {
+      margin-top: 0;
+      color: #5f6368;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #5f6368;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+    }
+
+    .button-container {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    button {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1557b0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #5f6368;
+      border: 1px solid #dadce0;
+    }
+
+    .btn-secondary:hover {
+      background: #f8f9fa;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #5f6368;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .alert-success {
+      background: #e6f4ea;
+      color: #137333;
+      border: 1px solid #b7e1cd;
+    }
+
+    .alert-error {
+      background: #fce8e6;
+      color: #c5221f;
+      border: 1px solid #f6aea9;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>
+      🔑 Configuration des API Keys
+    </h2>
+
+    <div id="alert-success" class="alert alert-success">
+      ✅ Configuration sauvegardée avec succès !
+    </div>
+
+    <div id="alert-error" class="alert alert-error">
+      ❌ <span id="error-message"></span>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Sauvegarde en cours...</p>
+    </div>
+
+    <form id="configForm">
+      <!-- API Familles -->
+      <div class="section">
+        <h3>📊 API Familles</h3>
+
+        <div class="form-group">
+          <label for="famillesUrl">URL de l'API</label>
+          <input type="text" id="famillesUrl" name="famillesUrl"
+            placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" required>
+          <div class="help-text">
+            URL du déploiement de l'API Familles (Family Management REST API v2.2)
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="famillesKey">Clé API</label>
+          <input type="password" id="famillesKey" name="famillesKey" placeholder="Entrez la clé API" required>
+          <div class="help-text">
+            Clé d'authentification pour l'API Familles
+          </div>
+        </div>
+      </div>
+
+      <!-- API Bénévoles -->
+      <div class="section">
+        <h3>👥 API Bénévoles</h3>
+
+        <div class="form-group">
+          <label for="benevolesUrl">URL de l'API</label>
+          <input type="text" id="benevolesUrl" name="benevolesUrl"
+            placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" required>
+          <div class="help-text">
+            URL du déploiement de l'API Bénévoles (Volunteer Management API v1.0)
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="benevolesKey">Clé API</label>
+          <input type="password" id="benevolesKey" name="benevolesKey" placeholder="Entrez la clé API" required>
+          <div class="help-text">
+            Clé d'authentification pour l'API Bénévoles
+          </div>
+        </div>
+      </div>
+
+      <!-- API GEO -->
+      <div class="section">
+        <h3>🌍 API GEO</h3>
+
+        <div class="form-group">
+          <label for="geoUrl">URL de l'API</label>
+          <input type="text" id="geoUrl" name="geoUrl"
+            placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" required>
+          <div class="help-text">
+            URL du déploiement de l'API GEO (AMANA GEO API v5.0)
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="geoKey">Clé API</label>
+          <input type="password" id="geoKey" name="geoKey" placeholder="Entrez la clé API" required>
+          <div class="help-text">
+            Clé d'authentification pour l'API GEO (paramètre X-Api-Key)
+          </div>
+        </div>
+      </div>
+
+      <div class="button-container">
+        <button type="button" class="btn-secondary" onclick="closeDialog()">
+          Annuler
+        </button>
+        <button type="submit" class="btn-primary">
+          💾 Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Charger la configuration actuelle au démarrage
+    window.addEventListener('load', function () {
+      google.script.run
+        .withSuccessHandler(loadConfig)
+        .withFailureHandler(showError)
+        .getApiKeysConfig();
+    });
+
+    function loadConfig(config) {
+      if (config.famillesUrl) {
+        document.getElementById('famillesUrl').value = config.famillesUrl;
+      }
+      if (config.benevolesUrl) {
+        document.getElementById('benevolesUrl').value = config.benevolesUrl;
+      }
+      if (config.geoUrl) {
+        document.getElementById('geoUrl').value = config.geoUrl;
+      }
+
+      // Les clés sont masquées par sécurité, ne pas les afficher
+    }
+
+    // Gérer la soumission du formulaire
+    document.getElementById('configForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const config = {
+        famillesUrl: document.getElementById('famillesUrl').value,
+        famillesKey: document.getElementById('famillesKey').value,
+        benevolesUrl: document.getElementById('benevolesUrl').value,
+        benevolesKey: document.getElementById('benevolesKey').value,
+        geoUrl: document.getElementById('geoUrl').value,
+        geoKey: document.getElementById('geoKey').value
+      };
+
+      // Afficher le loader
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('configForm').style.display = 'none';
+
+      // Envoyer la configuration
+      google.script.run
+        .withSuccessHandler(onSaveSuccess)
+        .withFailureHandler(onSaveError)
+        .saveApiKeysConfig(config);
+    });
+
+    function onSaveSuccess(result) {
+      document.getElementById('loading').style.display = 'none';
+
+      if (result.success) {
+        document.getElementById('alert-success').style.display = 'block';
+
+        // Fermer après 2 secondes
+        setTimeout(function () {
+          google.script.host.close();
+        }, 2000);
+      } else {
+        document.getElementById('configForm').style.display = 'block';
+        showError(result.error);
+      }
+    }
+
+    function onSaveError(error) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('configForm').style.display = 'block';
+      showError(error.message);
+    }
+
+    function showError(message) {
+      document.getElementById('error-message').textContent = message;
+      document.getElementById('alert-error').style.display = 'block';
+
+      // Masquer après 5 secondes
+      setTimeout(function () {
+        document.getElementById('alert-error').style.display = 'none';
+      }, 5000);
+    }
+
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+
+</html>

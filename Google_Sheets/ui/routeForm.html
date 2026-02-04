@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .form-content {
+      padding: 30px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #4facfe;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4a5568;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    input[type="date"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #4facfe;
+      box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+    }
+
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .radio-item input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #4facfe;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .button-container {
+      display: flex;
+      gap: 15px;
+      justify-content: flex-end;
+      padding: 20px 30px;
+      background: #f7fafc;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    button {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #4a5568;
+      border: 2px solid #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+      background: #f7fafc;
+      border-color: #cbd5e0;
+    }
+
+    .alert {
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateY(-10px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .alert-success {
+      background: #c6f6d5;
+      color: #22543d;
+      border-left: 4px solid #38a169;
+    }
+
+    .alert-error {
+      background: #fed7d7;
+      color: #742a2a;
+      border-left: 4px solid #e53e3e;
+    }
+
+    .alert-warning {
+      background: #feebc8;
+      color: #7c2d12;
+      border-left: 4px solid #ed8936;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4facfe;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-text {
+      color: #4a5568;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .results {
+      display: none;
+      padding: 30px;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-card .number {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .stat-card .label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .warnings-list {
+      background: #feebc8;
+      border: 1px solid #ed8936;
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+
+    .warnings-list h4 {
+      color: #7c2d12;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .warnings-list ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .warnings-list li {
+      color: #7c2d12;
+      font-size: 13px;
+      padding: 5px 0;
+      border-bottom: 1px solid #fbd38d;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>🗺️ Planifier les Routes</h1>
+        <p>Optimiser l'attribution des livraisons aux bénévoles</p>
+      </div>
+
+      <div class="form-content">
+        <div id="alert-success" class="alert alert-success"></div>
+        <div id="alert-error" class="alert alert-error"></div>
+        <div id="alert-warning" class="alert alert-warning"></div>
+      </div>
+
+      <form id="routeForm">
+        <div class="form-content">
+
+          <!-- Configuration de base -->
+          <div class="section">
+            <div class="section-title">
+              <span>📅</span>
+              <span>Configuration de Base</span>
+            </div>
+
+            <div class="form-group">
+              <label for="date_livraison">Date de livraison</label>
+              <input type="date" id="date_livraison" name="date_livraison" required>
+            </div>
+
+            <div class="form-group">
+              <label for="max_livraisons">Nombre maximum de livraisons par bénévole</label>
+              <input type="number" id="max_livraisons" name="max_livraisons" min="1" max="30" value="15" required>
+              <div class="help-text">
+                Limite le nombre d'arrêts pour chaque bénévole
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Occasion</label>
+              <div class="radio-group">
+                <div class="radio-item">
+                  <input type="radio" id="zakat" name="occasion" value="zakat_el_fitr" checked>
+                  <label for="zakat" style="margin: 0;">🌙 Zakat El Fitr</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="recolte" name="occasion" value="recolte">
+                  <label for="recolte" style="margin: 0;">🌾 Récolte</label>
+                </div>
+                <div class="radio-item">
+                  <input type="radio" id="ponctuelle" name="occasion" value="ponctuelle">
+                  <label for="ponctuelle" style="margin: 0;">📦 Ponctuelle</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="poids_moyen_kg">Poids moyen par personne (kg)</label>
+              <input type="number" id="poids_moyen_kg" name="poids_moyen_kg" min="1" max="20" value="5" step="0.5"
+                required>
+              <div class="help-text">
+                Utilisé pour calculer le poids total de chaque route
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="relivre" name="relivre" style="width: auto; margin-right: 8px;">
+                Route avec retour au QG (relivre)
+              </label>
+              <div class="help-text">
+                Si coché, les bénévoles devront revenir au QG après les livraisons
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="button-container">
+          <button type="button" class="btn-secondary" onclick="closeDialog()">
+            Annuler
+          </button>
+          <button type="submit" class="btn-primary" id="submitBtn">
+            ✨ Planifier les Routes
+          </button>
+        </div>
+      </form>
+
+      <!-- Loading -->
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Planification en cours...</div>
+        <div class="help-text" style="margin-top: 10px;">
+          Clustering géographique, attribution aux bénévoles et optimisation
+        </div>
+      </div>
+
+      <!-- Résultats -->
+      <div id="results" class="results">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h2>✅ Routes Planifiées</h2>
+        </div>
+
+        <div class="stat-cards">
+          <div class="stat-card">
+            <div class="number" id="stat-routes">0</div>
+            <div class="label">Routes Créées</div>
+          </div>
+          <div class="stat-card">
+            <div class="number" id="stat-warnings">0</div>
+            <div class="label">Avertissements</div>
+          </div>
+        </div>
+
+        <div id="warnings-details" class="warnings-list" style="display: none;">
+          <h4>⚠️ Routes Éloignées Détectées :</h4>
+          <ul id="warnings-list"></ul>
+          <div class="help-text" style="margin-top: 10px;">
+            Ces routes dépassent la distance recommandée. Vous pouvez les confirmer ou les modifier.
+          </div>
+        </div>
+
+        <div class="button-container">
+          <button type="button" class="btn-primary" onclick="closeDialog()">
+            Fermer
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function () {
+      setDefaultDate();
+    });
+
+    function setDefaultDate() {
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const dateStr = tomorrow.toISOString().split('T')[0];
+      document.getElementById('date_livraison').value = dateStr;
+    }
+
+    document.getElementById('routeForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const params = {
+        date_livraison: document.getElementById('date_livraison').value,
+        max_livraisons: parseInt(document.getElementById('max_livraisons').value),
+        occasion: document.querySelector('input[name="occasion"]:checked').value,
+        poids_moyen_kg: parseFloat(document.getElementById('poids_moyen_kg').value),
+        relivre: document.getElementById('relivre').checked,
+        vehicules_pretes: [], // Sera implémenté en Phase 3 avancée
+        binomes: [] // Sera implémenté en Phase 3 avancée
+      };
+
+      // Afficher le loader
+      document.getElementById('routeForm').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+
+      // Appeler la fonction backend
+      google.script.run
+        .withSuccessHandler(onPlanSuccess)
+        .withFailureHandler(onPlanError)
+        .planRoutesFromForm(params);
+    });
+
+    function onPlanSuccess(result) {
+      document.getElementById('loading').style.display = 'none';
+
+      if (!result.success) {
+        document.getElementById('routeForm').style.display = 'block';
+        showAlert('error', 'La planification a échoué : ' + (result.errors.join(', ') || 'Erreur inconnue'));
+        return;
+      }
+
+      // Afficher les résultats
+      document.getElementById('stat-routes').textContent = result.created;
+      document.getElementById('stat-warnings').textContent = result.warnings.length;
+
+      // Afficher les avertissements si présents
+      if (result.warnings.length > 0) {
+        const warningsList = document.getElementById('warnings-list');
+        warningsList.innerHTML = '';
+        result.warnings.forEach(warning => {
+          const li = document.createElement('li');
+          li.textContent = warning.message;
+          warningsList.appendChild(li);
+        });
+        document.getElementById('warnings-details').style.display = 'block';
+      }
+
+      document.getElementById('results').style.display = 'block';
+    }
+
+    function onPlanError(error) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('routeForm').style.display = 'block';
+      showAlert('error', 'Erreur : ' + error.message);
+    }
+
+    function showAlert(type, message) {
+      const alertId = 'alert-' + type;
+      const alert = document.getElementById(alertId);
+      alert.textContent = message;
+      alert.style.display = 'block';
+
+      setTimeout(function () {
+        alert.style.display = 'none';
+      }, 5000);
+    }
+
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+
+</html>

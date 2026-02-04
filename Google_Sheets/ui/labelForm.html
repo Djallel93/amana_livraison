@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .form-content {
+      padding: 30px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #fa709a;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4a5568;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #fa709a;
+      box-shadow: 0 0 0 3px rgba(250, 112, 154, 0.1);
+    }
+
+    .routes-list {
+      margin: 20px 0;
+    }
+
+    .route-item {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .route-item:hover {
+      border-color: #fa709a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(250, 112, 154, 0.2);
+    }
+
+    .route-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: #fa709a;
+      cursor: pointer;
+    }
+
+    .route-info {
+      flex: 1;
+    }
+
+    .route-id {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 5px;
+    }
+
+    .route-stats {
+      display: flex;
+      gap: 15px;
+      font-size: 12px;
+      color: #718096;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .preview-box {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      border: 2px dashed #fa709a;
+    }
+
+    .preview-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 15px;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+    }
+
+    .preview-stat {
+      text-align: center;
+      padding: 15px;
+      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      color: white;
+      border-radius: 6px;
+    }
+
+    .preview-stat .number {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .preview-stat .label {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .format-example {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f7fafc;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .format-example .grid {
+      display: inline-grid;
+      grid-template-columns: repeat(3, 60px);
+      grid-template-rows: repeat(7, 40px);
+      gap: 2px;
+      margin-top: 10px;
+    }
+
+    .format-example .cell {
+      background: #e2e8f0;
+      border: 1px solid #cbd5e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #4a5568;
+    }
+
+    .select-all-btn {
+      display: inline-block;
+      padding: 8px 16px;
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #4a5568;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 15px;
+    }
+
+    .select-all-btn:hover {
+      border-color: #fa709a;
+      color: #fa709a;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .button-container {
+      display: flex;
+      gap: 15px;
+      justify-content: flex-end;
+      padding: 20px 30px;
+      background: #f7fafc;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    button {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(250, 112, 154, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(250, 112, 154, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #4a5568;
+      border: 2px solid #e2e8f0;
+    }
+
+    .alert {
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .alert-success {
+      background: #c6f6d5;
+      color: #22543d;
+      border-left: 4px solid #38a169;
+    }
+
+    .alert-error {
+      background: #fed7d7;
+      color: #742a2a;
+      border-left: 4px solid #e53e3e;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #fa709a;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .results {
+      display: none;
+      padding: 30px;
+    }
+
+    .documents-list {
+      margin-top: 20px;
+    }
+
+    .document-item {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .document-item a {
+      color: #fa709a;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #718096;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>🏷️ Générer les Étiquettes</h1>
+        <p>Créer des étiquettes imprimables avec QR codes pour les colis</p>
+      </div>
+
+      <div class="form-content">
+        <div id="alert-success" class="alert alert-success"></div>
+        <div id="alert-error" class="alert alert-error"></div>
+      </div>
+
+      <form id="labelsForm">
+        <div class="form-content">
+
+          <!-- Configuration du format -->
+          <div class="section">
+            <div class="section-title">
+              <span>📐</span>
+              <span>Configuration du Format A4</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div class="form-group">
+                <label for="rows">Nombre de lignes</label>
+                <input type="number" id="rows" name="rows" min="1" max="15" value="7" required>
+                <div class="help-text">Lignes par page A4</div>
+              </div>
+
+              <div class="form-group">
+                <label for="cols">Nombre de colonnes</label>
+                <input type="number" id="cols" name="cols" min="1" max="5" value="3" required>
+                <div class="help-text">Colonnes par page A4</div>
+              </div>
+            </div>
+
+            <div class="format-example">
+              <strong>Aperçu du format : <span id="format-display">7×3 = 21 étiquettes par page</span></strong>
+              <div class="grid" id="grid-preview"></div>
+            </div>
+          </div>
+
+          <!-- Sélection des routes -->
+          <div class="section">
+            <div class="section-title">
+              <span>📍</span>
+              <span>Sélectionner les Routes</span>
+            </div>
+
+            <div id="routes-container">
+              <div class="loading" style="display: block;">
+                <div class="spinner"></div>
+                <div style="color: #4a5568;">Chargement des routes...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Prévisualisation -->
+          <div id="preview-section" style="display: none;">
+            <div class="preview-box">
+              <div class="preview-title">📊 Prévisualisation</div>
+              <div class="preview-grid">
+                <div class="preview-stat">
+                  <div class="number" id="preview-labels">0</div>
+                  <div class="label">Étiquettes</div>
+                </div>
+                <div class="preview-stat">
+                  <div class="number" id="preview-pages">0</div>
+                  <div class="label">Pages A4</div>
+                </div>
+                <div class="preview-stat">
+                  <div class="number" id="preview-routes">0</div>
+                  <div class="label">Routes</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="button-container">
+          <button type="button" class="btn-secondary" onclick="closeDialog()">
+            Annuler
+          </button>
+          <button type="submit" class="btn-primary" id="submitBtn" disabled>
+            ✨ Générer les Étiquettes
+          </button>
+        </div>
+      </form>
+
+      <!-- Loading -->
+      <div id="loading-generation" class="loading">
+        <div class="spinner"></div>
+        <div style="color: #4a5568; font-size: 16px; font-weight: 500; margin-bottom: 10px;">
+          Génération en cours...
+        </div>
+        <div class="help-text">
+          Création des documents Google avec QR codes
+        </div>
+      </div>
+
+      <!-- Résultats -->
+      <div id="results" class="results">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h2>✅ Étiquettes Générées</h2>
+        </div>
+
+        <div class="documents-list" id="documents-list"></div>
+
+        <div class="button-container">
+          <button type="button" class="btn-primary" onclick="closeDialog()">
+            Fermer
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let routes = [];
+
+    window.addEventListener('load', function () {
+      loadConfirmedRoutes();
+      updateGridPreview();
+
+      // Mettre à jour l'aperçu quand on change les dimensions
+      document.getElementById('rows').addEventListener('input', updateFormatDisplay);
+      document.getElementById('cols').addEventListener('input', updateFormatDisplay);
+    });
+
+    function loadConfirmedRoutes() {
+      google.script.run
+        .withSuccessHandler(displayRoutes)
+        .withFailureHandler(onLoadError)
+        .getConfirmedRoutesForLabels();
+    }
+
+    function displayRoutes(data) {
+      routes = data;
+      const container = document.getElementById('routes-container');
+
+      if (!routes || routes.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div style="font-size: 48px; margin-bottom: 20px;">📭</div>
+            <h3>Aucune route confirmée</h3>
+            <p style="margin-top: 10px;">
+              Les routes doivent être confirmées avant de générer les étiquettes
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <div class="select-all-btn" onclick="toggleSelectAll()">
+          ✓ Tout sélectionner / désélectionner
+        </div>
+        <div class="routes-list">
+      `;
+
+      routes.forEach((route, index) => {
+        html += `
+          <div class="route-item" onclick="toggleRoute(${index}, event)">
+            <input 
+              type="checkbox" 
+              id="route-${index}" 
+              value="${route.id_route}"
+              onchange="updatePreview()"
+            >
+            <div class="route-info">
+              <div class="route-id">${route.id_route}</div>
+              <div class="route-stats">
+                <div class="stat">
+                  <span>📦</span>
+                  <span>${route.nombre_livraisons || 0} livraisons</span>
+                </div>
+                <div class="stat">
+                  <span>🏷️</span>
+                  <span>${route.total_personnes || 0} étiquettes</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function onLoadError(error) {
+      const container = document.getElementById('routes-container');
+      container.innerHTML = `
+        <div class="empty-state">
+          <div style="font-size: 48px; margin-bottom: 20px; color: #e53e3e;">⚠️</div>
+          <h3>Erreur de chargement</h3>
+          <p style="margin-top: 10px; color: #742a2a;">
+            ${error.message}
+          </p>
+        </div>
+      `;
+    }
+
+    function toggleRoute(index, event) {
+      if (event.target.type !== 'checkbox') {
+        const checkbox = document.getElementById(`route-${index}`);
+        checkbox.checked = !checkbox.checked;
+        updatePreview();
+      }
+    }
+
+    function toggleSelectAll() {
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+
+      checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+      });
+
+      updatePreview();
+    }
+
+    function updateFormatDisplay() {
+      const rows = parseInt(document.getElementById('rows').value) || 7;
+      const cols = parseInt(document.getElementById('cols').value) || 3;
+      const total = rows * cols;
+
+      document.getElementById('format-display').textContent = `${rows}×${cols} = ${total} étiquettes par page`;
+
+      updateGridPreview();
+      updatePreview();
+    }
+
+    function updateGridPreview() {
+      const rows = parseInt(document.getElementById('rows').value) || 7;
+      const cols = parseInt(document.getElementById('cols').value) || 3;
+
+      const grid = document.getElementById('grid-preview');
+      grid.style.gridTemplateColumns = `repeat(${cols}, 60px)`;
+      grid.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+
+      grid.innerHTML = '';
+      for (let i = 0; i < rows * cols; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.textContent = i + 1;
+        grid.appendChild(cell);
+      }
+    }
+
+    function updatePreview() {
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+      const selectedRouteIds = Array.from(checkboxes).map(cb => cb.value);
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = selectedRouteIds.length === 0;
+
+      if (selectedRouteIds.length === 0) {
+        document.getElementById('preview-section').style.display = 'none';
+        return;
+      }
+
+      // Calculer le total d'étiquettes
+      let totalLabels = 0;
+      selectedRouteIds.forEach(routeId => {
+        const route = routes.find(r => r.id_route === routeId);
+        if (route) {
+          totalLabels += route.total_personnes || 0;
+        }
+      });
+
+      const rows = parseInt(document.getElementById('rows').value) || 7;
+      const cols = parseInt(document.getElementById('cols').value) || 3;
+      const labelsPerPage = rows * cols;
+      const totalPages = Math.ceil(totalLabels / labelsPerPage);
+
+      document.getElementById('preview-labels').textContent = totalLabels;
+      document.getElementById('preview-pages').textContent = totalPages;
+      document.getElementById('preview-routes').textContent = selectedRouteIds.length;
+
+      document.getElementById('preview-section').style.display = 'block';
+    }
+
+    document.getElementById('labelsForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+      const routeIds = Array.from(checkboxes).map(cb => cb.value);
+
+      if (routeIds.length === 0) {
+        showAlert('error', 'Veuillez sélectionner au moins une route');
+        return;
+      }
+
+      const params = {
+        routeIds: routeIds,
+        rows: parseInt(document.getElementById('rows').value),
+        cols: parseInt(document.getElementById('cols').value)
+      };
+
+      // Afficher le loader
+      document.getElementById('labelsForm').style.display = 'none';
+      document.getElementById('loading-generation').style.display = 'block';
+
+      // Appeler la fonction backend
+      google.script.run
+        .withSuccessHandler(onGenerateSuccess)
+        .withFailureHandler(onGenerateError)
+        .generateLabelsFromForm(params);
+    });
+
+    function onGenerateSuccess(result) {
+      document.getElementById('loading-generation').style.display = 'none';
+
+      if (!result.success) {
+        document.getElementById('labelsForm').style.display = 'block';
+        showAlert('error', 'La génération a échoué : ' + (result.errors.join(', ') || 'Erreur inconnue'));
+        return;
+      }
+
+      // Afficher les documents générés
+      const docsList = document.getElementById('documents-list');
+      docsList.innerHTML = '';
+
+      result.documents.forEach(doc => {
+        const item = document.createElement('div');
+        item.className = 'document-item';
+        item.innerHTML = `
+          <div>
+            <strong>${doc.routeId}</strong>
+            <div style="font-size: 12px; color: #718096;">${doc.labelCount} étiquettes</div>
+          </div>
+          <a href="${doc.url}" target="_blank">📄 Ouvrir le document</a>
+        `;
+        docsList.appendChild(item);
+      });
+
+      document.getElementById('results').style.display = 'block';
+    }
+
+    function onGenerateError(error) {
+      document.getElementById('loading-generation').style.display = 'none';
+      document.getElementById('labelsForm').style.display = 'block';
+      showAlert('error', 'Erreur : ' + error.message);
+    }
+
+    function showAlert(type, message) {
+      const alertId = 'alert-' + type;
+      const alert = document.getElementById(alertId);
+      alert.textContent = message;
+      alert.style.display = 'block';
+
+      setTimeout(function () {
+        alert.style.display = 'none';
+      }, 5000);
+    }
+
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+
+</html>
