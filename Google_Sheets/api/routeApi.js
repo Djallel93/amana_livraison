@@ -2,14 +2,6 @@
  * ====================================================================
  * ROUTE_API.GS - API Web pour les Actions des Bénévoles
  * ====================================================================
- * 
- * Endpoints pour les bénévoles :
- * - GET /ping - Test de connectivité
- * - POST /start_route - Démarrer une route
- * - POST /confirm_delivery - Confirmer une livraison
- * - POST /skip_delivery - Sauter une livraison
- * 
- * Sécurité : Tous les endpoints (sauf ping) nécessitent un token valide
  */
 
 /**

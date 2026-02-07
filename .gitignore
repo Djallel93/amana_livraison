@@ -7,3 +7,4 @@ package.json
 client_secret_*.json
 todo*.md
 Swaggers/**
+*old*

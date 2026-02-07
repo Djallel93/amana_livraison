@@ -41,8 +41,7 @@ const CONFIG = {
    */
   API_BENEVOLES: {
     get URL() {
-      return PropertiesService.getScriptProperties().getProperty('API_BENEVOLES_URL') ||
-        'https://script.google.com/macros/s/YOUR_VOLUNTEER_SCRIPT_ID/exec';
+      return PropertiesService.getScriptProperties().getProperty('API_BENEVOLES_URL') || '';
     },
     get KEY() {
       return PropertiesService.getScriptProperties().getProperty('API_BENEVOLES_KEY') || '';
@@ -65,8 +64,7 @@ const CONFIG = {
    */
   API_GEO: {
     get URL() {
-      return PropertiesService.getScriptProperties().getProperty('API_GEO_URL') ||
-        'https://script.google.com/macros/s/YOUR_GEO_SCRIPT_ID/exec';
+      return PropertiesService.getScriptProperties().getProperty('API_GEO_URL') || '';
     },
     get KEY() {
       return PropertiesService.getScriptProperties().getProperty('API_GEO_KEY') || '';

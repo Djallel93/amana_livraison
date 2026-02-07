@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .form-content {
+      padding: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4a5568;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .map-preview {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f7fafc;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .map-preview a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .button-container {
+      display: flex;
+      gap: 15px;
+      justify-content: flex-end;
+      padding: 20px 30px;
+      background: #f7fafc;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    button {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #4a5568;
+      border: 2px solid #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+      background: #f7fafc;
+      border-color: #cbd5e0;
+    }
+
+    .alert {
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateY(-10px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .alert-success {
+      background: #c6f6d5;
+      color: #22543d;
+      border-left: 4px solid #38a169;
+    }
+
+    .alert-error {
+      background: #fed7d7;
+      color: #742a2a;
+      border-left: 4px solid #e53e3e;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>📍 Configuration du QG</h1>
+        <p>Définir l'emplacement du quartier général</p>
+      </div>
+
+      <div class="form-content">
+        <div id="alert-success" class="alert alert-success"></div>
+        <div id="alert-error" class="alert alert-error"></div>
+
+        <form id="hqForm">
+          <div class="form-group">
+            <label for="address">Adresse du QG</label>
+            <input type="text" id="address" name="address" required>
+            <div class="help-text">
+              Adresse complète pour référence
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="lat">Latitude</label>
+            <input type="number" id="lat" name="lat" step="0.000001" min="-90" max="90" required>
+            <div class="help-text">
+              Entre -90 et 90 (ex: 47.215297)
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="lng">Longitude</label>
+            <input type="number" id="lng" name="lng" step="0.000001" min="-180" max="180" required>
+            <div class="help-text">
+              Entre -180 et 180 (ex: -1.611068)
+            </div>
+          </div>
+
+          <div class="map-preview" id="mapPreview" style="display: none;">
+            <p><strong>📍 Aperçu :</strong></p>
+            <a href="#" target="_blank" id="mapLink">Voir sur Google Maps</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="button-container">
+        <button type="button" class="btn-secondary" onclick="closeDialog()">
+          Annuler
+        </button>
+        <button type="submit" form="hqForm" class="btn-primary">
+          💾 Enregistrer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function () {
+      loadCurrentConfig();
+
+      // Mettre à jour l'aperçu quand les coordonnées changent
+      document.getElementById('lat').addEventListener('input', updateMapPreview);
+      document.getElementById('lng').addEventListener('input', updateMapPreview);
+    });
+
+    function loadCurrentConfig() {
+      google.script.run
+        .withSuccessHandler(function (config) {
+          if (config) {
+            document.getElementById('address').value = config.address || '';
+            document.getElementById('lat').value = config.lat || '';
+            document.getElementById('lng').value = config.lng || '';
+            updateMapPreview();
+          }
+        })
+        .withFailureHandler(function (error) {
+          showAlert('error', 'Erreur de chargement : ' + error.message);
+        })
+        .getCurrentHqConfig();
+    }
+
+    function updateMapPreview() {
+      const lat = document.getElementById('lat').value;
+      const lng = document.getElementById('lng').value;
+
+      if (lat && lng) {
+        const mapLink = document.getElementById('mapLink');
+        mapLink.href = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        document.getElementById('mapPreview').style.display = 'block';
+      } else {
+        document.getElementById('mapPreview').style.display = 'none';
+      }
+    }
+
+    document.getElementById('hqForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const config = {
+        address: document.getElementById('address').value.trim(),
+        lat: parseFloat(document.getElementById('lat').value),
+        lng: parseFloat(document.getElementById('lng').value)
+      };
+
+      // Validation
+      if (!config.address) {
+        showAlert('error', 'L\'adresse est requise');
+        return;
+      }
+
+      if (isNaN(config.lat) || config.lat < -90 || config.lat > 90) {
+        showAlert('error', 'Latitude invalide (-90 à 90)');
+        return;
+      }
+
+      if (isNaN(config.lng) || config.lng < -180 || config.lng > 180) {
+        showAlert('error', 'Longitude invalide (-180 à 180)');
+        return;
+      }
+
+      // Sauvegarder
+      google.script.run
+        .withSuccessHandler(function () {
+          showAlert('success', 'Configuration du QG enregistrée !');
+          setTimeout(function () {
+            closeDialog();
+          }, 1500);
+        })
+        .withFailureHandler(function (error) {
+          showAlert('error', 'Erreur : ' + error.message);
+        })
+        .saveHqConfig(config);
+    });
+
+    function showAlert(type, message) {
+      const alertId = 'alert-' + type;
+      const alert = document.getElementById(alertId);
+      alert.textContent = message;
+      alert.style.display = 'block';
+
+      setTimeout(function () {
+        alert.style.display = 'none';
+      }, 5000);
+    }
+
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+
+</html>
