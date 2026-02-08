@@ -121,6 +121,7 @@ function fetchEligibleFamilies(filters) {
   }
 
   let families = response.families;
+  console.log(`[DELIVERIES] ${families.length} familles récupérées avant filtrage`);
 
   // Filtrer par priorité (criticité)
   if (filters.priorites && filters.priorites.length > 0) {
@@ -129,14 +130,14 @@ function fetchEligibleFamilies(filters) {
       return filters.priorites.includes(criticite);
     });
   }
-
+  console.log(`[DELIVERIES] ${families.length} familles après filtrage par priorité`);
   // Filtrer par quartiers
   if (filters.quartiers && filters.quartiers.length > 0) {
     families = families.filter(f => {
       return filters.quartiers.includes(f.idQuartier);
     });
   }
-
+  console.log(`[DELIVERIES] ${families.length} familles après filtrage par quartiers`);
   return families;
 }
 
@@ -176,16 +177,8 @@ function createDeliveryFromFamily(family, filters) {
     throw new Error(`Données famille invalides: ${validation.getErrorMessages().join(', ')}`);
   }
 
-  // 3. Géocoder l'adresse si nécessaire
-  let coords = {
-    latitude: familyDetails.latitude,
-    longitude: familyDetails.longitude
-  };
-
-  if (!coords.latitude || !coords.longitude) {
-    Logger.log(`[DELIVERIES] 🗺️ Géocodage de l'adresse: ${familyDetails.adresse}`);
-    coords = geocodeFamilyAddress(familyDetails);
-  }
+  Logger.log(`[DELIVERIES] 🗺️ Géocodage de l'adresse: ${familyDetails.adresse}`);
+  coords = geocodeFamilyAddress(familyDetails);
 
   // 4. Résoudre la hiérarchie géographique
   const location = resolveLocation(coords.latitude, coords.longitude);
@@ -205,8 +198,8 @@ function createDeliveryFromFamily(family, filters) {
   const distanceKm = distanceResult.distance || 0;
 
   // 6. Calculer nombre de personnes
-  const adultes = parseInt(familyDetails.adultes) || 0;
-  const enfants = parseInt(familyDetails.enfants) || 0;
+  const adultes = parseInt(familyDetails.nombreAdulte) || 0;
+  const enfants = parseInt(familyDetails.nombreEnfant) || 0;
   const nombrePersonnes = adultes + enfants;
 
   // 7. Déterminer le type d'aide
@@ -257,19 +250,18 @@ function createDeliveryFromFamily(family, filters) {
  */
 function geocodeFamilyAddress(family) {
   try {
-    const geocodeResult = geocodeAddress(
-      family.adresse,
-      family.ville,
-      family.codePostal
-    );
+    const geocodeResult = geocodeAddress(family.adresse);
 
-    if (!geocodeResult || !geocodeResult.latitude || !geocodeResult.longitude) {
+    // console.log(`[DELIVERIES] Résultat géocodage: ${JSON.stringify(geocodeResult)}`);
+
+    if (!geocodeResult?.coordinates?.latitude || !geocodeResult?.coordinates?.longitude) {
       throw new Error('Géocodage échoué - coordonnées manquantes');
     }
 
+    console.log(`[DELIVERIES] Géocodage réussi: ${family.adresse} → (${geocodeResult.coordinates.latitude}, ${geocodeResult.coordinates.longitude})`);
     return {
-      latitude: geocodeResult.latitude,
-      longitude: geocodeResult.longitude
+      latitude: geocodeResult.coordinates.latitude,
+      longitude: geocodeResult.coordinates.longitude
     };
 
   } catch (error) {

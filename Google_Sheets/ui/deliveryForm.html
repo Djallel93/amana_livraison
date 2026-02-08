@@ -395,19 +395,19 @@
             </div>
             <div class="checkbox-group" id="priorites-group">
               <div class="checkbox-item">
-                <input type="checkbox" id="prio1" name="priorite" value="1">
+                <input type="checkbox" id="prio1" name="priorite" value="1" checked>
                 <label for="prio1">1 - Urgent</label>
               </div>
               <div class="checkbox-item">
-                <input type="checkbox" id="prio2" name="priorite" value="2">
+                <input type="checkbox" id="prio2" name="priorite" value="2" checked>
                 <label for="prio2">2 - Haute</label>
               </div>
               <div class="checkbox-item">
-                <input type="checkbox" id="prio3" name="priorite" value="3">
+                <input type="checkbox" id="prio3" name="priorite" value="3" checked>
                 <label for="prio3">3 - Moyenne</label>
               </div>
               <div class="checkbox-item">
-                <input type="checkbox" id="prio4" name="priorite" value="4">
+                <input type="checkbox" id="prio4" name="priorite" value="4" checked>
                 <label for="prio4">4 - Basse</label>
               </div>
               <div class="checkbox-item">
@@ -432,7 +432,7 @@
                 <label for="zakat">🌙 Zakat El Fitr</label>
               </div>
               <div class="checkbox-item">
-                <input type="checkbox" id="sadaqa" name="type_aide" value="sadaqa" checked>
+                <input type="checkbox" id="sadaqa" name="type_aide" value="sadaqa">
                 <label for="sadaqa">💝 Sadaqa</label>
               </div>
               <div class="checkbox-item">
@@ -476,7 +476,7 @@
 
             <div class="form-group">
               <label for="nombre">Nombre maximum de livraisons à générer</label>
-              <input type="number" id="nombre" name="nombre" min="1" max="1000" value="50" required>
+              <input type="number" id="nombre" name="nombre" min="1" max="1000" value="500" required>
               <div class="help-text">
                 Si moins de familles correspondent aux critères, toutes seront sélectionnées
               </div>
@@ -609,8 +609,8 @@
 
       const quartiersSelect = document.getElementById('quartiers');
       const quartiers = Array.from(quartiersSelect.selectedOptions)
-        .map(opt => opt.value)
-        .filter(v => v !== '');
+        .map(opt => parseInt(opt.value))
+        .filter(v => !isNaN(v));
 
       const filters = {
         priorites: priorites,

@@ -28,9 +28,8 @@ const CONFIG = {
     },
     ENDPOINTS: {
       ALL_FAMILIES: 'allfamilies',
-      GET_FAMILY: 'getfamily',
+      GET_FAMILY: 'familybyid',
       PING: 'ping',
-      CONFIRM_FAMILY: 'confirmfamilyinfo'
     },
     CACHE_DURATION: 300 // 5 minutes en secondes
   },

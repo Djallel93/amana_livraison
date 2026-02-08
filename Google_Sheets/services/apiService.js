@@ -40,7 +40,8 @@ function callApiWithRetry(url, options = {}, cacheKey = null, cacheDuration = 30
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      Logger.log(`[API] 📡 Tentative ${attempt}/${maxRetries}: ${url}`);
+      // Logger.log(`[API] 📡 Tentative ${attempt}/${maxRetries}: ${url}`);
+      Logger.log(`[API] 📡 Tentative ${attempt}/${maxRetries}`);
 
       const response = UrlFetchApp.fetch(url, {
         muteHttpExceptions: true,
@@ -74,7 +75,8 @@ function callApiWithRetry(url, options = {}, cacheKey = null, cacheDuration = 30
         setCachedResponse(cacheKey, data, cacheDuration);
       }
 
-      Logger.log(`[API] ✅ Succès (${statusCode}): ${url}`);
+      // Logger.log(`[API] ✅ Succès (${statusCode}): ${url}`);
+      Logger.log(`[API] ✅ Succès (${statusCode})`);
       return data;
 
     } catch (error) {

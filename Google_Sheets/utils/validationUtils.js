@@ -301,8 +301,8 @@ function validateFamilyData(famille) {
   }
 
   // Vérifier nombre de personnes
-  const adultes = parseInt(famille.adultes) || 0;
-  const enfants = parseInt(famille.enfants) || 0;
+  const adultes = parseInt(famille.nombreAdulte) || 0;
+  const enfants = parseInt(famille.nombreEnfant) || 0;
   const total = adultes + enfants;
 
   if (total < 1) {
