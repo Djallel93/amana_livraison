@@ -1,19 +1,18 @@
 /**
  * ====================================================================
- * DELIVERY_SERVICE.GS - Service de Gestion des Livraisons (CORE)
+ * DELIVERY_SERVICE.GS - Service de Gestion des Livraisons
  * ====================================================================
- * Point d'entrée principal et orchestration
- * Fichier 1/3 - ~250 lignes
+ * Version ultra-simplifiée - idQuartier déjà dans family!
+ * ~200 lignes
  */
 
 /**
- * Génère des livraisons à partir des familles validées (VERSION OPTIMISÉE)
+ * Génère des livraisons à partir des familles validées
  * @param {Object} filters - Filtres de sélection
  * @returns {Object} Résultat de la génération
  */
 function generateDeliveries(filters) {
-  Logger.log('[DELIVERIES] 🚀 Démarrage génération des livraisons...');
-  Logger.log(`[DELIVERIES] Filtres: ${JSON.stringify(filters)}`);
+  Logger.log('[DELIVERIES] 🚀 Démarrage génération...');
 
   const result = {
     success: false,
@@ -24,199 +23,185 @@ function generateDeliveries(filters) {
   };
 
   try {
-    // 1. Récupérer les familles depuis l'API
+    // 1. Récupérer familles (sans orderBy - on trie nous-mêmes)
     const families = fetchEligibleFamilies(filters);
-    Logger.log(`[DELIVERIES] 📊 ${families.length} familles récupérées depuis l'API`);
+    Logger.log(`[DELIVERIES] 📊 ${families.length} familles récupérées`);
 
     if (families.length === 0) {
-      result.errors.push('Aucune famille ne correspond aux critères sélectionnés');
+      result.errors.push('Aucune famille ne correspond aux critères');
       return result;
     }
 
-    // 2. Limiter au nombre demandé
+    // 2. Limiter et filtrer
     const limit = filters.nombre || families.length;
-    const selectedFamilies = families.slice(0, limit);
-    Logger.log(`[DELIVERIES] 🎯 ${selectedFamilies.length} familles sélectionnées (limite: ${limit})`);
+    const selected = families.slice(0, limit);
 
-    // 3. Initialiser le compteur d'ID
-    const startingId = getNextIdNumber(CONFIG.SHEETS.LIVRAISON, 'L', CONFIG.COLUMNS.LIVRAISON.ID_LIVRAISON);
-    let currentIdNumber = startingId;
-    Logger.log(`[DELIVERIES] 🔢 ID de départ: L${String(startingId).padStart(3, '0')}`);
+    const toProcess = selected.filter(f => {
+      if (hasActiveLivraison(f.id)) {
+        result.skipped++;
+        return false;
+      }
+      return true;
+    });
 
-    // 4. Traiter par batches de 20 familles
+    Logger.log(`[DELIVERIES] ✅ ${toProcess.length} familles à traiter`);
+
+    if (toProcess.length === 0) {
+      result.success = true;
+      return result;
+    }
+
+    // 3. Traiter par batches de 20
     const BATCH_SIZE = 20;
-    const totalBatches = Math.ceil(selectedFamilies.length / BATCH_SIZE);
+    let currentId = getNextIdNumber(CONFIG.SHEETS.LIVRAISON, 'L', CONFIG.COLUMNS.LIVRAISON.ID_LIVRAISON);
 
-    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-      const batchStart = batchIndex * BATCH_SIZE;
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, selectedFamilies.length);
-      const batchFamilies = selectedFamilies.slice(batchStart, batchEnd);
+    for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
+      const batch = toProcess.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const total = Math.ceil(toProcess.length / BATCH_SIZE);
 
-      Logger.log(`[DELIVERIES] 📦 Batch ${batchIndex + 1}/${totalBatches} (${batchFamilies.length} familles)`);
+      Logger.log(`[DELIVERIES] 📦 Batch ${batchNum}/${total} (${batch.length} familles)`);
 
-      const batchResult = processBatch(batchFamilies, filters, currentIdNumber, result);
+      const deliveries = processBatch(batch, filters, currentId);
 
-      // Mettre à jour le compteur d'ID
-      currentIdNumber = batchResult.nextIdNumber;
+      if (deliveries.length > 0) {
+        result.created += deliveries.length;
+        result.deliveries.push(...deliveries);
+        currentId += deliveries.length;
+      }
 
-      Logger.log(`[DELIVERIES] ✅ Batch ${batchIndex + 1} terminé: ${batchResult.created} créées, ${batchResult.skipped} ignorées`);
+      Logger.log(`[DELIVERIES] ✅ Batch ${batchNum}: ${deliveries.length} créées`);
+    }
+
+    // 4. Trier TOUTES les livraisons par distance (plus loin en premier)
+    if (result.deliveries.length > 0) {
+      Logger.log(`[DELIVERIES] 🔄 Tri de ${result.deliveries.length} livraisons...`);
+      result.deliveries.sort((a, b) => {
+        const distDiff = (b._distance || 0) - (a._distance || 0);
+        if (distDiff !== 0) return distDiff;
+        return a.priorite - b.priorite; // Si même distance, priorité
+      });
+
+      // 5. Sauvegarder APRÈS le tri
+      saveDeliveriesToSheet(result.deliveries);
     }
 
     result.success = result.created > 0;
-
-    Logger.log('[DELIVERIES] ========================================');
-    Logger.log(`[DELIVERIES] ✅ Génération terminée`);
-    Logger.log(`[DELIVERIES] Créées: ${result.created}`);
-    Logger.log(`[DELIVERIES] Ignorées: ${result.skipped}`);
-    Logger.log(`[DELIVERIES] Erreurs: ${result.errors.length}`);
-    Logger.log('[DELIVERIES] ========================================');
+    Logger.log(`[DELIVERIES] 🎉 Terminé: ${result.created} créées, ${result.skipped} ignorées`);
 
     return result;
 
   } catch (error) {
-    Logger.log(`[DELIVERIES] ❌ Erreur critique: ${error.message}`);
-    result.errors.push(`Erreur critique: ${error.message}`);
+    Logger.log(`[DELIVERIES] ❌ Erreur: ${error.message}`);
+    result.errors.push(error.message);
     return result;
   }
 }
 
 /**
  * Traite un batch de familles
- * @param {Array} families - Batch de familles
- * @param {Object} filters - Filtres
- * @param {number} startingIdNumber - Numéro d'ID de départ
- * @param {Object} result - Objet résultat à mettre à jour
- * @returns {Object} {created, skipped, nextIdNumber}
  */
-function processBatch(families, filters, startingIdNumber, result) {
-  const batchResult = {
-    created: 0,
-    skipped: 0,
-    nextIdNumber: startingIdNumber
-  };
-
-  const deliveriesToCreate = [];
-
-  // Phase 1: Préparer les données (sans appels API lourds)
-  for (let i = 0; i < families.length; i++) {
-    const family = families[i];
-
-    try {
-      // Vérifier si la famille a déjà une livraison active (rapide)
-      if (hasActiveLivraison(family.id)) {
-        Logger.log(`[DELIVERIES] ⏭️ Famille ${family.id} a déjà une livraison active - ignorée`);
-        batchResult.skipped++;
-        continue;
-      }
-
-      deliveriesToCreate.push({
-        family: family,
-        idNumber: batchResult.nextIdNumber++
-      });
-
-    } catch (error) {
-      Logger.log(`[DELIVERIES] ❌ Erreur préparation famille ${family.id}: ${error.message}`);
-      result.errors.push(`Famille ${family.id}: ${error.message}`);
-    }
-  }
-
-  // Phase 2: Traiter les livraisons en parallèle (géocodage, etc.)
-  const processedDeliveries = processDeliveriesInParallel(deliveriesToCreate, filters);
-
-  // Phase 3: Sauvegarder toutes les livraisons du batch en une fois
-  if (processedDeliveries.length > 0) {
-    saveDeliveriesToSheet(processedDeliveries);
-    batchResult.created = processedDeliveries.length;
-    result.created += processedDeliveries.length;
-    result.deliveries.push(...processedDeliveries);
-  }
-
-  return batchResult;
-}
-
-/**
- * Traite plusieurs livraisons en parallèle
- * @param {Array} deliveriesToCreate - [{family, idNumber}]
- * @param {Object} filters - Filtres
- * @returns {Array} Livraisons créées
- */
-function processDeliveriesInParallel(deliveriesToCreate, filters) {
+function processBatch(families, filters, startId) {
   const deliveries = [];
 
-  // Récupérer tous les détails de familles
-  const familyIds = deliveriesToCreate.map(d => d.family.id);
-  const familyDetailsMap = fetchFamilyDetailsBatch(familyIds);
+  // 1. Géocoder toutes les adresses en batch
+  const addresses = families.map(f => f.adresse);
+  const geocoded = batchGeocode(addresses);
 
-  // Préparer toutes les adresses pour géocodage
-  const addressesToGeocode = [];
-  const deliveryIndexMap = new Map();
+  // 2. Créer les livraisons
+  families.forEach((family, index) => {
+    try {
+      const coords = geocoded[family.adresse];
 
-  deliveriesToCreate.forEach((item, index) => {
-    const familyDetails = familyDetailsMap[item.family.id];
-    if (familyDetails && familyDetails.adresse) {
-      addressesToGeocode.push(familyDetails.adresse);
-      deliveryIndexMap.set(familyDetails.adresse, index);
+      if (!coords || !coords.latitude || !coords.longitude) {
+        Logger.log(`[DELIVERIES] ⚠️ Famille ${family.id}: géocodage échoué`);
+        return;
+      }
+
+      const delivery = createDelivery(family, coords, filters, startId + index);
+      deliveries.push(delivery);
+
+    } catch (error) {
+      Logger.log(`[DELIVERIES] ❌ Famille ${family.id}: ${error.message}`);
     }
   });
-
-  // Géocoder toutes les adresses
-  const geocodedAddresses = geocodeAddressesBatch(addressesToGeocode);
-
-  // Créer les objets livraison
-  for (let i = 0; i < deliveriesToCreate.length; i++) {
-    const item = deliveriesToCreate[i];
-
-    try {
-      const delivery = createDeliveryObject(item, familyDetailsMap, geocodedAddresses, filters);
-      if (delivery) {
-        deliveries.push(delivery);
-      }
-    } catch (error) {
-      Logger.log(`[DELIVERIES] ❌ Erreur famille ${item.family.id}: ${error.message}`);
-    }
-  }
-
-  // Trier par distance avant de retourner
-  sortDeliveriesByDistance(deliveries);
 
   return deliveries;
 }
 
 /**
- * Récupère les familles éligibles depuis l'API
- * @param {Object} filters - Filtres
- * @returns {Array<Object>} Liste des familles
+ * Crée une livraison
+ */
+function createDelivery(family, coords, filters, idNumber) {
+  // Valider
+  const validation = validateFamilyData(family);
+  if (validation.hasErrors()) {
+    throw new Error(validation.getErrorMessages().join(', '));
+  }
+
+  // Calculer distance
+  const distance = calculateDistance(
+    CONFIG.HQ.LAT,
+    CONFIG.HQ.LNG,
+    coords.latitude,
+    coords.longitude
+  );
+
+  // Créer
+  const delivery = {
+    id_livraison: `L${String(idNumber).padStart(3, '0')}`,
+    id_famille: family.id,
+    id_quartier: family.idQuartier, // ← Déjà dans family!
+    adresse: family.adresse,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    disponibilite_debut: filters.date_livraison ? new Date(filters.date_livraison + ' 09:00:00') : null,
+    disponibilite_fin: filters.date_livraison ? new Date(filters.date_livraison + ' 18:00:00') : null,
+    nombre_personnes: (parseInt(family.nombreAdulte) || 0) + (parseInt(family.nombreEnfant) || 0),
+    statut: CONFIG.ENUMS.STATUT_LIVRAISON.NON_ASSIGNEE,
+    priorite: parseInt(family.criticite) || 5,
+    type_aide: filters.types_aide?.[0] || CONFIG.ENUMS.TYPE_AIDE.SADAQA,
+    besoins_speciaux: family.besoins_speciaux || '',
+    date_creation: getCurrentDateTime(),
+    date_modification: getCurrentDateTime(),
+    _distance: distance.distance || 0
+  };
+
+  // Valider
+  const deliveryValidation = validateLivraison(delivery);
+  if (deliveryValidation.hasErrors()) {
+    throw new Error(deliveryValidation.getErrorMessages().join(', '));
+  }
+
+  return delivery;
+}
+
+/**
+ * Récupère les familles éligibles
  */
 function fetchEligibleFamilies(filters) {
   const apiFilters = {
-    includeHierarchy: true
+    includeHierarchy: false // Pas besoin de hiérarchie complète
   };
 
-  // Filtrer par type d'aide
-  if (filters.types_aide && filters.types_aide.length > 0) {
-    if (filters.types_aide.includes('zakat')) {
-      apiFilters.zakatElFitr = true;
-    }
-    if (filters.types_aide.includes('sadaqa')) {
-      apiFilters.sadaqa = true;
-    }
+  // Type d'aide
+  if (filters.types_aide?.length > 0) {
+    if (filters.types_aide.includes('zakat')) apiFilters.zakatElFitr = true;
+    if (filters.types_aide.includes('sadaqa')) apiFilters.sadaqa = true;
   }
 
-  // Trier par distance depuis HQ
-  apiFilters.orderBy = 'distance';
-  apiFilters.lat = CONFIG.HQ.LAT;
-  apiFilters.lng = CONFIG.HQ.LNG;
+  // PAS de orderBy, lat, lng - on trie nous-mêmes!
 
   const response = getAllValidatedFamilies(apiFilters);
 
-  if (!response || !response.families) {
-    throw new Error('Erreur lors de la récupération des familles depuis l\'API');
+  if (!response?.families) {
+    throw new Error('Erreur récupération familles');
   }
 
   let families = response.families;
 
-  // Filtrer par priorité (criticité)
-  if (filters.priorites && filters.priorites.length > 0) {
+  // Filtrer par priorité
+  if (filters.priorites?.length > 0) {
     families = families.filter(f => {
       const criticite = parseInt(f.criticite) || 5;
       return filters.priorites.includes(criticite);
@@ -224,57 +209,39 @@ function fetchEligibleFamilies(filters) {
   }
 
   // Filtrer par quartiers
-  if (filters.quartiers && filters.quartiers.length > 0) {
-    families = families.filter(f => {
-      return filters.quartiers.includes(f.idQuartier);
-    });
+  if (filters.quartiers?.length > 0) {
+    families = families.filter(f => filters.quartiers.includes(f.idQuartier));
   }
 
   return families;
 }
 
 /**
- * Vérifie si une famille a déjà une livraison active (VERSION OPTIMISÉE)
- * @param {string} familyId - ID de la famille
- * @returns {boolean}
+ * Vérifie si famille a livraison active
  */
 function hasActiveLivraison(familyId) {
-  const sheet = getSheet(CONFIG.SHEETS.LIVRAISON);
   const data = getAllData(CONFIG.SHEETS.LIVRAISON);
+  const idCol = CONFIG.COLUMNS.LIVRAISON.ID_FAMILLE - 1;
+  const statCol = CONFIG.COLUMNS.LIVRAISON.STATUT - 1;
 
-  const idFamilleColIndex = CONFIG.COLUMNS.LIVRAISON.ID_FAMILLE - 1;
-  const statutColIndex = CONFIG.COLUMNS.LIVRAISON.STATUT - 1;
-
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i];
-    if (row[idFamilleColIndex] === familyId) {
-      const statut = row[statutColIndex];
-      const isActive = statut !== CONFIG.ENUMS.STATUT_LIVRAISON.LIVREE &&
-        statut !== CONFIG.ENUMS.STATUT_LIVRAISON.ANNULEE;
-
-      if (isActive) {
+  for (const row of data) {
+    if (row[idCol] === familyId) {
+      const statut = row[statCol];
+      if (statut !== CONFIG.ENUMS.STATUT_LIVRAISON.LIVREE &&
+        statut !== CONFIG.ENUMS.STATUT_LIVRAISON.ANNULEE) {
         return true;
       }
     }
   }
-
   return false;
 }
 
 /**
- * Obtient le prochain numéro d'ID
- * @param {string} sheetName - Nom de la feuille
- * @param {string} prefix - Préfixe (ex: 'L')
- * @param {number} colIndex - Index de la colonne
- * @returns {number} Prochain numéro (pas le full ID)
+ * Obtient prochain ID
  */
 function getNextIdNumber(sheetName, prefix, colIndex) {
-  const sheet = getSheet(sheetName);
   const data = getAllData(sheetName);
-
-  if (data.length === 0) {
-    return 1;
-  }
+  if (data.length === 0) return 1;
 
   const numbers = data
     .map(row => row[colIndex - 1])
@@ -282,6 +249,33 @@ function getNextIdNumber(sheetName, prefix, colIndex) {
     .map(id => parseInt(id.substring(prefix.length)))
     .filter(num => !isNaN(num));
 
-  const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
-  return maxNumber + 1;
+  return numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+}
+
+/**
+ * Sauvegarde livraisons
+ */
+function saveDeliveriesToSheet(deliveries) {
+  if (deliveries.length === 0) return;
+
+  const rows = deliveries.map(d => [
+    d.id_livraison,
+    d.id_famille,
+    d.id_quartier,
+    d.adresse,
+    d.latitude,
+    d.longitude,
+    d.disponibilite_debut,
+    d.disponibilite_fin,
+    d.nombre_personnes,
+    d.statut,
+    d.priorite,
+    d.type_aide,
+    d.besoins_speciaux,
+    d.date_creation,
+    d.date_modification
+  ]);
+
+  appendRows(CONFIG.SHEETS.LIVRAISON, rows);
+  Logger.log(`[DELIVERIES] 💾 ${rows.length} sauvegardées`);
 }

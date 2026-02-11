@@ -70,8 +70,10 @@ const CONFIG = {
     },
     ENDPOINTS: {
       GEOCODE: 'geocode',
+      BATCH_GEOCODE: 'batchgeocode',
       REVERSE_GEOCODE: 'reversegeocode',
       RESOLVE_LOCATION: 'resolvelocation',
+      BATCH_RESOLVE_LOCATION: 'batchresolvelocation',
       GET_VILLES: 'getvilles',
       GET_VILLE: 'getville',
       GET_SECTEURS: 'getsecteurs',
@@ -80,6 +82,7 @@ const CONFIG = {
       GET_QUARTIER: 'getquartier',
       QUARTIERS_BY_SECTEUR: 'quartiersbysecteur',
       CALCULATE_DISTANCE: 'calculatedistance',
+      BATCH_CALCULATE_DISTANCE: 'batchcalculatedistance',
       VALIDATE_VILLE: 'validateville',
       VALIDATE_SECTEUR: 'validatesecteur',
       VALIDATE_QUARTIER: 'validatequartier',

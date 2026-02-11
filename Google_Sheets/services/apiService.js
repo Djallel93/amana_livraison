@@ -203,7 +203,7 @@ function getAllValidatedFamilies(filters = {}) {
   const params = {
     action: CONFIG.API_FAMILLES.ENDPOINTS.ALL_FAMILIES,
     apiKey: CONFIG.API_FAMILLES.KEY,
-    includeHierarchy: true,
+    // includeHierarchy: true,
     ...filters
   };
 
@@ -547,4 +547,140 @@ function logApiStatus() {
   }
 
   Logger.log('========================================');
+}
+
+
+/**
+ * ====================================================================
+ * API_WRAPPERS.GS - Wrappers pour API Calls (à placer dans Code.gs)
+ * ====================================================================
+ */
+
+/**
+ * Wrapper pour l'API GEO - Batch Geocode
+ * @param {Array<string>} addresses - Adresses à géocoder
+ * @returns {Object} Response de l'API
+ */
+function callBatchGeocode(addresses) {
+    const apiKey = PropertiesService.getScriptProperties().getProperty('GEO_API_KEY');
+    const baseUrl = PropertiesService.getScriptProperties().getProperty('GEO_API_URL');
+
+    if (!apiKey || !baseUrl) {
+        throw new Error('Configuration API GEO manquante (GEO_API_KEY ou GEO_API_URL)');
+    }
+
+    const addressObjects = addresses.map(addr => ({ adresse: addr }));
+
+    const payload = {
+        action: 'batchgeocode',
+        adresses: addressObjects
+    };
+
+    const options = {
+        method: 'post',
+        muteHttpExceptions: true,
+        headers: { 'Content-Type': 'application/json' },
+        payload: JSON.stringify(payload)
+    };
+
+    const url = baseUrl + '?X-Api-Key=' + apiKey;
+
+    try {
+        const response = UrlFetchApp.fetch(url, options);
+        const responseCode = response.getResponseCode();
+
+        if (responseCode !== 200) {
+            throw new Error('API GEO error: HTTP ' + responseCode);
+        }
+
+        return JSON.parse(response.getContentText());
+    } catch (error) {
+        Logger.log('[API_WRAPPER] Erreur batch geocode: ' + error.message);
+        throw error;
+    }
+}
+
+/**
+ * Wrapper pour l'API GEO - Batch Resolve Location
+ * @param {Array<Object>} coordinates - [{lat, lng}, ...]
+ * @returns {Object} Response de l'API
+ */
+function callBatchResolveLocation(coordinates) {
+    const apiKey = PropertiesService.getScriptProperties().getProperty('GEO_API_KEY');
+    const baseUrl = PropertiesService.getScriptProperties().getProperty('GEO_API_URL');
+
+    if (!apiKey || !baseUrl) {
+        throw new Error('Configuration API GEO manquante (GEO_API_KEY ou GEO_API_URL)');
+    }
+
+    const payload = {
+        action: 'batchresolvelocation',
+        coordinates: coordinates
+    };
+
+    const options = {
+        method: 'post',
+        muteHttpExceptions: true,
+        headers: { 'Content-Type': 'application/json' },
+        payload: JSON.stringify(payload)
+    };
+
+    const url = baseUrl + '?X-Api-Key=' + apiKey;
+
+    try {
+        const response = UrlFetchApp.fetch(url, options);
+        const responseCode = response.getResponseCode();
+
+        if (responseCode !== 200) {
+            throw new Error('API GEO error: HTTP ' + responseCode);
+        }
+
+        return JSON.parse(response.getContentText());
+    } catch (error) {
+        Logger.log('[API_WRAPPER] Erreur batch resolve: ' + error.message);
+        throw error;
+    }
+}
+
+/**
+ * Wrapper pour l'API GEO - Batch Calculate Distance
+ * @param {Object} reference - {lat, lng} point de référence
+ * @param {Array<Object>} coordinates - [{lat, lng}, ...]
+ * @returns {Object} Response de l'API
+ */
+function callBatchCalculateDistance(reference, coordinates) {
+    const params = {
+        action: CONFIG.API_GEO.ENDPOINTS.BATCH_CALCULATE_DISTANCE,
+        adresse: adresse,
+        'X-Api-Key': CONFIG.API_GEO.KEY
+    };
+
+    const payload = {
+        action: 'batchcalculatedistance',
+        reference: reference,
+        coordinates: coordinates
+    };
+
+    const options = {
+        method: 'post',
+        muteHttpExceptions: true,
+        headers: { 'Content-Type': 'application/json' },
+        payload: JSON.stringify(payload)
+    };
+
+    const url = baseUrl + '?X-Api-Key=' + apiKey;
+
+    try {
+        const response = UrlFetchApp.fetch(url, options);
+        const responseCode = response.getResponseCode();
+
+        if (responseCode !== 200) {
+            throw new Error('API GEO error: HTTP ' + responseCode);
+        }
+
+        return JSON.parse(response.getContentText());
+    } catch (error) {
+        Logger.log('[API_WRAPPER] Erreur batch distance: ' + error.message);
+        throw error;
+    }
 }
