@@ -103,24 +103,46 @@ function calculerDistanceHaversine(lat1, lng1, lat2, lng2) {
 }
 
 /**
- * Calcule la distance totale d'une route
- * @param {Array} livraisons - Livraisons de la route
- * @returns {number} Distance en km
+ * 📏 Calculer la distance totale d'une route (including HQ departure/return)
+ * @param {Array} livraisons - Array of deliveries
+ * @param {Object} hqCoords - Optional HQ coordinates {lat, lng}
+ * @returns {Number} Total distance in km
  */
-function calculerDistanceTotaleRoute(livraisons) {
-    if (livraisons.length === 0) return 0;
+function calculerDistanceTotaleRoute(livraisons, hqCoords) {
+    if (!livraisons || livraisons.length === 0) return 0;
+
+    if (!hqCoords) {
+        const hqConfig = getCurrentHqConfig();
+
+        if (hqConfig && hqConfig.lat && hqConfig.lng) {
+            hqCoords = {
+                lat: hqConfig.lat,     // ✅ Correct
+                lng: hqConfig.lng      // ✅ Correct
+            };
+        } else {
+            Logger.log(`[ROUTES] ⚠️ HQ coordinates not found, using delivery-only distance`);
+            let distance = 0;
+            for (let i = 0; i < livraisons.length - 1; i++) {
+                distance += calculerDistanceHaversine(
+                    livraisons[i].latitude,
+                    livraisons[i].longitude,
+                    livraisons[i + 1].latitude,
+                    livraisons[i + 1].longitude
+                );
+            }
+            return distance;
+        }
+    }
 
     let distance = 0;
 
-    // Distance HQ → Première livraison
     distance += calculerDistanceHaversine(
-        CONFIG.HQ.LAT,
-        CONFIG.HQ.LNG,
+        hqCoords.lat,
+        hqCoords.lng,
         livraisons[0].latitude,
         livraisons[0].longitude
     );
 
-    // Distance entre chaque livraison
     for (let i = 0; i < livraisons.length - 1; i++) {
         distance += calculerDistanceHaversine(
             livraisons[i].latitude,
@@ -130,12 +152,11 @@ function calculerDistanceTotaleRoute(livraisons) {
         );
     }
 
-    // Distance dernière livraison → HQ (pour estimation)
     distance += calculerDistanceHaversine(
         livraisons[livraisons.length - 1].latitude,
         livraisons[livraisons.length - 1].longitude,
-        CONFIG.HQ.LAT,
-        CONFIG.HQ.LNG
+        hqCoords.lat,
+        hqCoords.lng
     );
 
     return distance;

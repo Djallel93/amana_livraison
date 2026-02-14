@@ -31,30 +31,6 @@ function getDeliveriesByStatus(status) {
 }
 
 /**
- * Récupère les livraisons d'une route
- * @param {string} routeId - ID de la route
- * @returns {Array<Object>}
- */
-function getDeliveriesForRoute(routeId) {
-    const etapes = filterData(CONFIG.SHEETS.ETAPES_ROUTE, function (row) {
-        return row.id_route === routeId;
-    });
-
-    const deliveries = [];
-    for (const etape of etapes) {
-        const delivery = getDeliveryById(etape.id_livraison);
-        if (delivery) {
-            delivery._ordre_passage = etape.ordre_passage;
-            deliveries.push(delivery);
-        }
-    }
-
-    deliveries.sort((a, b) => a._ordre_passage - b._ordre_passage);
-
-    return deliveries;
-}
-
-/**
  * Récupère les livraisons pour une date donnée
  * @param {Date} date - Date de livraison
  * @returns {Array<Object>}

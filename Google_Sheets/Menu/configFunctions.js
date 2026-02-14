@@ -134,7 +134,7 @@ function showHqAddressConfig() {
 function getCurrentHqConfig() {
   const props = PropertiesService.getScriptProperties();
   return {
-    address: props.getProperty('HQ_ADDRESS') || CONFIG.HQ.ADDRESS,
+    address: props.getProperty('HQ_ADRESSE') || CONFIG.HQ.ADDRESS,
     lat: parseFloat(props.getProperty('HQ_LAT')) || CONFIG.HQ.LAT,
     lng: parseFloat(props.getProperty('HQ_LNG')) || CONFIG.HQ.LNG
   };
@@ -145,7 +145,7 @@ function getCurrentHqConfig() {
  */
 function saveHqConfig(config) {
   const props = PropertiesService.getScriptProperties();
-  props.setProperty('HQ_ADDRESS', config.address);
+  props.setProperty('HQ_ADRESSE', config.address);
   props.setProperty('HQ_LAT', config.lat.toString());
   props.setProperty('HQ_LNG', config.lng.toString());
 

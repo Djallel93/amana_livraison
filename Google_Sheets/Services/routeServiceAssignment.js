@@ -1,124 +1,175 @@
 /**
- * ====================================================================
- * ROUTE_SERVICE_ASSIGNMENT.GS - Attribution aux Véhicules et Sauvegarde
- * ====================================================================
- * Contient : assignerClustersAuxVehicules(), saveRoute(), detectRemoteRoutes()
- * Responsabilité : Assigner les clusters aux bénévoles et sauvegarder les routes
- */
-
-/**
- * Assigne les clusters aux véhicules
- * @param {Array} clusters - Clusters géographiques
- * @param {Array} benevoles - Bénévoles disponibles
- * @param {Object} params - Paramètres
- * @returns {Array} Routes créées
+ * 🚗 Assigner les clusters aux véhicules (avec support multi-trips)
  */
 function assignerClustersAuxVehicules(clusters, benevoles, params) {
     const routes = [];
-    const clustersRestants = [...clusters]; // Copie
+    const clustersRestants = [...clusters];
     const maxLivraisonsParRoute = params.max_livraisons || 15;
 
-    // Trier les bénévoles par capacité véhicule (DESC)
+    // Get HQ coordinates
+    const hqConfig = getCurrentHqConfig();
+    const hqCoords = (hqConfig && hqConfig.lat && hqConfig.lng)
+        ? { lat: hqConfig.lat, lng: hqConfig.lng }
+        : null;
+
+    if (hqCoords) {
+        Logger.log(`[ROUTES] 🏢 HQ: ${hqConfig.address} (${hqCoords.lat}, ${hqCoords.lng})`);
+    } else {
+        Logger.log(`[ROUTES] ⚠️ HQ coordinates not configured`);
+    }
+
+    // Sort vehicles by capacity (largest first)
     benevoles.sort((a, b) => {
         const capA = a.vehicule ? (a.vehicule.capaciteKg || 0) : 0;
         const capB = b.vehicule ? (b.vehicule.capaciteKg || 0) : 0;
         return capB - capA;
     });
 
-    Logger.log(`[ROUTES] 🚗 Attribution des clusters aux ${benevoles.length} véhicules`);
+    Logger.log(`[ROUTES] 🚗 Starting assignment: ${benevoles.length} volunteers, ${clusters.length} clusters`);
 
-    for (const benevole of benevoles) {
-        if (clustersRestants.length === 0) break;
+    // Multi-trip logic: Keep going until all clusters assigned
+    let tripNumber = 1;
 
-        const capaciteVehicule = benevole.vehicule.capaciteKg || 0;
+    while (clustersRestants.length > 0) {
+        Logger.log(`[ROUTES] 🔄 Trip ${tripNumber}: ${clustersRestants.length} clusters remaining`);
 
-        const route = {
-            benevole: benevole,
-            livraisons: [],
-            clusters_assignes: [],
-            poids_total: 0,
-            distance_totale: 0
-        };
+        let assignedInThisTrip = 0;
 
-        // Prendre le cluster avec le PLUS de livraisons restantes
-        const clusterPrincipal = clustersRestants.shift();
-        route.livraisons.push(...clusterPrincipal.livraisons);
-        route.poids_total += clusterPrincipal.poids_total;
-        route.clusters_assignes.push(clusterPrincipal.id);
-
-        Logger.log(`[ROUTES]   Bénévole ${benevole.nom} (${benevole.vehicule.type}, ${capaciteVehicule}kg):`);
-        Logger.log(`[ROUTES]     • Cluster principal ${clusterPrincipal.id}: ${clusterPrincipal.nombre_livraisons} livraisons`);
-
-        // Essayer d'ajouter d'autres clusters pour maximiser la charge
-        const clustersAAjouter = [];
-
-        for (let i = 0; i < clustersRestants.length; i++) {
-            const autreCluster = clustersRestants[i];
-
-            const distanceEntreClusters = calculerDistanceHaversine(
-                clusterPrincipal.centre.lat,
-                clusterPrincipal.centre.lng,
-                autreCluster.centre.lat,
-                autreCluster.centre.lng
-            );
-
-            const DISTANCE_CLUSTER_MAX = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_CLUSTER_MAX_KM;
-            const DISTANCE_REGROUPE = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_REGROUPE_ELOIGNES_KM;
-
-            // Peut grouper si :
-            // - Distance < DISTANCE_CLUSTER_MAX km (clusters voisins)
-            // - OU les deux > DISTANCE_REGROUPE km du HQ (regrouper trajets longs)
-            const peutGrouper = (
-                distanceEntreClusters < DISTANCE_CLUSTER_MAX ||
-                (clusterPrincipal.distance_hq > DISTANCE_REGROUPE && autreCluster.distance_hq > DISTANCE_REGROUPE)
-            );
-
-            const nouveauPoids = route.poids_total + autreCluster.poids_total;
-            const nouvelleTaille = route.livraisons.length + autreCluster.nombre_livraisons;
-
-            if (peutGrouper &&
-                nouveauPoids <= capaciteVehicule &&
-                nouvelleTaille <= maxLivraisonsParRoute) {
-
-                clustersAAjouter.push({ index: i, cluster: autreCluster });
-                Logger.log(`[ROUTES]     • Ajout cluster ${autreCluster.id}: ${autreCluster.nombre_livraisons} livraisons (distance: ${Math.round(distanceEntreClusters)} km)`);
+        for (const benevole of benevoles) {
+            if (clustersRestants.length === 0) {
+                Logger.log(`[ROUTES] ✅ All clusters assigned after trip ${tripNumber}`);
+                break;
             }
+
+            Logger.log(`[ROUTES] 👤 ${benevole.nom} - Trip ${tripNumber}`);
+            Logger.log(`[ROUTES]    Remaining clusters: ${clustersRestants.length}`);
+
+            const capaciteVehicule = benevole.vehicule?.capaciteKg || 0;
+            Logger.log(`[ROUTES]    Vehicle: ${benevole.vehicule?.type}, capacity: ${capaciteVehicule}kg`);
+
+            const route = {
+                benevole: benevole,
+                livraisons: [],
+                clusters_assignes: [],
+                poids_total: 0,
+                distance_totale: 0,
+                trip_number: tripNumber
+            };
+
+            // Take the cluster with MOST deliveries
+            const clusterPrincipal = clustersRestants.shift();
+
+            if (!clusterPrincipal) {
+                Logger.log(`[ROUTES] ❌ No principal cluster available`);
+                continue;
+            }
+
+            // ✅ CHECK VEHICLE CAPACITY
+            if (capaciteVehicule > 0 && clusterPrincipal.poids_total > capaciteVehicule) {
+                Logger.log(`[ROUTES] ⚠️ Cluster ${clusterPrincipal.id} too heavy (${Math.round(clusterPrincipal.poids_total)}kg > ${capaciteVehicule}kg) - skipping`);
+                // Put it back at the end for next volunteer
+                clustersRestants.push(clusterPrincipal);
+                continue;
+            }
+
+            Logger.log(`[ROUTES]    ✅ Principal cluster ${clusterPrincipal.id}: ${clusterPrincipal.nombre_livraisons} deliveries, ${Math.round(clusterPrincipal.poids_total)}kg`);
+
+            route.livraisons.push(...clusterPrincipal.livraisons);
+            route.poids_total += clusterPrincipal.poids_total;
+            route.clusters_assignes.push(clusterPrincipal.id);
+
+            // Try to add more clusters if they fit
+            const clustersAAjouter = [];
+
+            for (let j = 0; j < clustersRestants.length; j++) {
+                const autreCluster = clustersRestants[j];
+
+                const distanceEntreClusters = calculerDistanceHaversine(
+                    clusterPrincipal.centre.lat,
+                    clusterPrincipal.centre.lng,
+                    autreCluster.centre.lat,
+                    autreCluster.centre.lng
+                );
+
+                const DISTANCE_CLUSTER_MAX = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_CLUSTER_MAX_KM;
+                const DISTANCE_REGROUPE = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_REGROUPE_ELOIGNES_KM;
+
+                const peutGrouper = (
+                    distanceEntreClusters < DISTANCE_CLUSTER_MAX ||
+                    (clusterPrincipal.distance_hq > DISTANCE_REGROUPE && autreCluster.distance_hq > DISTANCE_REGROUPE)
+                );
+
+                const nouveauPoids = route.poids_total + autreCluster.poids_total;
+                const nouvelleTaille = route.livraisons.length + autreCluster.nombre_livraisons;
+
+                // ✅ CHECK: fits capacity, fits max deliveries, and can be grouped
+                if (peutGrouper &&
+                    (capaciteVehicule === 0 || nouveauPoids <= capaciteVehicule) &&
+                    nouvelleTaille <= maxLivraisonsParRoute) {
+
+                    clustersAAjouter.push({ index: j, cluster: autreCluster });
+                    Logger.log(`[ROUTES]       + Adding cluster ${autreCluster.id}: ${autreCluster.nombre_livraisons} deliveries, ${Math.round(autreCluster.poids_total)}kg`);
+                }
+            }
+
+            // Add selected clusters
+            for (let k = clustersAAjouter.length - 1; k >= 0; k--) {
+                const { index, cluster } = clustersAAjouter[k];
+                route.livraisons.push(...cluster.livraisons);
+                route.poids_total += cluster.poids_total;
+                route.clusters_assignes.push(cluster.id);
+                clustersRestants.splice(index, 1);
+            }
+
+            // Calculate distance including HQ
+            route.distance_totale = calculerDistanceTotaleRoute(route.livraisons, hqCoords);
+
+            Logger.log(`[ROUTES]    📊 Final route: ${route.livraisons.length} deliveries, ${Math.round(route.poids_total)}kg, ${Math.round(route.distance_totale)}km`);
+
+            routes.push(route);
+            assignedInThisTrip++;
         }
 
-        // Ajouter les clusters sélectionnés
-        for (let i = clustersAAjouter.length - 1; i >= 0; i--) {
-            const { index, cluster } = clustersAAjouter[i];
-            route.livraisons.push(...cluster.livraisons);
-            route.poids_total += cluster.poids_total;
-            route.clusters_assignes.push(cluster.id);
-            clustersRestants.splice(index, 1);
+        // Safety check: if no clusters assigned in this trip, break to avoid infinite loop
+        if (assignedInThisTrip === 0 && clustersRestants.length > 0) {
+            Logger.log(`[ROUTES] ⚠️ CRITICAL: No clusters assigned in trip ${tripNumber}`);
+            Logger.log(`[ROUTES] ⚠️ Remaining clusters cannot fit in any vehicle:`);
+            clustersRestants.forEach(c => {
+                Logger.log(`[ROUTES]    ⚠️ Cluster ${c.id}: ${c.nombre_livraisons} deliveries, ${Math.round(c.poids_total)}kg`);
+            });
+            break;
         }
 
-        // Calculer la distance totale de la route
-        route.distance_totale = calculerDistanceTotaleRoute(route.livraisons);
+        tripNumber++;
 
-        Logger.log(`[ROUTES]     → Total: ${route.livraisons.length} livraisons, ${Math.round(route.poids_total)} kg, ${Math.round(route.distance_totale)} km`);
-
-        routes.push(route);
+        // Safety limit: max 5 trips per volunteer
+        if (tripNumber > 5) {
+            Logger.log(`[ROUTES] ⚠️ Max trips (5) reached, stopping assignment`);
+            break;
+        }
     }
 
-    // Avertir si des clusters restants
+    // Final report
     if (clustersRestants.length > 0) {
-        Logger.log(`[ROUTES] ⚠️ ${clustersRestants.length} clusters non assignés (manque de bénévoles/véhicules)`);
+        const unassignedDeliveries = clustersRestants.reduce((sum, c) => sum + c.nombre_livraisons, 0);
+        Logger.log(`[ROUTES] ⚠️ WARNING: ${clustersRestants.length} clusters NOT assigned (${unassignedDeliveries} deliveries)`);
+        clustersRestants.forEach(c => {
+            Logger.log(`[ROUTES]    ⚠️ Unassigned cluster ${c.id}: ${c.nombre_livraisons} deliveries, ${Math.round(c.poids_total)}kg`);
+        });
+    } else {
+        Logger.log(`[ROUTES] ✅ SUCCESS: All clusters assigned in ${tripNumber - 1} trip(s)`);
     }
+
+    Logger.log(`[ROUTES] ✅ Assignment complete: ${routes.length} routes created`);
 
     return routes;
 }
 
 /**
- * Sauvegarde une route dans Google Sheets
- * @param {Object} route - Route à sauvegarder
- * @param {Object} params - Paramètres
- * @returns {Object} Route sauvegardée avec ID
+ * 💾 Sauvegarder une route
  */
 function saveRoute(route, params) {
     try {
-        // Générer l'ID de la route (temporaire, sera réassigné après tri)
         const tempId = generateNextId(
             CONFIG.SHEETS.ROUTES,
             'R',
@@ -142,13 +193,11 @@ function saveRoute(route, params) {
             date_modification: getCurrentDateTime()
         };
 
-        // Valider
         const validation = validateRoute(routeData);
         if (validation.hasErrors()) {
             throw new Error(`Route invalide: ${validation.getErrorMessages().join(', ')}`);
         }
 
-        // Sauvegarder dans Sheets
         const rowData = [
             routeData.id_route,
             routeData.id_benevole,
@@ -166,14 +215,25 @@ function saveRoute(route, params) {
             routeData.date_modification
         ];
 
+        // Step 1: Save route
         appendRow(CONFIG.SHEETS.ROUTES, rowData);
+        Logger.log(`[ROUTES] ✅ Route ${tempId} saved to sheet`);
 
-        // Mettre à jour les livraisons : Non Assignée → Assignée
+        // Step 2: Create preliminary etapes
+        createPreliminaryEtapes(tempId, route.livraisons);
+        Logger.log(`[ROUTES] ✅ ${route.livraisons.length} etapes created`);
+
+        // Step 3: ONLY NOW update delivery status (after route and etapes successfully saved)
         for (const livraison of route.livraisons) {
-            updateDeliveryStatus(livraison.id_livraison, CONFIG.ENUMS.STATUT_LIVRAISON.ASSIGNEE);
+            const updated = updateDeliveryStatus(
+                livraison.id_livraison,
+                CONFIG.ENUMS.STATUT_LIVRAISON.ASSIGNEE
+            );
+            if (!updated) {
+                Logger.log(`[ROUTES] ⚠️ Failed to update status for ${livraison.id_livraison}`);
+            }
         }
-
-        Logger.log(`[ROUTES] ✅ Route ${tempId} sauvegardée`);
+        Logger.log(`[ROUTES] ✅ Updated status for ${route.livraisons.length} deliveries`);
 
         return {
             ...routeData,
@@ -183,29 +243,46 @@ function saveRoute(route, params) {
 
     } catch (error) {
         Logger.log(`[ROUTES] ❌ Erreur sauvegarde route: ${error.message}`);
+        Logger.log(`[ROUTES] ❌ Route NOT saved - deliveries NOT updated`);
         return null;
     }
 }
 
 /**
- * Détecte les routes éloignées
- * @param {Array} routes - Routes créées
- * @returns {Array} Avertissements
+ * 📝 Créer les étapes préliminaires pour une route
  */
-function detectRemoteRoutes(routes) {
-    const warnings = [];
-    const DISTANCE_ISOLEE = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_LIVRAISON_ISOLEE_KM;
+function createPreliminaryEtapes(routeId, livraisons) {
+    Logger.log(`[ROUTES] 📝 Création de ${livraisons.length} étapes préliminaires pour ${routeId}...`);
 
-    for (const route of routes) {
-        if (route.distance_totale_km > DISTANCE_ISOLEE) {
-            warnings.push({
-                type: 'remote_route',
-                id_route: route.id_route,
-                distance: route.distance_totale_km,
-                message: `Route ${route.id_route} très éloignée (${Math.round(route.distance_totale_km)} km)`
-            });
-        }
+    const rows = [];
+
+    for (let i = 0; i < livraisons.length; i++) {
+        const livraison = livraisons[i];
+        const etapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        // ✅ MATCH YOUR SHEET STRUCTURE: 8 columns only
+        const rowData = [
+            etapeId,                                    // 1. ID_ETAPE
+            routeId,                                    // 2. ID_ROUTE
+            livraison.id_livraison,                     // 3. ID_LIVRAISON
+            i + 1,                                      // 4. ORDRE_PASSAGE (temporary)
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,      // 5. STATUT
+            null,                                       // 6. HEURE_DEBUT
+            null,                                       // 7. HEURE_FIN
+            ''                                          // 8. COMMENTAIRE
+        ];
+
+        rows.push(rowData);
     }
 
-    return warnings;
+    // Batch append all etapes at once
+    if (rows.length > 0) {
+        const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
+        sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+        Logger.log(`[ROUTES] ✅ ${rows.length} étapes créées pour ${routeId}`);
+    }
 }
