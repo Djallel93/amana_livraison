@@ -1,4 +1,12 @@
 /**
+ * ====================================================================
+ * ROUTE_SERVICE_ASSIGNMENT.GS - Service d'Assignment des Routes
+ * ====================================================================
+ * Gestion de l'assignment des clusters aux véhicules
+ * Création et sauvegarde des routes
+ */
+
+/**
  * 🚗 Assigner les clusters aux véhicules (avec support multi-trips)
  */
 function assignerClustersAuxVehicules(clusters, benevoles, params) {
@@ -219,9 +227,9 @@ function saveRoute(route, params) {
         appendRow(CONFIG.SHEETS.ROUTES, rowData);
         Logger.log(`[ROUTES] ✅ Route ${tempId} saved to sheet`);
 
-        // Step 2: Create preliminary etapes
+        // Step 2: Create etapes (deliveries + HQ return)
         createPreliminaryEtapes(tempId, route.livraisons);
-        Logger.log(`[ROUTES] ✅ ${route.livraisons.length} etapes created`);
+        Logger.log(`[ROUTES] ✅ ${route.livraisons.length} delivery etapes + HQ return created`);
 
         // Step 3: ONLY NOW update delivery status (after route and etapes successfully saved)
         for (const livraison of route.livraisons) {
@@ -249,27 +257,33 @@ function saveRoute(route, params) {
 }
 
 /**
- * 📝 Créer les étapes préliminaires pour une route
+ * 📝 Créer les étapes pour une route (DELIVERIES + HQ RETURN)
+ * HQ return is added automatically as the last stop
+ * 
+ * 🐛 FIX: Generate UNIQUE id_etape for EACH row
  */
 function createPreliminaryEtapes(routeId, livraisons) {
-    Logger.log(`[ROUTES] 📝 Création de ${livraisons.length} étapes préliminaires pour ${routeId}...`);
+    Logger.log(`[ROUTES] 📝 Création de ${livraisons.length} étapes + HQ return pour ${routeId}...`);
 
+    const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
     const rows = [];
 
+    // 1. CREATE DELIVERY ETAPES
     for (let i = 0; i < livraisons.length; i++) {
         const livraison = livraisons[i];
+
+        // 🔧 FIX: Call generateNextId() FOR EACH ETAPE to get unique IDs
         const etapeId = generateNextId(
             CONFIG.SHEETS.ETAPES_ROUTE,
             'E',
             CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
         );
 
-        // ✅ MATCH YOUR SHEET STRUCTURE: 8 columns only
         const rowData = [
-            etapeId,                                    // 1. ID_ETAPE
+            etapeId,                                    // 1. ID_ETAPE (UNIQUE!)
             routeId,                                    // 2. ID_ROUTE
             livraison.id_livraison,                     // 3. ID_LIVRAISON
-            i + 1,                                      // 4. ORDRE_PASSAGE (temporary)
+            i + 1,                                      // 4. ORDRE_PASSAGE
             CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,      // 5. STATUT
             null,                                       // 6. HEURE_DEBUT
             null,                                       // 7. HEURE_FIN
@@ -277,12 +291,41 @@ function createPreliminaryEtapes(routeId, livraisons) {
         ];
 
         rows.push(rowData);
+        Logger.log(`[ROUTES]    ✅ Created ${etapeId} for ${livraison.id_livraison} (ordre ${i + 1})`);
     }
 
-    // Batch append all etapes at once
+    // 2. ADD HQ RETURN AS LAST STOP
+    const hqConfig = getCurrentHqConfig();
+
+    if (hqConfig && hqConfig.lat && hqConfig.lng) {
+        const hqEtapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        const hqCommentaire = `Retour au QG - ${hqConfig.address}`;
+
+        const hqRowData = [
+            hqEtapeId,
+            routeId,
+            null,
+            livraisons.length + 1,
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
+            null,
+            null,
+            hqCommentaire
+        ];
+
+        rows.push(hqRowData);
+        Logger.log(`[ROUTES]    🏢 Created ${hqEtapeId} for HQ RETURN (ordre ${livraisons.length + 1})`);
+    } else {
+        Logger.log(`[ROUTES]    ⚠️ HQ not configured - skipping HQ return`);
+    }
+
+    // 3. BATCH APPEND ALL ETAPES (deliveries + HQ return)
     if (rows.length > 0) {
-        const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
         sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-        Logger.log(`[ROUTES] ✅ ${rows.length} étapes créées pour ${routeId}`);
+        Logger.log(`[ROUTES] ✅ ${rows.length} étapes créées pour ${routeId} (${livraisons.length} livraisons + 1 HQ return)`);
     }
 }

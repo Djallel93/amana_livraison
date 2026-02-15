@@ -257,3 +257,60 @@ function getDeliveriesSummary() {
         averageDistance: stats.averageDistance
     };
 }
+
+/**
+ * 🏢 Check if a delivery ID represents an HQ return
+ * @param {string} deliveryId - ID to check
+ * @returns {boolean}
+ */
+function isHqReturnDeliveryId(deliveryId) {
+    return deliveryId === null || deliveryId === '' || deliveryId === undefined;
+}
+
+/**
+ * 📊 Get statistics for etapes including HQ returns
+ * @param {string} routeId - Route ID
+ * @returns {Object} Statistics
+ */
+function getRouteEtapesStatistics(routeId) {
+    const allEtapes = filterData(CONFIG.SHEETS.ETAPES_ROUTE, row => row.id_route === routeId);
+
+    const stats = {
+        total: allEtapes.length,
+        deliveries: 0,
+        hqReturns: 0,
+        byStatus: {}
+    };
+
+    allEtapes.forEach(etape => {
+        // Count by type
+        if (isHqReturnDeliveryId(etape.id_livraison)) {
+            stats.hqReturns++;
+        } else {
+            stats.deliveries++;
+        }
+
+        // Count by status
+        const status = etape.statut;
+        stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
+    });
+
+    return stats;
+}
+
+/**
+ * 📍 Get all etapes for a route including HQ returns
+ * @param {string} routeId - Route ID
+ * @param {boolean} includeHq - Include HQ return stops (default: true)
+ * @returns {Array<Object>} Array of etapes
+ */
+function getAllEtapesForRoute(routeId, includeHq = true) {
+    const allEtapes = filterData(CONFIG.SHEETS.ETAPES_ROUTE, row => row.id_route === routeId);
+
+    if (includeHq) {
+        return allEtapes;
+    }
+
+    // Filter out HQ returns
+    return allEtapes.filter(etape => !isHqReturnDeliveryId(etape.id_livraison));
+}

@@ -1,470 +1,571 @@
-# 📦 Système de Gestion des Livraisons AMANA
+# Projet de Gestion des Livraisons - Google Apps Script
 
-## 🎉 Bienvenue
+## 🎯 Vue d'Ensemble du Projet
 
-Ce package contient **tous les fichiers nécessaires** pour déployer le système complet de gestion des livraisons.
+Vous êtes un expert Google Apps Script. Votre mission est de développer un système complet de gestion des livraisons pour une association. Ce système permet de :
 
-**Version :** 1.0 - Toutes phases opérationnelles  
-**Date :** 04 Février 2026  
-**Fichiers inclus :** 20 fichiers
+1. **Générer des demandes de livraison** à partir de familles validées
+2. **Planifier des routes** pour les bénévoles en optimisant distance et capacité
+3. **Générer des étapes** et communiquer les itinéraires aux bénévoles
+4. **Générer des étiquettes** imprimables pour les colis
+5. **Suivre le statut** en temps réel via une API web
 
----
+## 📊 Modèle de Données (Google Sheets)
 
-## 📂 Structure du Package
+### Table 1 : `Livraison` (Demandes de livraison)
 
-```
-livraisons-amana-system/
-│
-├── Code.gs                    ← Point d'entrée principal + Menu
-├── config.gs                  ← Configuration centralisée
-│
-├── services/                  ← Logique métier (5 services)
-│   ├── apiService.gs          - Intégration APIs externes
-│   ├── deliveryService.gs     - Génération livraisons
-│   ├── routeService.gs        - Planification routes
-│   ├── stopService.gs         - Génération étapes
-│   └── labelService.gs        - Génération étiquettes
-│
-├── api/                       ← API Web pour bénévoles
-│   └── routeApi.gs            - Endpoints REST (doGet/doPost)
-│
-├── utils/                     ← Utilitaires (3 modules)
-│   ├── sheetUtils.gs          - CRUD Google Sheets
-│   ├── dateUtils.gs           - Manipulation dates
-│   └── validationUtils.gs     - Validation données
-│
-├── ui/                        ← Interfaces HTML (5 formulaires)
-│   ├── configApiKeys.html     - Configuration APIs
-│   ├── deliveryForm.html      - Génération livraisons
-│   ├── routeForm.html         - Planification routes
-│   ├── stopForm.html          - Génération étapes
-│   └── labelForm.html         - Génération étiquettes
-│
-└── Documentation/             ← Guides complets
-    ├── PROJET_COMPLET.md      - Vue d'ensemble complète
-    ├── DEPLOIEMENT.md         - Guide d'installation
-    ├── README.md              - Documentation Phase 1
-    └── PHASE2_README.md       - Documentation Phase 2
-```
+| Colonne             | Type     | Description                                                                      |
+| ------------------- | -------- | -------------------------------------------------------------------------------- |
+| id_livraison        | String   | Clé primaire (auto-incrémenté L001, L002...) - **String pour préfixes lisibles** |
+| id_famille          | String   | ID de la famille (depuis API Familles)                                           |
+| id_quartier         | String   | Quartier de la famille                                                           |
+| adresse             | String   | Adresse complète                                                                 |
+| latitude            | Float    | Coordonnées GPS                                                                  |
+| longitude           | Float    | Coordonnées GPS                                                                  |
+| disponibilite_debut | DateTime | Début de la fenêtre de disponibilité                                             |
+| disponibilite_fin   | DateTime | Fin de la fenêtre de disponibilité                                               |
+| nombre_personnes    | Integer  | Nombre total de personnes (adultes + enfants)                                    |
+| statut              | Enum     | **Non Assignée, Assignée, En Cours, Livrée, Annulée**                            |
+| priorite            | Integer  | 1-5 (1 = urgent, 5 = standard)                                                   |
+| type_aide           | String   | zakat/sadaqa/recolte                                                             |
+| besoins_speciaux    | String   | Notes spéciales (escaliers, code porte...)                                       |
+| date_creation       | DateTime | Date de création                                                                 |
+| date_modification   | DateTime | Dernière modification                                                            |
+
+**Note sur les IDs** : Tous les IDs sont en String (et non Integer) pour permettre des préfixes lisibles par humain (L001, R001, E001). Cela facilite grandement le débogage, les logs, et la communication avec les équipes terrain.
+
+**Relations** : 1 Livraison → 1 Famille (API externe), 1 Livraison → N Etapes_route
 
 ---
 
-## ⚡ Installation Rapide (15 minutes)
+### Table 2 : `routes` (Routes des bénévoles)
 
-### Étape 1️⃣ : Créer le Google Spreadsheet
+| Colonne            | Type     | Description                                              |
+| ------------------ | -------- | -------------------------------------------------------- |
+| id_route           | String   | Clé primaire (R001, R002...)                             |
+| id_benevole        | String   | ID du bénévole principal                                 |
+| id_binome          | String   | ID du binôme (optionnel)                                 |
+| id_vehicule_prete  | String   | ID du véhicule prêté (si applicable)                     |
+| date_debut         | Date     | Date de début de la route                                |
+| date_fin           | Date     | Date de fin (post-livraison, pour audit)                 |
+| occasion           | Enum     | **zakat_el_fitr, recolte, ponctuelle**                   |
+| statut             | Enum     | **Brouillon, Confirmée, En Cours, Terminée, Annulée**    |
+| distance_totale_km | Float    | Distance totale (calculée)                               |
+| poids_total_kg     | Float    | **Poids total transporté (calculé lors création route)** |
+| relivre            | Boolean  | true = retour au HQ, false = route linéaire              |
+| dossier_drive      | String   | URL du dossier Google Drive                              |
+| date_creation      | DateTime | Date de création                                         |
+| date_modification  | DateTime | Dernière modification                                    |
 
-1. Aller sur [Google Sheets](https://sheets.google.com)
-2. Créer un nouveau spreadsheet
-3. Le renommer : **"Gestion Livraisons AMANA"**
-
-### Étape 2️⃣ : Ouvrir l'éditeur Apps Script
-
-1. Dans le menu du spreadsheet : `Extensions > Apps Script`
-2. Une nouvelle fenêtre s'ouvre
-
-### Étape 3️⃣ : Importer les fichiers
-
-**Important :** Suivre l'ordre exact !
-
-#### A. Créer la structure de dossiers
-
-Dans l'éditeur Apps Script, créer ces dossiers :
-
-1. Cliquer sur `+` à côté de "Fichiers"
-2. Choisir "Dossier"
-3. Créer dans l'ordre :
-   - `services`
-   - `api`
-   - `utils`
-   - `ui`
-
-#### B. Importer les fichiers principaux (racine)
-
-1. Supprimer le fichier `Code.gs` par défaut
-2. Créer nouveau `Script` → nommer `Code.gs`
-3. Copier-coller le contenu de **Code.gs**
-4. Enregistrer (Ctrl+S)
-5. Répéter pour **config.gs**
-
-#### C. Importer les services/
-
-Pour chaque fichier .gs du dossier `services/` :
-
-1. Sélectionner le dossier `services`
-2. Cliquer `+` → `Script`
-3. Nommer exactement comme dans le ZIP
-4. Copier-coller le contenu
-5. Enregistrer
-
-**Fichiers à importer :**
-
-- apiService.gs
-- deliveryService.gs
-- routeService.gs
-- stopService.gs
-- labelService.gs
-
-#### D. Importer api/
-
-1. Sélectionner le dossier `api`
-2. Créer `routeApi.gs`
-3. Copier-coller le contenu
-
-#### E. Importer utils/
-
-Dans le dossier `utils`, créer :
-
-- sheetUtils.gs
-- dateUtils.gs
-- validationUtils.gs
-
-#### F. Importer ui/
-
-Pour chaque fichier .html du dossier `ui/` :
-
-1. Sélectionner le dossier `ui`
-2. Cliquer `+` → `HTML`
-3. Nommer exactement (avec .html)
-4. Copier-coller le contenu
-5. Enregistrer
-
-**Fichiers à importer :**
-
-- configApiKeys.html
-- deliveryForm.html
-- routeForm.html
-- stopForm.html
-- labelForm.html
-
-### Étape 4️⃣ : Initialiser le système
-
-1. Retourner dans le Google Spreadsheet
-2. Rafraîchir la page (F5)
-3. Un nouveau menu apparaît : **"📦 Gestion Livraisons AMANA"**
-4. Aller dans : `Aide > Initialiser Système`
-5. Cliquer **"Oui"**
-
-**Résultat :** 4 feuilles créées automatiquement :
-
-- Livraison
-- routes
-- etapes_route
-- tokens
-
-### Étape 5️⃣ : Configurer les API Keys
-
-1. Menu : `Configuration > Configurer API Keys`
-2. Remplir les 3 sections :
-
-**API Familles :**
-
-- URL : `https://script.google.com/.../exec`
-- Key : Votre clé API Familles
-
-**API Bénévoles :**
-
-- URL : `https://script.google.com/.../exec`
-- Key : Votre clé API Bénévoles
-
-**API GEO :**
-
-- URL : `https://script.google.com/.../exec`
-- Key : Votre clé API GEO
-
-1. Cliquer **"Enregistrer"**
-
-### Étape 6️⃣ : Tester les connexions
-
-1. Menu : `Synchronisation > Tester Connexion APIs`
-2. Vérifier que les 3 APIs répondent ✅✅✅
-
-### Étape 7️⃣ : Déployer l'API Web (Phase 6)
-
-1. Dans l'éditeur Apps Script
-2. Cliquer **"Déployer"** → **"Nouveau déploiement"**
-3. Type : **"Application Web"**
-4. Configuration :
-   - Description : `API Web Livraisons v1.0`
-   - Exécuter en tant que : **Moi**
-   - Qui a accès : **Tout le monde**
-5. Cliquer **"Déployer"**
-6. Copier l'URL de déploiement
-
-### Étape 8️⃣ : Configurer l'URL de l'API
-
-1. Dans l'éditeur Apps Script
-2. Ouvrir `Code.gs`
-3. Chercher la fonction `configureApiWebUrl()`
-4. Exécuter (Exécuter > configureApiWebUrl)
-5. Coller l'URL de déploiement
+**Relations** : 1 Route → 1 Bénévole (API externe), 1 Route → N Etapes_route
 
 ---
 
-## ✅ Vérification de l'Installation
+### Table 3 : `etapes_route` (Étapes individuelles)
 
-### Test Phase 2 : Génération Livraisons
+| Colonne       | Type     | Description                              |
+| ------------- | -------- | ---------------------------------------- |
+| id_etape      | String   | Clé primaire (E001, E002...)             |
+| id_route      | String   | Clé étrangère → routes                   |
+| id_livraison  | String   | Clé étrangère → Livraison                |
+| ordre_passage | Integer  | Séquence (1, 2, 3...)                    |
+| statut        | Enum     | **En Attente, En Cours, Livrée, Sautée** |
+| heure_debut   | DateTime | Début effectif de l'étape                |
+| heure_fin     | DateTime | Fin effectif de l'étape                  |
+| commentaire   | String   | Notes du bénévole                        |
 
-1. Menu : `Livraisons > Générer Livraisons`
-2. Configurer :
-   - Priorités : 1, 2, 3
-   - Type : Zakat
-   - Quartiers : Quelques quartiers
-   - Date : Demain
-   - Nombre : 10
-3. Cliquer **"Générer"**
+**Relations** : N Etapes → 1 Route, N Etapes → 1 Livraison
 
-**Résultat attendu :** Livraisons créées dans la feuille `Livraison`
+---
 
-### Test Phase 3 : Planification Routes
 
-1. Menu : `Routes > Planifier Routes`
-2. Configurer :
-   - Date : Même date que les livraisons
-   - Max livraisons : 15
-   - Occasion : Zakat El Fitr
-3. Cliquer **"Planifier"**
+## 🔄 Workflow Complet
 
-**Résultat attendu :** Routes créées dans `routes`
+### Étape 1 : Generate Deliveries (Générer les Livraisons)
 
-### Test Phase 4 : Génération Étapes
+**Menu** : `Livraisons > Générer Livraisons`
 
-1. Menu : `Routes > Générer Étapes`
-2. Sélectionner les routes en brouillon
-3. Cliquer **"Générer et Envoyer"**
+**Interface HTML** :
 
-**Résultat attendu :** Étapes créées + Emails envoyés
-
-### Test Phase 5 : Génération Étiquettes
-
-1. Menu : `Routes > Générer Étiquettes`
-2. Format : 7×3
-3. Sélectionner les routes confirmées
-4. Cliquer **"Générer"**
-
-**Résultat attendu :** Documents Google avec étiquettes
-
-### Test Phase 6 : API Web
-
-Dans un navigateur :
-
-```
-https://VOTRE_URL_DEPLOIEMENT?action=ping
+```txt
+Formulaire avec :
+- Sélecteur de priorités (checkboxes : 1, 2, 3, 4, 5)
+- Sélecteur de type d'aide (checkboxes : zakat, sadaqa, recolte)
+- Sélecteur multiple de quartiers (depuis API GEO)
+- Champ date unique (Date de livraison souhaitée)
+- Nombre de livraisons à générer (input number)
 ```
 
-**Résultat attendu :** `{"status":"ok",...}`
+**Logique Backend** :
+
+1. **Récupérer les familles validées** depuis l'API Familles avec les filtres sélectionnés
+2. Pour chaque famille récupérée :
+   - Vérifier qu'elle n'a pas déjà une livraison active (statut ≠ Livrée/Annulée)
+   - Récupérer adresse via `GET /getfamily?id=X`
+   - Géocoder l'adresse via API GEO : `GET /geocode?address=...`
+   - Résoudre la hiérarchie complète via : `GET /resolvelocation?lat=X&lng=Y`
+3. **Calculer distance depuis HQ** pour chaque famille via : `GET /calculatedistance?from=HQ&to=famille`
+4. **Trier les familles** : d'abord par distance (plus loin en premier), puis par priorité (1-5)
+5. **Créer les lignes Livraison** avec :
+   - `statut = "Non Assignée"` (important : pas encore assigné à un bénévole)
+   - `nombre_personnes = adultes + enfants` (depuis API Familles)
+   - Autres champs remplis depuis l'API
+6. **Logger les résultats** en français dans la console
+
+**Validation** :
+
+- Si aucune famille ne correspond aux filtres → popup d'avertissement
+- Si le nombre demandé > familles disponibles → créer seulement celles disponibles
 
 ---
 
-## 🎯 Fonctionnalités Disponibles
+### Étape 2 : Plan Routes (Planifier les Routes)
 
-### Phase 1 : Foundation ✅
+**Menu** : `Routes > Planifier Routes`
 
-- Configuration centralisée
-- Intégration 3 APIs externes
-- Cache intelligent
-- CRUD Google Sheets
-- Menu complet
+**Interface HTML** :
 
-### Phase 2 : Génération Livraisons ✅
+```txt
+Formulaire avec :
+- Sélecteur de date unique (date de livraison)
+- Nombre maximum de livraisons par bénévole (input number)
+- Sélecteur d'occasion (radio : zakat_el_fitr, recolte, ponctuelle)
+- Poids moyen par personne en kg (input number, ex: 5 kg)
 
-- Filtrage multi-critères
-- Géocodage automatique
-- Anti-doublons
-- Tri intelligent
+┌─ Véhicules Supplémentaires (Prêtés) ─────────┐
+│ (Véhicules prêtés par des bénévoles)         │
+│                                              │
+│ Type          Capacité (kg)  [Actions]       │
+│ [Monospace ▼] [500        ]  [Supprimer]     │
+│ [Berline   ▼] [400        ]  [Supprimer]     │
+│                                              │
+│ [+ Ajouter un véhicule prêté]                │
+└──────────────────────────────────────────────┘
 
-### Phase 3 : Planification Routes ✅
+┌─ Configuration des Binômes (Optionnel) ───────┐
+│ Bénévole Principal    Binôme                  │
+│ [Ahmed         ▼]     [Omar          ▼]       │
+│ [Fatima        ▼]     [Aucun         ▼]       │
+│                                               │
+│ [+ Ajouter un binôme]                         │
+└───────────────────────────────────────────────┘
 
-- Clustering géographique
-- Optimisation capacités
-- Attribution bénévoles
-- Détection routes éloignées
-
-### Phase 4 : Génération Étapes ✅
-
-- Optimisation TSP
-- Documents Google Drive
-- Emails bénévoles
-- Tokens sécurisés
-
-### Phase 5 : Génération Étiquettes ✅
-
-- QR codes intégrés
-- Format A4 configurable
-- Export imprimable
-
-### Phase 6 : API Web Mobile ✅
-
-- Endpoints REST
-- Démarrage routes
-- Confirmation livraisons
-- Gestion erreurs
-
----
-
-## 📚 Documentation Complète
-
-### Fichiers inclus
-
-1. **PROJET_COMPLET.md** - Vue d'ensemble complète du système
-2. **DEPLOIEMENT.md** - Guide détaillé de déploiement (étape par étape)
-3. **README.md** - Documentation technique Phase 1
-4. **PHASE2_README.md** - Documentation complète Phase 2
-
-### Consulter la documentation
-
-Ouvrir les fichiers `.md` avec :
-
-- Visual Studio Code
-- Notepad++
-- Tout éditeur de texte
-- Ou directement sur GitHub
-
----
-
-## 🆘 Dépannage
-
-### Problèmes Fréquents
-
-**❌ Le menu n'apparaît pas**
-→ Rafraîchir la page (F5)
-
-**❌ "Clés API manquantes"**
-→ Menu `Configuration > API Keys`
-
-**❌ Une API ne répond pas**
-→ Vérifier URL et clé API
-
-**❌ Les emails ne sont pas envoyés**
-→ Vérifier permissions Gmail dans Apps Script
-
-**❌ Erreur "Script not found"**
-→ Vérifier que tous les fichiers sont importés
-
-### Logs et Débogage
-
-**Voir les logs :**
-
-1. Éditeur Apps Script
-2. Menu : `Affichage > Journaux`
-
-**Format des logs :**
-
-```
-[DELIVERIES] 🚀 Démarrage génération...
-[ROUTES] ✅ Route R001 créée
-[API] 📡 GET /confirm_delivery
+Boutons : [Annuler] [Planifier Routes]
 ```
 
----
+**Logique Backend (CRITIQUE - Algorithme de Génération de Routes)** :
 
-## 📊 Spécifications Techniques
+#### **Préparation des données**
 
-### Modèle de Données
+1. Récupérer toutes les livraisons avec `statut = "Non Assignée"` pour la date sélectionnée
+2. Récupérer les bénévoles disponibles via API :
 
-**4 Feuilles Google Sheets :**
+   ```url
+   GET /listvolunteers?actif=true&statut=Validé
+   ```
 
-1. **Livraison** (15 colonnes)
-   - Statuts : Non Assignée, Assignée, En Cours, Livrée, Annulée
+3. Vérifier la disponibilité de chaque bénévole pour la date via :
 
-2. **routes** (14 colonnes)
-   - Statuts : Brouillon, Confirmée, En Cours, Terminée, Annulée
+   ```url
+   GET /getavailability?volunteerId=X
+   ```
 
-3. **etapes_route** (8 colonnes)
-   - Statuts : En Attente, En Cours, Livrée, Sautée
+4. Récupérer les capacités des véhicules via :
 
-4. **tokens** (4 colonnes)
-   - Expiration : 48 heures
+   ```url
+   GET /getvehicles
+   ```
 
-### APIs Externes Requises
+**IMPORTANT - Gestion des Véhicules** :
+Les bénévoles peuvent avoir :
 
-- **API Familles** v2.2 - CRUD familles
-- **API Bénévoles** v1.0 - Gestion bénévoles
-- **API GEO** v5.0 - Géocodage et distances
+- **Un véhicule personnel** (Citadine, Berline, Break, Monospace, Camion utilitaire)
+- **Un permis sans véhicule** (type "Permis", capacité 0 kg)
+- **Ni permis ni véhicule** (type "Sans permis", capacité 0 kg)
 
-### Technologies Utilisées
+**Véhicules prêtés** : Certains bénévoles prêtent leur véhicule à d'autres. Le système doit :
 
-- Google Apps Script (JavaScript ES5)
-- Google Sheets (base de données)
-- Google Drive (stockage documents)
-- Google Docs (génération documents)
-- Gmail (notifications)
-- HTML5 + CSS3 + JavaScript Vanilla
+- Identifier les véhicules disponibles à prêter
+- Les assigner aux bénévoles avec permis mais sans véhicule
+- Enregistrer l'attribution dans `id_vehicule_prete` de la table routes
 
----
+**Données exemple de GET /getvehicles** :
 
-## 🔐 Sécurité
+```json
+{
+  "vehicles": [
+    {"id": 1, "type": "Citadine", "capaciteKg": 250},
+    {"id": 2, "type": "Berline", "capaciteKg": 350},
+    {"id": 3, "type": "Break", "capaciteKg": 400},
+    {"id": 4, "type": "Monospace", "capaciteKg": 500},
+    {"id": 5, "type": "Camion utilitaire", "capaciteKg": 700},
+    {"id": 6, "type": "Permis", "capaciteKg": 0},
+    {"id": 7, "type": "Sans permis", "capaciteKg": 0}
+  ]
+}
+```
 
-### Permissions Requises
+#### **Règles de Génération de Routes (LOGIQUE EMPIRIQUE - PAR ORDRE DE PRIORITÉ)**
 
-Le script demande ces permissions :
+**IMPORTANT** : Cette logique est basée sur l'expérience terrain et optimise pour :
 
-- ✅ Google Sheets (lecture/écriture)
-- ✅ Google Drive (création dossiers/docs)
-- ✅ Gmail (envoi emails)
-- ✅ UrlFetchApp (appels APIs externes)
-
-**C'est normal et nécessaire.**
-
-### Protection des Données
-
-- Clés API stockées dans Script Properties (chiffré)
-- Tokens générés aléatoirement (32 caractères)
-- Expiration automatique tokens (48h)
-- Validation stricte à chaque requête
-
----
-
-## 📞 Support
-
-### Ressources
-
-- **PROJET_COMPLET.md** - Vue d'ensemble
-- **DEPLOIEMENT.md** - Guide installation
-- Logs dans Apps Script
-- Documentation Google Apps Script officielle
-
-### Contact
-
-Pour assistance technique, consulter :
-
-1. Les logs détaillés
-2. La documentation complète
-3. Tester chaque phase individuellement
+1. **Maximiser l'utilisation des gros véhicules** (remplir au maximum leur capacité)
+2. **Prioriser par nombre de livraisons** (pas par distance)
+3. **Regrouper les clusters éloignés** pour éviter plusieurs trajets longue distance
 
 ---
 
-## ✅ Checklist de Déploiement
+**RÈGLE 1** : Ignorer complètement le paramètre "confiance" (trusted) pour les livraisons AMANA
 
-- [ ] Spreadsheet créé
-- [ ] Tous les fichiers importés (20 fichiers)
-- [ ] Système initialisé (4 feuilles)
-- [ ] API Keys configurées
-- [ ] Connexions APIs testées ✅✅✅
-- [ ] API Web déployée
-- [ ] URL API Web configurée
-- [ ] Test Phase 2 (Livraisons) ✅
-- [ ] Test Phase 3 (Routes) ✅
-- [ ] Test Phase 4 (Étapes) ✅
-- [ ] Test Phase 5 (Étiquettes) ✅
-- [ ] Test Phase 6 (API Web) ✅
-- [ ] Formation utilisateurs
-- [ ] **Système en production** 🚀
+**RÈGLE 2** : Identifier les clusters géographiques
+
+```javascript
+// Grouper les livraisons par proximité
+function identifierClusters(livraisons) {
+  const clusters = [];
+  const DISTANCE_PROXIMITE = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_PROXIMITE_KM; // 3 km
+  
+  for (let livraison of livraisons) {
+    // Trouver un cluster existant à moins de 3 km
+    let clusterTrouve = clusters.find(c => 
+      calculerDistance(c.centre, livraison.coords) < DISTANCE_PROXIMITE
+    );
+    
+    if (clusterTrouve) {
+      clusterTrouve.livraisons.push(livraison);
+      clusterTrouve.poids_total += (livraison.nombre_personnes * poids_moyen_par_part);
+    } else {
+      // Créer nouveau cluster
+      clusters.push({
+        id: `C${clusters.length + 1}`,
+        centre: livraison.coords,
+        livraisons: [livraison],
+        quartier_id: livraison.id_quartier,
+        distance_hq: livraison.distance_from_hq,
+        poids_total: livraison.nombre_personnes * poids_moyen_par_part
+      });
+    }
+  }
+  
+  // IMPORTANT : Trier par NOMBRE DE LIVRAISONS (DESC), pas par distance
+  return clusters.sort((a, b) => b.livraisons.length - a.livraisons.length);
+}
+```
+
+**RÈGLE 3** : Prioriser par NOMBRE DE LIVRAISONS (pas par distance)
+
+- Cluster avec 10 livraisons à 7 km > Cluster avec 3 livraisons à 50 km
+- **La capacité du véhicule doit correspondre au volume de livraisons**
+
+**RÈGLE 4** : Attribution des véhicules (par capacité décroissante)
+
+```javascript
+// Trier véhicules par capacité DESC
+vehicules.sort((a, b) => b.capaciteKg - a.capaciteKg);
+
+for (let vehicule of vehicules) {
+  let route = {
+    livraisons: [],
+    poids_total: 0,
+    clusters_assignes: []
+  };
+  
+  // Prendre le cluster avec le PLUS de livraisons restantes
+  let clusterPrincipal = clusters_restants.shift(); // Le premier (plus de livraisons)
+  route.livraisons.push(...clusterPrincipal.livraisons);
+  route.poids_total += clusterPrincipal.poids_total;
+  route.clusters_assignes.push(clusterPrincipal.id);
+  
+  // RÈGLE IMPORTANTE : Maximiser l'utilisation du véhicule
+  // Essayer d'ajouter d'autres clusters tant que :
+  // 1. Capacité non dépassée
+  // 2. Distance entre clusters < 15 km OU tous sont éloignés (> 30 km)
+  
+  for (let autreCluster of clusters_restants) {
+    let distance_entre_clusters = calculerDistance(
+      clusterPrincipal.centre, 
+      autreCluster.centre
+    );
+    
+    // Peut grouper si :
+    // - Distance < 15 km (clusters voisins)
+    // - OU les deux > 30 km du HQ (regrouper trajets longs)
+    let peut_grouper = (
+      distance_entre_clusters < CONFIG.ROUTE_OPTIMIZATION.DISTANCE_CLUSTER_MAX_KM ||
+      (clusterPrincipal.distance_hq > 30 && autreCluster.distance_hq > 30)
+    );
+    
+    if (peut_grouper && 
+        (route.poids_total + autreCluster.poids_total) <= vehicule.capaciteKg &&
+        (route.livraisons.length + autreCluster.livraisons.length) <= max_livraisons) {
+      
+      route.livraisons.push(...autreCluster.livraisons);
+      route.poids_total += autreCluster.poids_total;
+      route.clusters_assignes.push(autreCluster.id);
+      
+      // Retirer du pool
+      clusters_restants = clusters_restants.filter(c => c.id !== autreCluster.id);
+    }
+  }
+  
+  // Créer la route
+  creerRoute(vehicule, route);
+}
+```
+
+**Exemple Concret** :
+
+- Camion (900 kg), Citadine (250 kg)
+- Cluster A : 6 livraisons, 90 kg, 50 km
+- Cluster B : 5 livraisons, 75 kg, 48 km
+- Cluster C : 4 livraisons, 60 kg, 45 km
+- Cluster D : 3 livraisons, 45 kg, 5 km
+
+**Attribution** :
+
+```txt
+Route R001 (Camion) : A + B + C (15 livraisons, 225 kg, ~140 km)
+  → Tous éloignés (> 30 km), donc groupés même si > 15 km entre eux
+  → Maximise utilisation camion (225/900 kg)
+Route R002 (Citadine) : D (3 livraisons, 45 kg, 5 km)
+```
+
+**RÈGLE 5** : Minimiser les relivres (retours au HQ)
+
+- Par défaut : `relivre = false` (route linéaire)
+- `relivre = true` uniquement si besoin matériel supplémentaire ou retour véhicule prêté
+
+**RÈGLE 6** : Respecter la capacité du véhicule
+
+```javascript
+if (route.poids_total_kg > vehicule.capaciteKg) {
+  // Popup d'avertissement à l'admin
+  Logger.log(`⚠️ AVERTISSEMENT : Route ${id_route} dépasse la capacité de ${vehicule.capaciteKg} kg`);
+  // Ne pas bloquer mais alerter
+}
+```
+
+**RÈGLE 7** : Binômes et véhicules prêtés
+
+- **GESTION ENTIÈREMENT MANUELLE** par l'admin
+- Bénévoles "Sans Permis" peuvent participer à d'autres tâches (tri, collecte)
+- Interface de sélection binôme et véhicules prêtés dans le formulaire
+- Aucune suggestion automatique, aucun popup
+
+**RÈGLE 8** : Détection des routes éloignées (après création)
+
+```javascript
+// Après création de toutes les routes
+for (let route of routes_creees) {
+  if (route.distance_totale_km > CONFIG.ROUTE_OPTIMIZATION.DISTANCE_LIVRAISON_ISOLEE_KM) {
+    // Popup informatif (route déjà créée)
+    afficherPopup(
+      "Route Éloignée Détectée",
+      `⚠️ Route ${route.id} est très éloignée (${route.distance_totale_km} km).
+      Voulez-vous la conserver ?`,
+      ["Confirmer", "Supprimer", "Modifier"]
+    );
+  }
+}
+```
+
+**RÈGLE 9** : Ordre des IDs de routes
+
+```javascript
+// Après création, trier par distance_totale DESC avant assignation IDs
+routes.sort((a, b) => b.distance_totale_km - a.distance_totale_km);
+
+// Assigner IDs : R001 = plus éloignée, R002 = deuxième, etc.
+routes.forEach((route, index) => {
+  route.id_route = `R${String(index + 1).padStart(3, '0')}`;
+});
+```
+
+**Algorithme simplifié** :
+
+```javascript
+1. Identifier les clusters géographiques (fonction identifierClusters)
+   → Trier par NOMBRE DE LIVRAISONS (DESC), pas par distance
+
+2. Détecter les clusters éloignés (pour popup ultérieur)
+   → Marquer si distance HQ > CONFIG.DISTANCE_LIVRAISON_ISOLEE_KM (30 km)
+
+3. Trier véhicules par capacité (DESC) : Camion > Monospace > Berline > Citadine
+
+4. Pour chaque véhicule disponible :
+   a. Prendre le cluster avec le PLUS de livraisons restantes
+   b. Essayer d'ajouter d'autres clusters pour maximiser la charge si :
+      - Capacité non dépassée
+      - Distance entre clusters < 15 km OU tous > 30 km du HQ
+      - Nombre total livraisons < max_livraisons
+   c. Calculer poids_total_kg de la route :
+      poids_total_kg = Σ(nombre_personnes × poids_moyen_par_part)
+   d. Créer route avec statut "Brouillon"
+   e. Remplir id_vehicule_prete si applicable
+   f. Mettre à jour les livraisons : statut → "Assignée"
+
+5. Trier routes par distance_totale_km (DESC)
+   → Assigner IDs : R001 = plus éloignée, R002, R003...
+
+6. Pour chaque route > 30 km :
+   → Popup : "Route R001 très éloignée (45 km). Confirmer ?"
+      [Confirmer] [Supprimer] [Modifier]
+
+7. Créer dossier Google Drive : 
+   Routes/YYYYMMdd_{occasion}/
+```
+
+**Transition de statut** :
+
+- Livraisons : `Non Assignée` → `Assignée` (dès que la route est créée en mode Brouillon)
+- Routes : créées avec `statut = "Brouillon"`
+- Ordre IDs : R001 = route la plus éloignée
 
 ---
 
-## 🎉 Félicitations
+### Étape 3 : Generate Stops (Générer les Étapes)
 
-Une fois l'installation terminée, vous aurez un **système complet et opérationnel** de gestion des livraisons avec :
+**Menu** : `Routes > Générer Étapes`
 
-✨ Génération automatique des livraisons  
-✨ Planification optimisée des routes  
-✨ Génération des itinéraires  
-✨ Étiquettes avec QR codes  
-✨ Suivi temps réel via mobile  
+**Interface HTML** :
 
-**Système développé avec ❤️ pour AMANA**  
-**Version 1.0 - Février 2026**
+```txt
+Liste des routes en statut "Brouillon" :
+- Checkbox pour sélectionner les routes à traiter
+- Bouton "Générer et Envoyer"
+```
+
+**Logique Backend** :
+
+#### **Optimisation de l'ordre des étapes**
+
+**PRIORITÉ 1** : Respecter les fenêtres de disponibilité
+
+```javascript
+// Trier les livraisons par disponibilite_debut (plus tôt en premier)
+stops.sort((a, b) => a.disponibilite_debut - b.disponibilite_debut);
+```
+
+**PRIORITÉ 2** : Optimiser la distance totale (TSP simplifié)
+
+- Utiliser un algorithme nearest-neighbor :
+
+```javascript
+1. Départ = HQ
+2. Répéter :
+   - Trouver la livraison non visitée la plus proche
+   - Ajouter comme prochaine étape
+   - Mettre à jour position actuelle
+3. Si relivre = true : retour au HQ
+```
+
+**PRIORITÉ 3** : Réorganisation manuelle
+
+- **Pas d'interface drag-and-drop** : l'admin réorganisera directement dans Google Sheets
+- Modifier la colonne `ordre_passage` dans la feuille `etapes_route`
+- Possibilité d'ajouter/supprimer des étapes manuellement
+
+#### **Création des étapes**
+
+1. Pour chaque livraison de la route :
+   - Créer une ligne dans `etapes_route`
+   - `ordre_passage` = séquence calculée (1, 2, 3...)
+   - `statut = "En Attente"`
+
+2. **Générer documents Google** :
+   - **1 Google Doc par route** : `Route_R001.gdoc`
+   - Contenu : tableau avec adresses, horaires, notes
+   - **1 fiche d'étiquettes A4** par route (voir section Labels)
+
+3. **Envoyer email HTML au bénévole** :
+   - Template HTML stocké dans `/templates/email_route.html`
+   - CSS commun dans `/templates/styles.css`
+   - Langue : **Français uniquement**
+   - Contenu :
+     - Récapitulatif de la route (nombre d'arrêts, poids total, distance)
+     - **Lien Google Maps pour toute la route** (incluant HQ au début et à la fin si relivre=true)
+       - Format : `https://www.google.com/maps/dir/[HQ]/[Adresse1]/[Adresse2]/.../[AdresseN]/[HQ si relivre]`
+       - Exemple : `https://www.google.com/maps/dir/319+Rte+de+Vannes,+44800+Saint-Herblain/Château+d'eau+de+la+Contrie,+44100+Nantes/6+Rue+Jean+Baptiste+Delambre,+44100+Nantes/...`
+     - Tableau des arrêts avec adresses cliquables individuelles (Google Maps par étape)
+     - Boutons d'action (voir section API Web)
+   - **Envoi direct** (pas de revue par l'admin)
+
+4. **Mettre à jour le statut** :
+   - Routes : `Brouillon` → `Confirmée`
 
 ---
 
-**Bon déploiement ! 🚀**
+### Étape 4 : Generate Labels (Générer les Étiquettes)
+
+**Menu** : `Routes > Générer Étiquettes`
+
+**Interface HTML** :
+
+```txt
+Formulaire avec :
+- Sélecteur de routes (multiples, statut = Confirmed)
+- Configuration du format :
+  * Nombre de lignes (input number, défaut: 7)
+  * Nombre de colonnes (input number, défaut: 3)
+- Aperçu du format (21 étiquettes par A4)
+- Bouton "Générer"
+```
+
+**Logique Backend** :
+
+1. Pour chaque route sélectionnée :
+   - Récupérer toutes les étapes (livraisons)
+   - Pour chaque livraison avec `parts = N` :
+     - Créer `N` étiquettes identiques
+
+2. **Format de l'étiquette (recto)** :
+
+```txt
+┌─────────────────────────┐
+│ R_001  F_12345          │
+│                         │
+│                         │
+│                      1/3│
+└─────────────────────────┘
+```
+
+- **Gauche** : `R_` + id_route (en **grande police**, ex: 16pt, gras)
+- **Droite** : `F_` + id_famille (en **grande police**, ex: 16pt, gras)
+- **En bas à droite** : `X/Y` (numéro part / total parts, en **petite police**, ex: 10pt)
+- **Centre** : vide (espace pour écriture manuelle si besoin)
+
+1. **Format de l'étiquette (verso - avec QR Code)** :
+
+```txt
+┌─────────────────────────┐
+│                         │
+│      [QR CODE]          │
+│                         │
+│  Scan pour confirmer    │
+└─────────────────────────┘
+```
+
+***⚠️ DÉCISION : Implémenter Option A (QR sur le recto)***
+
+- QR code intégré sur le **recto** de l'étiquette (solution la plus simple)
+- Position : coin supérieur droit ou en bas, selon préférence
+- Évite les problèmes d'alignement recto-verso
+
+**Génération du QR Code** :
+
+- URL à encoder : même que dans l'email de confirmation
+- Exemple : `https://your-api.com/confirm-delivery?token=abc123&etape=E001`
+- Bibliothèque : utiliser Google Charts API
+
+```javascript
+const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=150x150&chl=${encodeURIComponent(confirmUrl)}`;
+```
+
+1. **Génération du Google Doc** :
+
+- Créer un Google Doc avec tableau `rows x cols`
+- Insérer les étiquettes
+- **Facile à découper** : bordures pointillées entre étiquettes
+- Sauvegarder dans `Routes/YYYYMMdd_{occasion}/Labels_R001.gdoc`
+
+---

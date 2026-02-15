@@ -18,7 +18,7 @@ function generateStops(params) {
     }
     const route = routeData[0];
 
-    // 2. Get deliveries for this route
+    // 2. Get deliveries for this route (excluding HQ returns)
     const deliveries = getDeliveriesForRoute(routeId);
     Logger.log(`[STOPS] 📦 ${deliveries.length} livraisons trouvées pour ${routeId}`);
 
@@ -28,7 +28,7 @@ function generateStops(params) {
 
     // 3. Get existing etapes (excluding HQ returns from previous runs)
     let etapes = filterData(CONFIG.SHEETS.ETAPES_ROUTE, row =>
-      row.id_route === routeId && row.id_livraison !== ''
+      row.id_route === routeId && row.id_livraison !== null && row.id_livraison !== ''
     );
     Logger.log(`[STOPS] 📍 ${etapes.length} étapes de livraison trouvées`);
 
@@ -74,27 +74,30 @@ function generateStops(params) {
       }
     }
 
-    // 7. CREATE HQ RETURN STOP
+    // 7. CREATE HQ RETURN STOP (with NULL id_livraison and address in commentaire)
     const hqEtapeId = generateNextId(
       CONFIG.SHEETS.ETAPES_ROUTE,
       'E',
       CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
     );
 
-    // ✅ MATCH YOUR SHEET STRUCTURE: 8 columns only
+    // ✅ Use NULL for id_livraison and preserve HQ address in commentaire
+    const hqCommentaire = `Retour au QG - ${HQ_COORDS.adresse}`;
+
     const hqRowData = [
       hqEtapeId,                                  // 1. ID_ETAPE
       routeId,                                    // 2. ID_ROUTE
-      '',                                         // 3. ID_LIVRAISON (empty for HQ)
+      null,                                       // 3. ID_LIVRAISON (NULL for HQ return)
       optimizedOrder.length + 1,                  // 4. ORDRE_PASSAGE (last stop)
       CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,      // 5. STATUT
       null,                                       // 6. HEURE_DEBUT
       null,                                       // 7. HEURE_FIN
-      'Retour au QG'                              // 8. COMMENTAIRE
+      hqCommentaire                               // 8. COMMENTAIRE (preserves HQ address)
     ];
 
     appendRow(CONFIG.SHEETS.ETAPES_ROUTE, hqRowData);
     Logger.log(`[STOPS] 🏢 Étape de retour au QG créée: ${hqEtapeId} (ordre ${hqRowData[3]})`);
+    Logger.log(`[STOPS] 📍 HQ préservé dans commentaire: ${hqCommentaire}`);
 
     // 8. Calculate total distance (including return to HQ)
     const totalDistance = calculateTotalDistanceWithHQ(optimizedOrder, HQ_COORDS);
@@ -142,12 +145,12 @@ function generateStops(params) {
 }
 
 /**
- * 📦 Get deliveries for a specific route
+ * 📦 Get deliveries for a specific route (excludes HQ returns)
  */
 function getDeliveriesForRoute(routeId) {
-  // Get etapes for this route (excluding HQ returns)
+  // Get etapes for this route (excluding HQ returns - NULL id_livraison)
   const etapes = filterData(CONFIG.SHEETS.ETAPES_ROUTE, row =>
-    row.id_route === routeId && row.id_livraison !== ''
+    row.id_route === routeId && row.id_livraison !== null && row.id_livraison !== ''
   );
 
   if (etapes.length === 0) {
@@ -162,4 +165,55 @@ function getDeliveriesForRoute(routeId) {
   const deliveries = allDeliveries.filter(d => deliveryIds.includes(d.id_livraison));
 
   return deliveries;
+}
+
+/**
+ * 🏢 Check if an etape is an HQ return stop
+ * @param {Object} etape - Etape object
+ * @returns {boolean}
+ */
+function isHqReturnStop(etape) {
+  return etape.id_livraison === null || etape.id_livraison === '';
+}
+
+/**
+ * 🏢 Extract HQ address from commentaire field
+ * @param {string} commentaire - Commentaire text
+ * @returns {string|null} - Extracted address or null
+ */
+function extractHqAddressFromCommentaire(commentaire) {
+  if (!commentaire) return null;
+
+  const match = commentaire.match(/Retour au QG - (.+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * 📍 Get HQ coordinates for an etape
+ * For HQ return stops, returns current HQ config
+ * For delivery stops, returns delivery coordinates
+ * @param {Object} etape - Etape object
+ * @returns {Object} {lat, lng, adresse}
+ */
+function getEtapeCoordinates(etape) {
+  if (isHqReturnStop(etape)) {
+    const hqConfig = getCurrentHqConfig();
+    return {
+      lat: hqConfig.lat,
+      lng: hqConfig.lng,
+      adresse: hqConfig.address
+    };
+  }
+
+  // Get delivery coordinates
+  const delivery = getDeliveryById(etape.id_livraison);
+  if (!delivery) {
+    throw new Error(`Livraison ${etape.id_livraison} introuvable`);
+  }
+
+  return {
+    lat: delivery.latitude,
+    lng: delivery.longitude,
+    adresse: delivery.adresse
+  };
 }

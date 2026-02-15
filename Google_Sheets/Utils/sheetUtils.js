@@ -233,26 +233,48 @@ function filterData(sheetName, predicate) {
  * @param {number} colIndex - Index de la colonne contenant les IDs
  * @returns {string} Nouvel ID (ex: 'L001', 'R042')
  */
+
+// Global cache for ID counters (persists during execution)
+const ID_COUNTER_CACHE = {};
+
 function generateNextId(sheetName, prefix, colIndex) {
-  const sheet = getSheet(sheetName);
-  const data = getAllData(sheetName);
+    // Create a cache key for this sheet/prefix combination
+    const cacheKey = `${sheetName}_${prefix}`;
+    
+    // If we haven't cached this counter yet, read from sheet
+    if (ID_COUNTER_CACHE[cacheKey] === undefined) {
+        const data = getAllData(sheetName);
+        
+        if (data.length === 0) {
+            ID_COUNTER_CACHE[cacheKey] = 1;
+        } else {
+            // Extract existing numbers
+            const numbers = data
+                .map(row => row[colIndex - 1])
+                .filter(id => id && typeof id === 'string' && id.startsWith(prefix))
+                .map(id => parseInt(id.substring(prefix.length)))
+                .filter(num => !isNaN(num));
+            
+            const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+            ID_COUNTER_CACHE[cacheKey] = maxNumber + 1;
+        }
+    }
+    
+    // Get current counter and increment for next call
+    const currentNumber = ID_COUNTER_CACHE[cacheKey];
+    ID_COUNTER_CACHE[cacheKey]++;
+    
+    // Format with padding (ex: 001, 042)
+    return `${prefix}${String(currentNumber).padStart(3, '0')}`;
+}
 
-  if (data.length === 0) {
-    return `${prefix}001`; // Premier ID
-  }
-
-  // Extraire les numéros existants
-  const numbers = data
-    .map(row => row[colIndex - 1])
-    .filter(id => id && typeof id === 'string' && id.startsWith(prefix))
-    .map(id => parseInt(id.substring(prefix.length)))
-    .filter(num => !isNaN(num));
-
-  const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
-  const nextNumber = maxNumber + 1;
-
-  // Formater avec padding (ex: 001, 042)
-  return `${prefix}${String(nextNumber).padStart(3, '0')}`;
+/**
+ * 🔄 OPTIONAL: Reset the ID counter cache
+ * Call this if you need to force re-reading from sheet
+ */
+function resetIdCounterCache() {
+    Object.keys(ID_COUNTER_CACHE).forEach(key => delete ID_COUNTER_CACHE[key]);
+    Logger.log('[CACHE] ID counter cache reset');
 }
 
 /**

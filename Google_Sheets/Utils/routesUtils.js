@@ -6,7 +6,12 @@ function resetOrphanedDeliveries() {
     Logger.log('[CLEANUP] 🧹 Starting orphan cleanup...');
 
     const allEtapes = getAllDataAsObjects(CONFIG.SHEETS.ETAPES_ROUTE);
-    const etapeDeliveryIds = new Set(allEtapes.map(e => e.id_livraison));
+    // Filter out HQ returns (NULL id_livraison) when building the set
+    const etapeDeliveryIds = new Set(
+        allEtapes
+            .filter(e => e.id_livraison !== null && e.id_livraison !== '')
+            .map(e => e.id_livraison)
+    );
 
     const assignedDeliveries = filterData(CONFIG.SHEETS.LIVRAISON, row =>
         row.statut === CONFIG.ENUMS.STATUT_LIVRAISON.ASSIGNEE
@@ -108,35 +113,53 @@ function optimizeRouteOrder(deliveries) {
 
 /**
  * 📏 Calculate total distance including return to HQ
+ * Handles both delivery objects and etape objects
+ * @param {Array} items - Array of deliveries or etapes
+ * @param {Object} hqCoords - HQ coordinates {lat, lng}
+ * @returns {number} Total distance in km
  */
-function calculateTotalDistanceWithHQ(deliveries, hqCoords) {
-    if (deliveries.length === 0) return 0;
+function calculateTotalDistanceWithHQ(items, hqCoords) {
+    if (!items || items.length === 0) return 0;
+
+    if (!hqCoords) {
+        const hqConfig = getCurrentHqConfig();
+        if (hqConfig && hqConfig.lat && hqConfig.lng) {
+            hqCoords = {
+                lat: hqConfig.lat,
+                lng: hqConfig.lng
+            };
+        } else {
+            Logger.log(`[ROUTES] ⚠️ HQ coordinates not found, using delivery-only distance`);
+            return calculateItemsDistance(items);
+        }
+    }
 
     let totalDistance = 0;
 
-    // Distance from HQ to first delivery
+    // Distance from HQ to first item
+    const firstItem = items[0];
     totalDistance += calculerDistanceHaversine(
         hqCoords.lat,
         hqCoords.lng,
-        deliveries[0].latitude,
-        deliveries[0].longitude
+        firstItem.latitude,
+        firstItem.longitude
     );
 
-    // Distances between deliveries
-    for (let i = 0; i < deliveries.length - 1; i++) {
+    // Distances between items
+    for (let i = 0; i < items.length - 1; i++) {
         totalDistance += calculerDistanceHaversine(
-            deliveries[i].latitude,
-            deliveries[i].longitude,
-            deliveries[i + 1].latitude,
-            deliveries[i + 1].longitude
+            items[i].latitude,
+            items[i].longitude,
+            items[i + 1].latitude,
+            items[i + 1].longitude
         );
     }
 
-    // Distance from last delivery back to HQ
-    const lastDelivery = deliveries[deliveries.length - 1];
+    // Distance from last item back to HQ
+    const lastItem = items[items.length - 1];
     totalDistance += calculerDistanceHaversine(
-        lastDelivery.latitude,
-        lastDelivery.longitude,
+        lastItem.latitude,
+        lastItem.longitude,
         hqCoords.lat,
         hqCoords.lng
     );
@@ -145,7 +168,31 @@ function calculateTotalDistanceWithHQ(deliveries, hqCoords) {
 }
 
 /**
+ * 📏 Calculate distance between items only (no HQ)
+ * @param {Array} items - Array of items with lat/lng
+ * @returns {number} Total distance in km
+ */
+function calculateItemsDistance(items) {
+    if (!items || items.length <= 1) return 0;
+
+    let distance = 0;
+    for (let i = 0; i < items.length - 1; i++) {
+        distance += calculerDistanceHaversine(
+            items[i].latitude,
+            items[i].longitude,
+            items[i + 1].latitude,
+            items[i + 1].longitude
+        );
+    }
+    return distance;
+}
+
+/**
  * 📏 Calculate total route distance (for comparison)
+ * @param {Array} deliveries - Array of deliveries
+ * @param {number} startLat - Starting latitude
+ * @param {number} startLng - Starting longitude
+ * @returns {number} Total distance in km
  */
 function calculateRouteDistance(deliveries, startLat, startLng) {
     if (deliveries.length === 0) return 0;
@@ -222,4 +269,73 @@ function detectRemoteRoutes(routes) {
     }
 
     return warnings;
+}
+
+/**
+ * 🏢 Get HQ coordinates from an etape's commentaire field
+ * Used for historical routes where HQ may have changed
+ * @param {Object} etape - Etape object
+ * @returns {Object|null} {lat, lng, adresse} or null if not HQ return or can't parse
+ */
+function getHistoricalHqFromEtape(etape) {
+    if (!etape || etape.id_livraison !== null) {
+        return null; // Not an HQ return stop
+    }
+
+    const address = extractHqAddressFromCommentaire(etape.commentaire);
+    if (!address) {
+        return null; // Can't extract address from commentaire
+    }
+
+    // For historical accuracy, we have the address but not coordinates
+    // Return current HQ coords as fallback (best we can do)
+    const hqConfig = getCurrentHqConfig();
+    return {
+        lat: hqConfig.lat,
+        lng: hqConfig.lng,
+        adresse: address // Use historical address
+    };
+}
+
+/**
+ * 📍 Get coordinates for an etape (handles both deliveries and HQ returns)
+ * @param {Object} etape - Etape object
+ * @returns {Object} {lat, lng, adresse}
+ */
+function getEtapeCoordinatesFromEtape(etape) {
+    // Check if this is an HQ return stop
+    if (etape.id_livraison === null || etape.id_livraison === '') {
+        const hqConfig = getCurrentHqConfig();
+        const historicalAddress = extractHqAddressFromCommentaire(etape.commentaire);
+
+        return {
+            lat: hqConfig.lat,
+            lng: hqConfig.lng,
+            adresse: historicalAddress || hqConfig.address
+        };
+    }
+
+    // Regular delivery stop - get from Livraison table
+    const delivery = getDeliveryById(etape.id_livraison);
+    if (!delivery) {
+        throw new Error(`Livraison ${etape.id_livraison} introuvable pour étape ${etape.id_etape}`);
+    }
+
+    return {
+        lat: delivery.latitude,
+        lng: delivery.longitude,
+        adresse: delivery.adresse
+    };
+}
+
+/**
+ * 🔍 Extract HQ address from commentaire field
+ * @param {string} commentaire - Commentaire text
+ * @returns {string|null} Extracted address or null
+ */
+function extractHqAddressFromCommentaire(commentaire) {
+    if (!commentaire) return null;
+
+    const match = commentaire.match(/Retour au QG - (.+)/);
+    return match ? match[1] : null;
 }
