@@ -31,7 +31,6 @@ function onOpen() {
     .addSubMenu(
       ui.createMenu('🗺️ Routes')
         .addItem('📍 Planifier Routes', 'showPlanRoutesForm')
-        .addItem('🛣️ Générer Étapes', 'showGenerateStopsForm')
         .addSeparator()
         .addItem('✉️ Envoyer Routes aux Bénévoles', 'sendRoutesToVolunteers')
         .addItem('🏷️ Générer Étiquettes', 'showGenerateLabelsForm')

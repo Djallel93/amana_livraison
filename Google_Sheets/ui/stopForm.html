@@ -486,28 +486,6 @@
       submitBtn.disabled = checkboxes.length === 0;
     }
 
-    document.getElementById('stopsForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-      const routeIds = Array.from(checkboxes).map(cb => cb.value);
-
-      if (routeIds.length === 0) {
-        showAlert('error', 'Veuillez sélectionner au moins une route');
-        return;
-      }
-
-      // Afficher le loader
-      document.getElementById('stopsForm').style.display = 'none';
-      document.getElementById('loading-generation').style.display = 'block';
-
-      // Appeler la fonction backend
-      google.script.run
-        .withSuccessHandler(onGenerateSuccess)
-        .withFailureHandler(onGenerateError)
-        .generateStopsFromForm(routeIds);
-    });
-
     function onGenerateSuccess(result) {
       document.getElementById('loading-generation').style.display = 'none';
 

@@ -84,18 +84,6 @@ function planRoutesFromForm(params) {
   }
 }
 
-/**
- * PHASE 4 - Génération des Étapes
- */
-function showGenerateStopsForm() {
-  const html = HtmlService.createHtmlOutputFromFile('ui/stopForm')
-    .setWidth(850)
-    .setHeight(700)
-    .setTitle('🛣️ Générer les Étapes');
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Générer les Étapes');
-}
-
 function sendRoutesToVolunteers() {
   const ui = SpreadsheetApp.getUi();
 
@@ -184,28 +172,6 @@ function getDraftRoutesForForm() {
   } catch (error) {
     Logger.log(`[FORM] ❌ Erreur récupération routes: ${error.message}`);
     return [];
-  }
-}
-
-/**
- * Génère les étapes depuis le formulaire
- * @param {Array<string>} routeIds - IDs des routes
- * @returns {Object}
- */
-function generateStopsFromForm(routeIds) {
-  try {
-    Logger.log('[FORM] 📝 Génération étapes depuis formulaire...');
-    Logger.log(`[FORM] Routes sélectionnées: ${routeIds.join(', ')}`);
-
-    const result = generateStops(routeIds);
-
-    Logger.log(`[FORM] ✅ Génération terminée: ${result.processed} routes traitées`);
-
-    return result;
-
-  } catch (error) {
-    Logger.log(`[FORM] ❌ Erreur: ${error.message}`);
-    throw error;
   }
 }
 
