@@ -48,9 +48,10 @@ function generateStops(params) {
 
     Logger.log(`[STOPS] 🏢 QG: ${HQ_COORDS.adresse} (${HQ_COORDS.lat}, ${HQ_COORDS.lng})`);
 
-    // 5. Optimize route order using TSP
-    Logger.log(`[STOPS] 🔄 Optimisation de l'ordre des arrêts...`);
-    const optimizedOrder = optimizeRouteOrder(deliveries);
+    // 5. Optimize route order using TSP (Nearest Neighbor + 2-opt)
+    // ✅ FIX: Use optimizeDeliveryOrder() (NN + 2-opt) instead of optimizeRouteOrder() (NN only)
+    Logger.log(`[STOPS] 🔄 Optimisation de l'ordre des arrêts (NN + 2-opt)...`);
+    const optimizedOrder = optimizeDeliveryOrder(deliveries, HQ_COORDS);
 
     // 6. Update ordre_passage in etapes_route sheet
     Logger.log(`[STOPS] 💾 Mise à jour de l'ordre dans la feuille...`);
