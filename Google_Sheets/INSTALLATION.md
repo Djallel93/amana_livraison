@@ -2,7 +2,7 @@
 
 ## 🎯 Vue d'Ensemble du Projet
 
-Vous êtes un expert Google Apps Script. Votre mission est de développer un système complet de gestion des livraisons pour une association. Ce système permet de :
+Vous êtes un expert Google Apps Script. Votre mission est de m'aider a développer un système complet de gestion des livraisons pour une association. Ce système permet de :
 
 1. **Générer des demandes de livraison** à partir de familles validées
 2. **Planifier des routes** pour les bénévoles en optimisant distance et capacité
@@ -79,7 +79,6 @@ Vous êtes un expert Google Apps Script. Votre mission est de développer un sys
 ---
 
 
-## 🔄 Workflow Complet
 
 ### Étape 1 : Generate Deliveries (Générer les Livraisons)
 
@@ -569,3 +568,49 @@ const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=150x150&chl=${encod
 - Sauvegarder dans `Routes/YYYYMMdd_{occasion}/Labels_R001.gdoc`
 
 ---
+
+## Besoins Technique
+
+1. Ajoute une nouvelle colonne dans la feuille `routes` nommée `lien_maps` pour stocker le lien Google Maps de la route générée aprs avoir optimiser l'ordre des étapes. Maintenant c'est l'admin qui doit passer le statut de la route à "Confirmée" apres avoir revue et validé le lien maps et l'ordre des étapes. Voici un exemple de lien maps à générer :
+
+    ```url
+      https://www.google.com/maps/dir/319+Rte+de+Vannes,+44800+Saint-Herblain/57+Rue+du+65%C3%A8me+R%C3%A9giment+d'Infanterie/2+Rue+%C3%89lie+Delaunay,+44000+Nantes/3+All.+Jacques+Berque,+44000+Nantes/26+All.+de+la+Bouscarle+de+Cetti/6b+Rue+Louis+M%C3%A9karski,+44000+Nantes/3+Rue+des+Chal%C3%A2tres,+44000+Nantes/5+Rue+des+Chal%C3%A2tres,+44000+Nantes/@47.2288845,-1.5872129,14z/data=!4m49!4m48!1m5!1m1!1s0x4805ed009f92a93b:0x627c99a63fb62fa8!2m2!1d-1.6037901!2d47.2457349!1m5!1m1!1s0x4805ee99ba12fe1d:0x9b282a6c35b90fc3!2m2!1d-1.5519562!2d47.2264073!1m5!1m1!1s0x4805eebc68800c07:0x990596f8c09bddf!2m2!1d-1.5466591!2d47.2196411!1m5!1m1!1s0x4805eec83c3cf4eb:0xc821b56fb888dc3d!2m2!1d-1.5381678!2d47.2122747!1m5!1m1!1s0x4805eec79620f0f7:0xaf13b4fb6de15738!2m2!1d-1.5379628!2d47.2153257!1m5!1m1!1s0x4805eec2aa7febdd:0x75695ebb6ca916b6!2m2!1d-1.5294367!2d47.2235896!1m5!1m1!1s0x4805eee84e49fd47:0x130fc0ed9f7cc9af!2m2!1d-1.531169!2d47.225398!1m5!1m1!1s0x4805eee851e97575:0x1fdb38fbca8fa83a!2m2!1d-1.531324!2d47.225586?entry=ttu&g_ep=EgoyMDI1MTIwOS4wIKXMDSoASAFQAw%3D%3D
+    ```
+
+2. lorsque je genere les etiquettes pour les routes j'obtiens une erreur a chaque fois. Voici les logs d'execution :
+
+```log
+16 Feb 2026, 21:00:49	Info	[FORM] 📝 Génération étiquettes depuis formulaire...
+16 Feb 2026, 21:00:49	Info	[FORM] Paramètres: {"routeIds":["R001","R002","R003","R004","R005","R006","R007","R008","R009","R010","R011","R012","R013","R014","R015","R016"],"rows":7,"cols":3}
+16 Feb 2026, 21:00:49	Info	[LABELS] 🚀 Démarrage génération des étiquettes...
+16 Feb 2026, 21:00:49	Info	[LABELS] Routes: R001, R002, R003, R004, R005, R006, R007, R008, R009, R010, R011, R012, R013, R014, R015, R016
+16 Feb 2026, 21:00:49	Info	[LABELS] Format: 7x3
+16 Feb 2026, 21:00:49	Info	[LABELS] 📄 Traitement route R001...
+16 Feb 2026, 21:00:51	Info	[LABELS]   2 livraisons
+16 Feb 2026, 21:00:53	Info	[LABELS]   8 étiquettes
+16 Feb 2026, 21:00:53	Info	[LABELS] ❌ Document error: getOrCreateDriveFolder is not defined
+16 Feb 2026, 21:00:53	Info	[LABELS] ❌ Route R001: getOrCreateDriveFolder is not defined
+16 Feb 2026, 21:00:53	Info	[LABELS] 📄 Traitement route R002...
+16 Feb 2026, 21:00:53	Info	[LABELS]   6 livraisons
+16 Feb 2026, 21:00:59	Info	[LABELS]   26 étiquettes
+16 Feb 2026, 21:00:59	Info	[LABELS] ❌ Document error: getOrCreateDriveFolder is not defined
+16 Feb 2026, 21:00:59	Info	[LABELS] ❌ Route R002: getOrCreateDriveFolder is not defined
+...
+```
+
+## 🚨 RAPPEL FINAL
+
+Si tu as besoin de plus d'informations (logs donnees du google sheets), n'hésite pas à me demander !
+
+**RÈGLE ABSOLUE :**
+
+1. Tous les logs et commentaires doivent être en **FRANÇAIS**
+2. Chaque fichier < 250 lignes
+   - Si un fichier dépasse → **LE DIVISER** en plusieurs fichiers logiques
+   - Créer autant de fichiers que nécessaire pour respecter cette limite
+   - Privilégier la clarté et la modularité
+   - Regenerer entierement le fichier pour que je puisse copier-coller facilement
+
+## output
+
+When done create a minimal migraion guide (just what files to replace)

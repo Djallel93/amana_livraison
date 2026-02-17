@@ -3,6 +3,8 @@
  * CONFIG_SHEETS_AND_UI.GS - Configuration Sheets, Drive, Email, UI
  * =======================================================================
  * Contient : Structure des feuilles, colonnes, Drive, Email, Tokens, Labels, Énumérations
+ * 
+ * ⚠️ MODIFICATION: Ajout de la colonne LIEN_MAPS dans ROUTES
  */
 
 /**
@@ -47,9 +49,10 @@ const CONFIG_SHEETS = {
             DISTANCE_TOTALE_KM: 9,
             POIDS_TOTAL_KG: 10,
             RELIVRE: 11,
-            DOSSIER_DRIVE: 12,
-            DATE_CREATION: 13,
-            DATE_MODIFICATION: 14
+            LIEN_MAPS: 12,          // ✅ NOUVELLE COLONNE
+            DOSSIER_DRIVE: 13,      // ⚠️ Index décalé de 12 → 13
+            DATE_CREATION: 14,       // ⚠️ Index décalé de 13 → 14
+            DATE_MODIFICATION: 15    // ⚠️ Index décalé de 14 → 15
         },
         ETAPES_ROUTE: {
             ID_ETAPE: 1,
