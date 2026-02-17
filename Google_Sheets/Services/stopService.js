@@ -1,281 +1,220 @@
 /**
- * ====================================================================
- * STOP_SERVICE.GS - Service de Génération des Étapes de Route
- * ====================================================================
- * Gère la création et l'optimisation des étapes (stops) pour les routes
- * 
- * ⚠️ MODIFICATION: Ajout génération lien Google Maps après optimisation TSP
+ * 📍 Générer les arrêts optimisés pour une route
  */
-
-/**
- * Génère les étapes pour une route après optimisation TSP
- * @param {string} routeId - ID de la route
- * @returns {Object} Résultat avec nombre d'étapes créées
- */
-function generateStepsForRoute(routeId) {
+function generateStops(params) {
   try {
-    Logger.log(`[STOPS] 🚀 Génération étapes pour route ${routeId}`);
+    const routeId = params.route_id;
 
-    // 1. Récupérer les données de la route
-    const routeData = getRouteById(routeId);
-    if (!routeData) {
-      throw new Error(`Route ${routeId} introuvable`);
+    if (!routeId) {
+      throw new Error('route_id est requis');
     }
 
-    // 2. Récupérer les livraisons assignées à cette route
+    Logger.log(`[STOPS] 📍 Génération des arrêts pour ${routeId}`);
+
+    // 1. Get route info
+    const routeData = filterData(CONFIG.SHEETS.ROUTES, row => row.id_route === routeId);
+    if (routeData.length === 0) {
+      throw new Error(`Route ${routeId} introuvable`);
+    }
+    const route = routeData[0];
+
+    // 2. Get deliveries for this route (excluding HQ returns)
     const deliveries = getDeliveriesForRoute(routeId);
-    if (!deliveries || deliveries.length === 0) {
+    Logger.log(`[STOPS] 📦 ${deliveries.length} livraisons trouvées pour ${routeId}`);
+
+    if (deliveries.length === 0) {
       throw new Error(`Aucune livraison trouvée pour la route ${routeId}`);
     }
 
-    Logger.log(`[STOPS] 📦 ${deliveries.length} livraisons à optimiser`);
+    // 3. Get existing etapes (excluding HQ returns from previous runs)
+    let etapes = filterData(CONFIG.SHEETS.ETAPES_ROUTE, row =>
+      row.id_route === routeId && row.id_livraison !== null && row.id_livraison !== ''
+    );
+    Logger.log(`[STOPS] 📍 ${etapes.length} étapes de livraison trouvées`);
 
-    // 3. Récupérer les coordonnées du QG
-    const hqCoords = getHQCoordinates();
-    if (!hqCoords) {
-      throw new Error('Coordonnées du QG non configurées');
+    // 4. Get HQ configuration
+    Logger.log(`[STOPS] 🏢 Récupération du QG...`);
+    const hqConfig = getCurrentHqConfig();
+
+    if (!hqConfig || !hqConfig.lat || !hqConfig.lng) {
+      throw new Error('Configuration du QG introuvable. Veuillez configurer le QG dans les paramètres.');
     }
 
-    // 4. Optimiser l'ordre des livraisons avec TSP
-    Logger.log('[STOPS] 🔄 Optimisation TSP en cours...');
-    const optimizedOrder = optimizeRouteTSP(deliveries, hqCoords);
+    const HQ_COORDS = {
+      lat: hqConfig.lat,
+      lng: hqConfig.lng,
+      adresse: hqConfig.address
+    };
 
-    // 5. Réorganiser les livraisons selon l'ordre optimisé
-    const orderedDeliveries = optimizedOrder.map(index => deliveries[index]);
+    Logger.log(`[STOPS] 🏢 QG: ${HQ_COORDS.adresse} (${HQ_COORDS.lat}, ${HQ_COORDS.lng})`);
 
-    // 6. ✨ NOUVEAU: Générer le lien Google Maps avec l'ordre optimisé
-    Logger.log('[STOPS] 🗺️ Génération du lien Google Maps...');
-    const mapsUrl = generateGoogleMapsUrl(orderedDeliveries, hqCoords);
+    // 5. Optimize route order using TSP (Nearest Neighbor + 2-opt)
+    // ✅ FIX: Use optimizeDeliveryOrder() (NN + 2-opt) instead of optimizeRouteOrder() (NN only)
+    Logger.log(`[STOPS] 🔄 Optimisation de l'ordre des arrêts (NN + 2-opt)...`);
+    const optimizedOrder = optimizeDeliveryOrder(deliveries, HQ_COORDS);
 
-    // 7. ✨ NOUVEAU: Mettre à jour la colonne lien_maps dans la feuille routes
-    updateRouteMapsLink(routeId, mapsUrl);
-    Logger.log(`[STOPS] ✅ Lien Maps enregistré: ${mapsUrl.substring(0, 80)}...`);
+    // 6. Update ordre_passage in etapes_route sheet
+    Logger.log(`[STOPS] 💾 Mise à jour de l'ordre dans la feuille...`);
 
-    // 8. Supprimer les anciennes étapes de cette route
-    deleteStepsForRoute(routeId);
+    for (let i = 0; i < optimizedOrder.length; i++) {
+      const delivery = optimizedOrder[i];
+      const ordre = i + 1;
 
-    // 9. Créer les nouvelles étapes dans l'ordre optimisé
-    const stepsSheet = getSheet(CONFIG_SHEETS.SHEETS.ETAPES_ROUTE);
-    let stepsCreated = 0;
+      const etape = etapes.find(e => e.id_livraison === delivery.id_livraison);
 
-    orderedDeliveries.forEach((delivery, index) => {
-      const stepData = {
-        id_etape: generateStepId(),
-        id_route: routeId,
-        id_livraison: delivery.id_livraison,
-        ordre_passage: index + 1,
-        statut: CONFIG_SHEETS.ENUMS.STATUT_ETAPE.EN_ATTENTE,
-        heure_debut: '',
-        heure_fin: '',
-        commentaire: ''
-      };
+      if (etape) {
+        updateCellByRowId(
+          CONFIG.SHEETS.ETAPES_ROUTE,
+          etape.id_etape,
+          'id_etape',
+          'ordre_passage',
+          ordre
+        );
 
-      const rowData = [
-        stepData.id_etape,
-        stepData.id_route,
-        stepData.id_livraison,
-        stepData.ordre_passage,
-        stepData.statut,
-        stepData.heure_debut,
-        stepData.heure_fin,
-        stepData.commentaire
-      ];
+        Logger.log(`[STOPS]   ✅ ${etape.id_etape}: ordre ${ordre} (${delivery.id_livraison})`);
+      }
+    }
 
-      stepsSheet.appendRow(rowData);
-      stepsCreated++;
-    });
+    // 7. CREATE HQ RETURN STOP (with NULL id_livraison and address in commentaire)
+    const hqEtapeId = generateNextId(
+      CONFIG.SHEETS.ETAPES_ROUTE,
+      'E',
+      CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+    );
 
-    Logger.log(`[STOPS] ✅ ${stepsCreated} étapes créées et optimisées`);
+    // ✅ Use NULL for id_livraison and preserve HQ address in commentaire
+    const hqCommentaire = `Retour au QG - ${HQ_COORDS.adresse}`;
+
+    const hqRowData = [
+      hqEtapeId,                                  // 1. ID_ETAPE
+      routeId,                                    // 2. ID_ROUTE
+      null,                                       // 3. ID_LIVRAISON (NULL for HQ return)
+      optimizedOrder.length + 1,                  // 4. ORDRE_PASSAGE (last stop)
+      CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,      // 5. STATUT
+      null,                                       // 6. HEURE_DEBUT
+      null,                                       // 7. HEURE_FIN
+      hqCommentaire                               // 8. COMMENTAIRE (preserves HQ address)
+    ];
+
+    appendRow(CONFIG.SHEETS.ETAPES_ROUTE, hqRowData);
+    Logger.log(`[STOPS] 🏢 Étape de retour au QG créée: ${hqEtapeId} (ordre ${hqRowData[3]})`);
+    Logger.log(`[STOPS] 📍 HQ préservé dans commentaire: ${hqCommentaire}`);
+
+    // 8. Calculate total distance (including return to HQ)
+    const totalDistance = calculateTotalDistanceWithHQ(optimizedOrder, HQ_COORDS);
+
+    updateCellByRowId(
+      CONFIG.SHEETS.ROUTES,
+      routeId,
+      'id_route',
+      'distance_totale_km',
+      Math.round(totalDistance * 100) / 100
+    );
+
+    Logger.log(`[STOPS] 📏 Distance totale (avec retour QG): ${Math.round(totalDistance * 100) / 100}km`);
+
+    // 9. Update route status to "Confirmée"
+    updateCellByRowId(
+      CONFIG.SHEETS.ROUTES,
+      routeId,
+      'id_route',
+      'statut',
+      CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE
+    );
+
+    updateCellByRowId(
+      CONFIG.SHEETS.ROUTES,
+      routeId,
+      'id_route',
+      'date_modification',
+      getCurrentDateTime()
+    );
+
+    Logger.log(`[STOPS] ✅ Arrêts générés avec succès pour ${routeId}`);
 
     return {
       success: true,
-      stepsCreated: stepsCreated,
-      mapsUrl: mapsUrl
+      route_id: routeId,
+      stops_count: optimizedOrder.length + 1, // +1 for HQ return
+      total_distance_km: Math.round(totalDistance * 100) / 100
     };
 
   } catch (error) {
-    Logger.log(`[STOPS] ❌ Erreur génération étapes: ${error.message}`);
+    Logger.log(`[STOPS] ❌ Erreur génération arrêts: ${error.message}`);
     throw error;
   }
 }
 
 /**
- * ✨ NOUVELLE FONCTION: Met à jour le lien Maps dans la feuille routes
- * @param {string} routeId - ID de la route
- * @param {string} mapsUrl - URL Google Maps
- */
-function updateRouteMapsLink(routeId, mapsUrl) {
-  try {
-    const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-    const routeRow = findRouteRow(routeId);
-
-    if (!routeRow) {
-      throw new Error(`Route ${routeId} introuvable dans la feuille`);
-    }
-
-    // Écrire le lien Maps dans la colonne LIEN_MAPS (colonne 12)
-    sheet.getRange(routeRow, CONFIG_SHEETS.COLUMNS.ROUTES.LIEN_MAPS).setValue(mapsUrl);
-
-    Logger.log(`[STOPS] 📝 Lien Maps mis à jour pour route ${routeId}`);
-
-  } catch (error) {
-    Logger.log(`[STOPS] ⚠️ Erreur mise à jour lien Maps: ${error.message}`);
-    throw error;
-  }
-}
-
-/**
- * Trouve la ligne d'une route dans la feuille routes
- * @param {string} routeId - ID de la route
- * @returns {number|null} Numéro de ligne ou null
- */
-function findRouteRow(routeId) {
-  const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < data.length; i++) { // Skip header
-    if (data[i][CONFIG_SHEETS.COLUMNS.ROUTES.ID_ROUTE - 1] === routeId) {
-      return i + 1; // Retourner le numéro de ligne (1-indexed)
-    }
-  }
-
-  return null;
-}
-
-/**
- * Récupère les données d'une route par son ID
- * @param {string} routeId - ID de la route
- * @returns {Object|null} Données de la route
- */
-function getRouteById(routeId) {
-  const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_ROUTE - 1] === routeId) {
-      return {
-        id_route: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_ROUTE - 1],
-        id_benevole: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_BENEVOLE - 1],
-        statut: row[CONFIG_SHEETS.COLUMNS.ROUTES.STATUT - 1],
-        occasion: row[CONFIG_SHEETS.COLUMNS.ROUTES.OCCASION - 1]
-      };
-    }
-  }
-
-  return null;
-}
-
-/**
- * Récupère les livraisons assignées à une route
- * @param {string} routeId - ID de la route
- * @returns {Array<Object>} Livraisons avec coordonnées
+ * 📦 Get deliveries for a specific route (excludes HQ returns)
  */
 function getDeliveriesForRoute(routeId) {
-  const sheet = getSheet(CONFIG_SHEETS.SHEETS.LIVRAISON);
-  const data = sheet.getDataRange().getValues();
-  const deliveries = [];
+  // Get etapes for this route (excluding HQ returns - NULL id_livraison)
+  const etapes = filterData(CONFIG.SHEETS.ETAPES_ROUTE, row =>
+    row.id_route === routeId && row.id_livraison !== null && row.id_livraison !== ''
+  );
 
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    // Logique de filtrage des livraisons pour cette route
-    // (à adapter selon votre structure de données)
-    deliveries.push({
-      id_livraison: row[CONFIG_SHEETS.COLUMNS.LIVRAISON.ID_LIVRAISON - 1],
-      adresse: row[CONFIG_SHEETS.COLUMNS.LIVRAISON.ADRESSE - 1],
-      latitude: row[CONFIG_SHEETS.COLUMNS.LIVRAISON.LATITUDE - 1],
-      longitude: row[CONFIG_SHEETS.COLUMNS.LIVRAISON.LONGITUDE - 1]
-    });
+  if (etapes.length === 0) {
+    return [];
   }
+
+  // Get delivery IDs from etapes
+  const deliveryIds = etapes.map(e => e.id_livraison);
+
+  // Get full delivery data
+  const allDeliveries = getAllDataAsObjects(CONFIG.SHEETS.LIVRAISON);
+  const deliveries = allDeliveries.filter(d => deliveryIds.includes(d.id_livraison));
 
   return deliveries;
 }
 
 /**
- * Récupère les coordonnées du QG depuis la configuration
- * @returns {Object} Coordonnées {lat, lng, adresse}
+ * 🏢 Check if an etape is an HQ return stop
+ * @param {Object} etape - Etape object
+ * @returns {boolean}
  */
-function getHQCoordinates() {
-  const props = PropertiesService.getScriptProperties();
-  const hqLat = props.getProperty('HQ_LATITUDE');
-  const hqLng = props.getProperty('HQ_LONGITUDE');
-  const hqAddress = props.getProperty('HQ_ADDRESS');
+function isHqReturnStop(etape) {
+  return etape.id_livraison === null || etape.id_livraison === '';
+}
 
-  if (!hqLat || !hqLng) {
-    return null;
+/**
+ * 🏢 Extract HQ address from commentaire field
+ * @param {string} commentaire - Commentaire text
+ * @returns {string|null} - Extracted address or null
+ */
+function extractHqAddressFromCommentaire(commentaire) {
+  if (!commentaire) return null;
+
+  const match = commentaire.match(/Retour au QG - (.+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * 📍 Get HQ coordinates for an etape
+ * For HQ return stops, returns current HQ config
+ * For delivery stops, returns delivery coordinates
+ * @param {Object} etape - Etape object
+ * @returns {Object} {lat, lng, adresse}
+ */
+function getEtapeCoordinates(etape) {
+  if (isHqReturnStop(etape)) {
+    const hqConfig = getCurrentHqConfig();
+    return {
+      lat: hqConfig.lat,
+      lng: hqConfig.lng,
+      adresse: hqConfig.address
+    };
+  }
+
+  // Get delivery coordinates
+  const delivery = getDeliveryById(etape.id_livraison);
+  if (!delivery) {
+    throw new Error(`Livraison ${etape.id_livraison} introuvable`);
   }
 
   return {
-    lat: parseFloat(hqLat),
-    lng: parseFloat(hqLng),
-    adresse: hqAddress || 'QG Association'
+    lat: delivery.latitude,
+    lng: delivery.longitude,
+    adresse: delivery.adresse
   };
-}
-
-/**
- * Supprime les étapes existantes d'une route
- * @param {string} routeId - ID de la route
- */
-function deleteStepsForRoute(routeId) {
-  const sheet = getSheet(CONFIG_SHEETS.SHEETS.ETAPES_ROUTE);
-  const data = sheet.getDataRange().getValues();
-
-  // Parcourir de bas en haut pour éviter les problèmes d'index
-  for (let i = data.length - 1; i >= 1; i--) {
-    if (data[i][1] === routeId) { // Colonne ID_ROUTE
-      sheet.deleteRow(i + 1);
-    }
-  }
-
-  Logger.log(`[STOPS] 🗑️ Anciennes étapes supprimées pour route ${routeId}`);
-}
-
-/**
- * Génère un ID unique pour une étape
- * @returns {string} ID étape (format: STEP_YYYYMMDD_XXX)
- */
-function generateStepId() {
-  const timestamp = Utilities.formatDate(new Date(), 'Europe/Paris', 'yyyyMMdd_HHmmss');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `STEP_${timestamp}_${random}`;
-}
-
-/**
- * Affiche le formulaire de génération d'étapes
- */
-function showStopGenerationForm() {
-  const html = HtmlService.createHtmlOutputFromFile('ui/stopForm')
-    .setWidth(600)
-    .setHeight(400);
-  SpreadsheetApp.getUi().showModalDialog(html, '🚦 Générer les Étapes de Route');
-}
-
-/**
- * Génère les étapes depuis le formulaire
- * @param {Object} formData - Données du formulaire
- * @returns {Object} Résultat de la génération
- */
-function generateStepsFromForm(formData) {
-  try {
-    const routeId = formData.routeId;
-
-    if (!routeId) {
-      throw new Error('ID de route manquant');
-    }
-
-    const result = generateStepsForRoute(routeId);
-
-    return {
-      success: true,
-      message: `✅ ${result.stepsCreated} étapes créées et optimisées`,
-      mapsUrl: result.mapsUrl
-    };
-
-  } catch (error) {
-    Logger.log(`[STOPS] ❌ Erreur formulaire: ${error.message}`);
-    return {
-      success: false,
-      message: `❌ Erreur: ${error.message}`
-    };
-  }
 }

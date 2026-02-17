@@ -1,250 +1,371 @@
 /**
  * ====================================================================
- * ROUTE_ASSIGNMENT_SERVICE.GS - Service d'Attribution de Routes
+ * ROUTE_SERVICE_ASSIGNMENT.GS - Service d'Assignment des Routes
  * ====================================================================
- * Gère l'attribution des véhicules et la sauvegarde des routes
+ * VERSION 2.0 - WITH INTEGRATED TSP OPTIMIZATION
  * 
- * ⚠️ MODIFICATION: Ajout champ lien_maps (vide) dans rowData
+ * 🎯 NEW WORKFLOW:
+ * 1. Assign clusters to vehicles
+ * 2. Optimize delivery order using TSP (Nearest Neighbor + 2-opt)
+ * 3. Create etapes with optimized ordre_passage
+ * 4. Add HQ return as last stop
+ * 
+ * ✅ "Générer Étapes" is now obsolete - everything happens during route creation
  */
 
 /**
- * Sauvegarde une route dans la feuille routes
- * @param {Object} routeData - Données de la route
- * @returns {boolean} Succès de la sauvegarde
+ * 🚗 Assigner les clusters aux véhicules (with support multi-trips)
+ * UNCHANGED - This function remains the same
  */
-function saveRoute(routeData) {
-    try {
-        Logger.log(`[ROUTE] 💾 Sauvegarde route ${routeData.id_route}`);
-
-        const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-
-        // Construire le tableau de données pour la ligne
-        // ⚠️ IMPORTANT: L'ordre doit correspondre EXACTEMENT aux colonnes de la feuille
-        const rowData = [
-            routeData.id_route,              // 1. ID_ROUTE
-            routeData.id_benevole,           // 2. ID_BENEVOLE
-            routeData.id_binome || '',       // 3. ID_BINOME
-            routeData.id_vehicule_prete || '', // 4. ID_VEHICULE_PRETE
-            routeData.date_debut,            // 5. DATE_DEBUT
-            routeData.date_fin,              // 6. DATE_FIN
-            routeData.occasion,              // 7. OCCASION
-            routeData.statut,                // 8. STATUT
-            routeData.distance_totale_km || 0, // 9. DISTANCE_TOTALE_KM
-            routeData.poids_total_kg || 0,   // 10. POIDS_TOTAL_KG
-            routeData.relivre || false,      // 11. RELIVRE
-            '',                              // 12. LIEN_MAPS ← ✨ NOUVEAU (vide, sera rempli après optimisation TSP)
-            routeData.dossier_drive || '',   // 13. DOSSIER_DRIVE
-            routeData.date_creation,         // 14. DATE_CREATION
-            routeData.date_modification      // 15. DATE_MODIFICATION
-        ];
-
-        // Vérifier que le nombre de champs correspond
-        const expectedColumns = 15;
-        if (rowData.length !== expectedColumns) {
-            Logger.log(`[ROUTE] ⚠️ Attention: ${rowData.length} champs fournis, ${expectedColumns} attendus`);
-        }
-
-        // Ajouter la ligne dans la feuille
-        sheet.appendRow(rowData);
-
-        Logger.log(`[ROUTE] ✅ Route ${routeData.id_route} sauvegardée (statut: ${routeData.statut})`);
-
-        return true;
-
-    } catch (error) {
-        Logger.log(`[ROUTE] ❌ Erreur sauvegarde route: ${error.message}`);
-        throw error;
-    }
-}
-
-/**
- * Met à jour une route existante
- * @param {string} routeId - ID de la route
- * @param {Object} updates - Champs à mettre à jour
- * @returns {boolean} Succès de la mise à jour
- */
-function updateRoute(routeId, updates) {
-    try {
-        Logger.log(`[ROUTE] 🔄 Mise à jour route ${routeId}`);
-
-        const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-        const routeRow = findRouteRow(routeId);
-
-        if (!routeRow) {
-            throw new Error(`Route ${routeId} introuvable`);
-        }
-
-        // Mettre à jour les champs spécifiés
-        Object.keys(updates).forEach(field => {
-            const columnIndex = CONFIG_SHEETS.COLUMNS.ROUTES[field.toUpperCase()];
-            if (columnIndex) {
-                sheet.getRange(routeRow, columnIndex).setValue(updates[field]);
-            }
-        });
-
-        // Toujours mettre à jour la date de modification
-        const now = new Date();
-        sheet.getRange(routeRow, CONFIG_SHEETS.COLUMNS.ROUTES.DATE_MODIFICATION).setValue(now);
-
-        Logger.log(`[ROUTE] ✅ Route ${routeId} mise à jour`);
-
-        return true;
-
-    } catch (error) {
-        Logger.log(`[ROUTE] ❌ Erreur mise à jour route: ${error.message}`);
-        throw error;
-    }
-}
-
-/**
- * Trouve la ligne d'une route dans la feuille
- * @param {string} routeId - ID de la route
- * @returns {number|null} Numéro de ligne ou null
- */
-function findRouteRow(routeId) {
-    const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-    const data = sheet.getDataRange().getValues();
-
-    for (let i = 1; i < data.length; i++) { // Skip header row
-        if (data[i][CONFIG_SHEETS.COLUMNS.ROUTES.ID_ROUTE - 1] === routeId) {
-            return i + 1; // Retourner le numéro de ligne (1-indexed)
-        }
-    }
-
-    return null;
-}
-
-/**
- * Crée une nouvelle route avec les paramètres par défaut
- * @param {Object} params - Paramètres de la route
- * @returns {Object} Données de la route créée
- */
-function createNewRoute(params) {
-    const now = new Date();
-
-    const routeData = {
-        id_route: generateRouteId(),
-        id_benevole: params.id_benevole,
-        id_binome: params.id_binome || '',
-        id_vehicule_prete: params.id_vehicule_prete || '',
-        date_debut: params.date_debut || now,
-        date_fin: params.date_fin || now,
-        occasion: params.occasion,
-        statut: CONFIG_SHEETS.ENUMS.STATUT_ROUTE.BROUILLON, // ← La route commence en BROUILLON
-        distance_totale_km: 0,
-        poids_total_kg: 0,
-        relivre: params.relivre || false,
-        dossier_drive: '',
-        date_creation: now,
-        date_modification: now
-    };
-
-    saveRoute(routeData);
-
-    return routeData;
-}
-
-/**
- * Génère un ID unique pour une route
- * @returns {string} ID route (format: R_YYYYMMDD_XXX)
- */
-function generateRouteId() {
-    const timestamp = Utilities.formatDate(new Date(), 'Europe/Paris', 'yyyyMMdd');
-    const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-    const lastRow = sheet.getLastRow();
-    const counter = (lastRow).toString().padStart(3, '0');
-    return `R_${timestamp}_${counter}`;
-}
-
-/**
- * Récupère les routes avec le statut "Brouillon"
- * @returns {Array<Object>} Liste des routes en brouillon
- */
-function getDraftRoutes() {
-    const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-    const data = sheet.getDataRange().getValues();
+function assignerClustersAuxVehicules(clusters, benevoles, params) {
     const routes = [];
+    const clustersRestants = [...clusters];
+    const maxLivraisonsParRoute = params.max_livraisons || 15;
 
-    for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        const statut = row[CONFIG_SHEETS.COLUMNS.ROUTES.STATUT - 1];
+    // Get HQ coordinates
+    const hqConfig = getCurrentHqConfig();
+    const hqCoords = (hqConfig && hqConfig.lat && hqConfig.lng)
+        ? { lat: hqConfig.lat, lng: hqConfig.lng }
+        : null;
 
-        if (statut === CONFIG_SHEETS.ENUMS.STATUT_ROUTE.BROUILLON) {
-            routes.push({
-                id_route: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_ROUTE - 1],
-                id_benevole: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_BENEVOLE - 1],
-                occasion: row[CONFIG_SHEETS.COLUMNS.ROUTES.OCCASION - 1],
-                lien_maps: row[CONFIG_SHEETS.COLUMNS.ROUTES.LIEN_MAPS - 1],
-                date_debut: row[CONFIG_SHEETS.COLUMNS.ROUTES.DATE_DEBUT - 1],
-                statut: statut
+    if (hqCoords) {
+        Logger.log(`[ROUTES] 🏢 HQ: ${hqConfig.address} (${hqCoords.lat}, ${hqCoords.lng})`);
+    } else {
+        Logger.log(`[ROUTES] ⚠️ HQ coordinates not configured`);
+    }
+
+    // Sort vehicles by capacity (largest first)
+    benevoles.sort((a, b) => {
+        const capA = a.vehicule ? (a.vehicule.capaciteKg || 0) : 0;
+        const capB = b.vehicule ? (b.vehicule.capaciteKg || 0) : 0;
+        return capB - capA;
+    });
+
+    Logger.log(`[ROUTES] 🚗 Starting assignment: ${benevoles.length} volunteers, ${clusters.length} clusters`);
+
+    // Multi-trip logic
+    let tripNumber = 1;
+
+    while (clustersRestants.length > 0) {
+        Logger.log(`[ROUTES] 🔄 Trip ${tripNumber}: ${clustersRestants.length} clusters remaining`);
+
+        let assignedInThisTrip = 0;
+
+        for (const benevole of benevoles) {
+            if (clustersRestants.length === 0) {
+                Logger.log(`[ROUTES] ✅ All clusters assigned after trip ${tripNumber}`);
+                break;
+            }
+
+            Logger.log(`[ROUTES] 👤 ${benevole.nom} - Trip ${tripNumber}`);
+            Logger.log(`[ROUTES]    Remaining clusters: ${clustersRestants.length}`);
+
+            const capaciteVehicule = benevole.vehicule?.capaciteKg || 0;
+            Logger.log(`[ROUTES]    Vehicle: ${benevole.vehicule?.type}, capacity: ${capaciteVehicule}kg`);
+
+            const route = {
+                benevole: benevole,
+                livraisons: [],
+                clusters_assignes: [],
+                poids_total: 0,
+                distance_totale: 0,
+                trip_number: tripNumber
+            };
+
+            // Take the cluster with MOST deliveries
+            const clusterPrincipal = clustersRestants.shift();
+
+            if (!clusterPrincipal) {
+                Logger.log(`[ROUTES] ❌ No principal cluster available`);
+                continue;
+            }
+
+            // Check capacity
+            if (capaciteVehicule > 0 && clusterPrincipal.poids_total > capaciteVehicule) {
+                Logger.log(`[ROUTES] ⚠️ Cluster ${clusterPrincipal.id} too heavy (${Math.round(clusterPrincipal.poids_total)}kg > ${capaciteVehicule}kg) - skipping`);
+                clustersRestants.push(clusterPrincipal);
+                continue;
+            }
+
+            Logger.log(`[ROUTES]    ✅ Principal cluster ${clusterPrincipal.id}: ${clusterPrincipal.nombre_livraisons} deliveries, ${Math.round(clusterPrincipal.poids_total)}kg`);
+
+            route.livraisons.push(...clusterPrincipal.livraisons);
+            route.poids_total += clusterPrincipal.poids_total;
+            route.clusters_assignes.push(clusterPrincipal.id);
+
+            // Try to add more clusters
+            const clustersAAjouter = [];
+
+            for (let j = 0; j < clustersRestants.length; j++) {
+                const autreCluster = clustersRestants[j];
+
+                const distanceEntreClusters = calculerDistanceHaversine(
+                    clusterPrincipal.centre.lat,
+                    clusterPrincipal.centre.lng,
+                    autreCluster.centre.lat,
+                    autreCluster.centre.lng
+                );
+
+                const DISTANCE_CLUSTER_MAX = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_CLUSTER_MAX_KM;
+                const DISTANCE_REGROUPE = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_REGROUPE_ELOIGNES_KM;
+
+                const peutGrouper = (
+                    distanceEntreClusters < DISTANCE_CLUSTER_MAX ||
+                    (clusterPrincipal.distance_hq > DISTANCE_REGROUPE && autreCluster.distance_hq > DISTANCE_REGROUPE)
+                );
+
+                const nouveauPoids = route.poids_total + autreCluster.poids_total;
+                const nouvelleTaille = route.livraisons.length + autreCluster.nombre_livraisons;
+
+                if (peutGrouper &&
+                    (capaciteVehicule === 0 || nouveauPoids <= capaciteVehicule) &&
+                    nouvelleTaille <= maxLivraisonsParRoute) {
+
+                    clustersAAjouter.push({ index: j, cluster: autreCluster });
+                    Logger.log(`[ROUTES]       + Adding cluster ${autreCluster.id}: ${autreCluster.nombre_livraisons} deliveries, ${Math.round(autreCluster.poids_total)}kg`);
+                }
+            }
+
+            // Add selected clusters
+            for (let k = clustersAAjouter.length - 1; k >= 0; k--) {
+                const { index, cluster } = clustersAAjouter[k];
+                route.livraisons.push(...cluster.livraisons);
+                route.poids_total += cluster.poids_total;
+                route.clusters_assignes.push(cluster.id);
+                clustersRestants.splice(index, 1);
+            }
+
+            // Calculate distance (will be recalculated after TSP optimization)
+            route.distance_totale = calculerDistanceTotaleRoute(route.livraisons, hqCoords);
+
+            Logger.log(`[ROUTES]    📊 Route: ${route.livraisons.length} deliveries, ${Math.round(route.poids_total)}kg, ~${Math.round(route.distance_totale)}km (before optimization)`);
+
+            routes.push(route);
+            assignedInThisTrip++;
+        }
+
+        if (assignedInThisTrip === 0 && clustersRestants.length > 0) {
+            Logger.log(`[ROUTES] ⚠️ CRITICAL: No clusters assigned in trip ${tripNumber}`);
+            Logger.log(`[ROUTES] ⚠️ Remaining clusters cannot fit:`);
+            clustersRestants.forEach(c => {
+                Logger.log(`[ROUTES]    ⚠️ Cluster ${c.id}: ${c.nombre_livraisons} deliveries, ${Math.round(c.poids_total)}kg`);
             });
+            break;
+        }
+
+        tripNumber++;
+
+        if (tripNumber > 5) {
+            Logger.log(`[ROUTES] ⚠️ Max trips (5) reached, stopping`);
+            break;
         }
     }
+
+    if (clustersRestants.length > 0) {
+        const unassignedDeliveries = clustersRestants.reduce((sum, c) => sum + c.nombre_livraisons, 0);
+        Logger.log(`[ROUTES] ⚠️ WARNING: ${clustersRestants.length} clusters NOT assigned (${unassignedDeliveries} deliveries)`);
+    } else {
+        Logger.log(`[ROUTES] ✅ SUCCESS: All clusters assigned in ${tripNumber - 1} trip(s)`);
+    }
+
+    Logger.log(`[ROUTES] ✅ Assignment complete: ${routes.length} routes created`);
 
     return routes;
 }
 
 /**
- * Change le statut d'une route de "Brouillon" à "Confirmée"
- * @param {string} routeId - ID de la route
- * @returns {boolean} Succès de la confirmation
+ * 💾 Sauvegarder une route (WITH TSP OPTIMIZATION)
+ * 
+ * 🆕 NEW WORKFLOW:
+ * 1. Optimize delivery order using TSP
+ * 2. Save route to sheet
+ * 3. Create etapes with optimized ordre_passage
+ * 4. Update delivery statuses
  */
-function confirmRoute(routeId) {
+function saveRoute(route, params) {
     try {
-        Logger.log(`[ROUTE] ✅ Confirmation route ${routeId}`);
+        const tempId = generateNextId(
+            CONFIG.SHEETS.ROUTES,
+            'R',
+            CONFIG.COLUMNS.ROUTES.ID_ROUTE
+        );
 
-        // Vérifier que le lien Maps existe
-        const routeData = getRouteById(routeId);
-        if (!routeData || !routeData.lien_maps) {
-            throw new Error('Le lien Google Maps doit être généré avant de confirmer la route');
+        Logger.log(`[ROUTES] 💾 Saving route ${tempId}...`);
+
+        // ✨ NEW: Optimize delivery order BEFORE creating etapes
+        const hqConfig = getCurrentHqConfig();
+        let optimizedLivraisons = route.livraisons;
+
+        if (hqConfig && hqConfig.lat && hqConfig.lng && route.livraisons.length > 1) {
+            Logger.log(`[ROUTES] 🎯 Optimizing delivery order for ${tempId}...`);
+
+            const hqCoords = {
+                lat: hqConfig.lat,
+                lng: hqConfig.lng
+            };
+
+            // Apply TSP optimization
+            optimizedLivraisons = optimizeDeliveryOrder(route.livraisons, hqCoords);
+
+            // Recalculate distance with optimized order
+            const optimizedDistance = calculerDistanceTotaleRoute(optimizedLivraisons, hqCoords);
+            route.distance_totale = optimizedDistance;
+
+            Logger.log(`[ROUTES] ✅ Optimization complete: ${Math.round(optimizedDistance)}km`);
+        } else {
+            Logger.log(`[ROUTES] ⚠️ Skipping optimization (HQ not configured or single delivery)`);
         }
 
-        // Mettre à jour le statut
-        updateRoute(routeId, {
-            statut: CONFIG_SHEETS.ENUMS.STATUT_ROUTE.CONFIRMEE
-        });
+        // Create route data
+        const routeData = {
+            id_route: tempId,
+            id_benevole: route.benevole.id,
+            id_binome: route.binome ? route.binome.id : '',
+            id_vehicule_prete: route.vehicule_prete_id || '',
+            date_debut: params.date_livraison,
+            date_fin: null,
+            occasion: params.occasion,
+            statut: CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE, // ✨ CHANGED: Now goes directly to CONFIRMEE
+            distance_totale_km: Math.round(route.distance_totale * 100) / 100,
+            poids_total_kg: Math.round(route.poids_total * 100) / 100,
+            relivre: params.relivre || false,
+            dossier_drive: '',
+            date_creation: getCurrentDateTime(),
+            date_modification: getCurrentDateTime()
+        };
 
-        Logger.log(`[ROUTE] ✅ Route ${routeId} confirmée`);
+        // Validate
+        const validation = validateRoute(routeData);
+        if (validation.hasErrors()) {
+            throw new Error(`Route invalide: ${validation.getErrorMessages().join(', ')}`);
+        }
 
-        return true;
+        const rowData = [
+            routeData.id_route,
+            routeData.id_benevole,
+            routeData.id_binome,
+            routeData.id_vehicule_prete,
+            routeData.date_debut,
+            routeData.date_fin,
+            routeData.occasion,
+            routeData.statut,
+            routeData.distance_totale_km,
+            routeData.poids_total_kg,
+            routeData.relivre,
+            routeData.dossier_drive,
+            routeData.date_creation,
+            routeData.date_modification
+        ];
+
+        // Step 1: Save route
+        appendRow(CONFIG.SHEETS.ROUTES, rowData);
+        Logger.log(`[ROUTES] ✅ Route ${tempId} saved (status: CONFIRMEE)`);
+
+        // Step 2: Create etapes with OPTIMIZED order
+        createOptimizedEtapes(tempId, optimizedLivraisons);
+        Logger.log(`[ROUTES] ✅ ${optimizedLivraisons.length} optimized etapes + HQ return created`);
+
+        // Step 3: Update delivery status
+        for (const livraison of optimizedLivraisons) {
+            const updated = updateDeliveryStatus(
+                livraison.id_livraison,
+                CONFIG.ENUMS.STATUT_LIVRAISON.ASSIGNEE
+            );
+            if (!updated) {
+                Logger.log(`[ROUTES] ⚠️ Failed to update status for ${livraison.id_livraison}`);
+            }
+        }
+        Logger.log(`[ROUTES] ✅ Updated status for ${optimizedLivraisons.length} deliveries`);
+
+        return {
+            ...routeData,
+            livraisons: optimizedLivraisons,
+            benevole_nom: route.benevole.nom
+        };
 
     } catch (error) {
-        Logger.log(`[ROUTE] ❌ Erreur confirmation route: ${error.message}`);
-        throw error;
+        Logger.log(`[ROUTES] ❌ Erreur sauvegarde route: ${error.message}`);
+        Logger.log(`[ROUTES] ❌ Route NOT saved - deliveries NOT updated`);
+        return null;
     }
 }
 
 /**
- * Récupère les données complètes d'une route
- * @param {string} routeId - ID de la route
- * @returns {Object|null} Données de la route
+ * 📝 Créer les étapes OPTIMISÉES pour une route
+ * 
+ * 🆕 NOW USES OPTIMIZED ORDER FROM TSP
+ * 
+ * @param {string} routeId - Route ID
+ * @param {Array<Object>} optimizedLivraisons - Deliveries in optimized order
  */
-function getRouteById(routeId) {
-    const sheet = getSheet(CONFIG_SHEETS.SHEETS.ROUTES);
-    const data = sheet.getDataRange().getValues();
+function createOptimizedEtapes(routeId, optimizedLivraisons) {
+    Logger.log(`[ROUTES] 📝 Creating ${optimizedLivraisons.length} optimized etapes + HQ return for ${routeId}...`);
 
-    for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        if (row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_ROUTE - 1] === routeId) {
-            return {
-                id_route: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_ROUTE - 1],
-                id_benevole: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_BENEVOLE - 1],
-                id_binome: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_BINOME - 1],
-                id_vehicule_prete: row[CONFIG_SHEETS.COLUMNS.ROUTES.ID_VEHICULE_PRETE - 1],
-                date_debut: row[CONFIG_SHEETS.COLUMNS.ROUTES.DATE_DEBUT - 1],
-                date_fin: row[CONFIG_SHEETS.COLUMNS.ROUTES.DATE_FIN - 1],
-                occasion: row[CONFIG_SHEETS.COLUMNS.ROUTES.OCCASION - 1],
-                statut: row[CONFIG_SHEETS.COLUMNS.ROUTES.STATUT - 1],
-                distance_totale_km: row[CONFIG_SHEETS.COLUMNS.ROUTES.DISTANCE_TOTALE_KM - 1],
-                poids_total_kg: row[CONFIG_SHEETS.COLUMNS.ROUTES.POIDS_TOTAL_KG - 1],
-                relivre: row[CONFIG_SHEETS.COLUMNS.ROUTES.RELIVRE - 1],
-                lien_maps: row[CONFIG_SHEETS.COLUMNS.ROUTES.LIEN_MAPS - 1], // ← ✨ NOUVEAU
-                dossier_drive: row[CONFIG_SHEETS.COLUMNS.ROUTES.DOSSIER_DRIVE - 1],
-                date_creation: row[CONFIG_SHEETS.COLUMNS.ROUTES.DATE_CREATION - 1],
-                date_modification: row[CONFIG_SHEETS.COLUMNS.ROUTES.DATE_MODIFICATION - 1]
-            };
+    const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
+    const rows = [];
+
+    // 1. CREATE DELIVERY ETAPES (in optimized order)
+    for (let i = 0; i < optimizedLivraisons.length; i++) {
+        const livraison = optimizedLivraisons[i];
+
+        const etapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        const rowData = [
+            etapeId,                                    // 1. ID_ETAPE (UNIQUE!)
+            routeId,                                    // 2. ID_ROUTE
+            livraison.id_livraison,                     // 3. ID_LIVRAISON
+            i + 1,                                      // 4. ORDRE_PASSAGE (optimized order!)
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,      // 5. STATUT
+            null,                                       // 6. HEURE_DEBUT
+            null,                                       // 7. HEURE_FIN
+            ''                                          // 8. COMMENTAIRE
+        ];
+
+        rows.push(rowData);
+
+        if (i < 3 || i === optimizedLivraisons.length - 1) {
+            Logger.log(`[ROUTES]    ✅ Created ${etapeId} for ${livraison.id_livraison} (ordre ${i + 1})`);
+        } else if (i === 3) {
+            Logger.log(`[ROUTES]    ... (${optimizedLivraisons.length - 4} more etapes)`);
         }
     }
 
-    return null;
+    // 2. ADD HQ RETURN AS LAST STOP
+    const hqConfig = getCurrentHqConfig();
+
+    if (hqConfig && hqConfig.lat && hqConfig.lng) {
+        const hqEtapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        const hqCommentaire = `Retour au QG - ${hqConfig.address}`;
+
+        const hqRowData = [
+            hqEtapeId,
+            routeId,
+            null,  // NULL for HQ return
+            optimizedLivraisons.length + 1,
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
+            null,
+            null,
+            hqCommentaire
+        ];
+
+        rows.push(hqRowData);
+        Logger.log(`[ROUTES]    🏢 Created ${hqEtapeId} for HQ RETURN (ordre ${optimizedLivraisons.length + 1})`);
+    } else {
+        Logger.log(`[ROUTES]    ⚠️ HQ not configured - skipping HQ return`);
+    }
+
+    // 3. BATCH APPEND ALL ETAPES
+    if (rows.length > 0) {
+        sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+        Logger.log(`[ROUTES] ✅ ${rows.length} etapes created for ${routeId} (${optimizedLivraisons.length} deliveries + ${rows.length - optimizedLivraisons.length} HQ return)`);
+    }
 }
