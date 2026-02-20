@@ -1,78 +1,93 @@
 /**
  * ====================================================================
- * LABEL_SERVICE.GS - Service de Génération des Étiquettes
+ * LABEL_SERVICE.GS - Service de Génération des Étiquettes (Google Sheets)
  * ====================================================================
- * Un seul fichier cumulatif par date/occasion dans Routes/
- * Format recto/verso avec miroir colonnes pour impression dos-à-dos
- * Tailles QR et polices calculées dynamiquement selon la grille
  *
- * Optimisation QR  : 1 seul appel par livraison, blob réutilisé pour toutes les parts
- * Optimisation GAS : saveAndClose() + openById() tous les SAVE_EVERY lots
+ * Generates a Google Sheet named "date_occasion" with:
+ *   - FRONT page: QR codes only (one per slot, same QR for all parts of same delivery)
+ *   - BACK page:  Route ID + Delivery ID + Part X/N (mirrored columns, duplex long-edge)
+ *   - Pages stacked with blank row separators
  *
- * Nom du fichier : Labels_YYYYMMDD_occasion
- * Comportement   : Écrase le fichier existant à chaque génération
+ * Layout per "page pair":
+ *   [FRONT rows]
+ *   [blank separator row]
+ *   [BACK  rows]
+ *   [blank separator row]
  */
 
-// Nombre de lots (paires recto/verso) entre chaque sauvegarde intermédiaire
-const SAVE_EVERY = 2;
-
 // ============================================================
-// DIMENSIONS DYNAMIQUES
+// CONSTANTS
 // ============================================================
 
 /**
- * Calcule les dimensions optimales selon la densité de la grille
- * @param {number} rows
- * @param {number} cols
- * @returns {Object} {qrPx, fontIdPt, fontPartPt, spacingPt}
+ * A4 usable area in Google Sheets pixels (96 dpi).
+ * A4 = 794 × 1123 px total; subtract ~40px margins on each axis.
  */
-function calculateLabelDimensions(rows, cols) {
-  const density = rows * cols;
-  let dims;
+const A4_USABLE_WIDTH_PX  = 754;  // 794 - 40
+const A4_USABLE_HEIGHT_PX = 1083; // 1123 - 40
 
-  if (density <= 9) {
-    dims = { qrPx: 150, fontIdPt: 22, fontPartPt: 14, spacingPt: 10 };
-  } else if (density <= 20) {
-    dims = { qrPx: 110, fontIdPt: 18, fontPartPt: 12, spacingPt: 7 };
-  } else if (density <= 35) {
-    dims = { qrPx: 100, fontIdPt: 14, fontPartPt: 10, spacingPt: 4 };
-  } else {
-    dims = { qrPx: 80, fontIdPt: 11, fontPartPt: 8, spacingPt: 3 };
-  }
+/** Fraction of the cell used by the QR image (leaves padding) */
+const QR_CELL_FILL_RATIO = 0.75;
 
-  // ── Calcul du spacer pour aligner recto sur la hauteur naturelle du verso ──
-  // Verso = spacingPt(before QR) + qrPx×0.75 (px→pt) + spacingPt(after QR)
-  //       + fontPartPt("Scan pour confirmer") + spacingPt(after scan)
-  const PX_TO_PT = 0.75;
-  const versoHeightPt = dims.spacingPt
-    + dims.qrPx * PX_TO_PT
-    + dims.spacingPt
-    + dims.fontPartPt
-    + dims.spacingPt;
+/**
+ * Resolution requested from qrserver.com.
+ * The IMAGE() formula controls display size; this just needs to be
+ * large enough that the QR is crisp at any layout density.
+ */
+const QR_SOURCE_SIZE_PX = 200;
 
-  // Recto naturel = paddingTop + 1 ligne texte + paddingBottom
-  const rectoNaturalPt = dims.spacingPt + dims.fontIdPt + dims.spacingPt;
+/** Height of the blank separator row between page sections */
+const SEPARATOR_ROW_HEIGHT_PX = 20;
 
-  // Spacer injecté dans la sous-cellule centrale pour combler l'écart
-  dims.spacerPt = Math.max(1, versoHeightPt - rectoNaturalPt);
+/** Font size for section header rows (FRONT / BACK indicators) */
+const HEADER_FONT_SIZE = 8;
 
-  Logger.log(`[LABELS] 📐 Densité ${density} (${rows}×${cols}) → QR:${dims.qrPx}px, ID:${dims.fontIdPt}pt, verso≈${versoHeightPt.toFixed(1)}pt, spacer:${dims.spacerPt.toFixed(1)}pt`);
-  return dims;
+// ============================================================
+// DYNAMIC CELL DIMENSIONS
+// ============================================================
+
+/**
+ * Calculates cell dimensions that fill an A4 page exactly for the
+ * given rows × cols layout.
+ *
+ * @param {number} rows - Number of label rows chosen by user
+ * @param {number} cols - Number of label cols chosen by user
+ * @returns {{ colWidth: number, rowHeight: number, qrSize: number, fontSize: number }}
+ */
+function calculateCellDimensions(rows, cols) {
+  const colWidth  = Math.floor(A4_USABLE_WIDTH_PX  / cols);
+  const rowHeight = Math.floor(A4_USABLE_HEIGHT_PX / rows);
+
+  // QR fits inside the smaller dimension, with padding
+  const qrSize = Math.floor(Math.min(colWidth, rowHeight) * QR_CELL_FILL_RATIO);
+
+  // Back-label font scales with cell size so text is always readable
+  // Clamp between 9 pt (very dense) and 16 pt (sparse layout)
+  const fontSize = Math.min(16, Math.max(9, Math.floor(rowHeight / 10)));
+
+  Logger.log(
+    `[LABELS] 📐 Layout ${rows}×${cols}: ` +
+    `cell ${colWidth}×${rowHeight}px, QR ${qrSize}px, font ${fontSize}pt`
+  );
+
+  return { colWidth, rowHeight, qrSize, fontSize };
 }
 
 // ============================================================
-// POINT D'ENTRÉE PRINCIPAL
+// MAIN ENTRY POINT
 // ============================================================
 
 /**
- * Génère les étiquettes pour des routes sélectionnées
- * @param {Object} params - {routeIds, rows, cols}
- * @returns {Object} Résultat
+ * Generates labels for selected routes into a Google Sheet.
+ * Called from the menu form via generateLabelsFromForm().
+ *
+ * @param {Object} params - { routeIds: string[], rows: number, cols: number }
+ * @returns {Object} result - { success, processed, errors, documents }
  */
 function generateLabels(params) {
-  Logger.log('[LABELS] 🚀 Démarrage génération des étiquettes...');
+  Logger.log('[LABELS] 🚀 Starting label generation (Google Sheets)...');
   Logger.log(`[LABELS] Routes: ${params.routeIds.join(', ')}`);
-  Logger.log(`[LABELS] Format: ${params.rows}x${params.cols}`);
+  Logger.log(`[LABELS] Format: ${params.rows}×${params.cols}`);
 
   const result = {
     success: false,
@@ -82,112 +97,375 @@ function generateLabels(params) {
   };
 
   try {
-    const allLabels = [];
-    let dateDebut = null;
-    let occasion = null;
+    const rows = parseInt(params.rows) || 7;
+    const cols = parseInt(params.cols) || 3;
+    const slotsPerPage = rows * cols;
 
-    const dims = calculateLabelDimensions(params.rows || 7, params.cols || 3);
+    // ── Collect all label slots across all routes ──────────────────
+    const allSlots = [];
+    let sheetDate = null;
+    let sheetOccasion = null;
 
     for (const routeId of params.routeIds) {
       try {
-        Logger.log(`[LABELS] 📦 Collecte route ${routeId}...`);
-
         const route = getRouteById(routeId);
         if (!route) throw new Error(`Route ${routeId} introuvable`);
 
-        if (!dateDebut && route.date_debut) {
-          dateDebut = new Date(route.date_debut);
-          occasion = route.occasion || 'ponctuelle';
+        if (!sheetDate && route.date_debut) {
+          sheetDate   = new Date(route.date_debut);
+          sheetOccasion = route.occasion || 'ponctuelle';
         }
 
         const livraisons = getDeliveriesForRoute(routeId);
         if (livraisons.length === 0) {
-          Logger.log(`[LABELS] ⚠️ Aucune livraison pour ${routeId}, ignorée`);
+          Logger.log(`[LABELS] ⚠️ No deliveries for ${routeId}, skipping`);
           continue;
         }
 
-        const labels = createLabelsForRoute(routeId, livraisons, dims);
-        Logger.log(`[LABELS]   ${livraisons.length} livraisons → ${labels.length} étiquettes (${livraisons.length} QR téléchargés)`);
+        // Build one slot per part per delivery
+        for (const livraison of livraisons) {
+          const total = parseInt(livraison.nombre_personnes) || 1;
+          const confirmUrl = buildConfirmUrl(livraison.id_livraison, routeId);
+          const qrUrl = buildQrUrl(confirmUrl);
 
-        allLabels.push(...labels);
+          for (let part = 1; part <= total; part++) {
+            allSlots.push({
+              routeId:      String(routeId),
+              livraisonId:  String(livraison.id_livraison || ''),
+              familleId:    String(livraison.id_famille   || ''),
+              part:         part,
+              total:        total,
+              qrUrl:        qrUrl   // same QR for all parts of same delivery
+            });
+          }
+        }
+
         result.processed++;
 
-      } catch (error) {
-        Logger.log(`[LABELS] ❌ Route ${routeId}: ${error.message}`);
-        result.errors.push(`Route ${routeId}: ${error.message}`);
+      } catch (err) {
+        Logger.log(`[LABELS] ❌ Route ${routeId}: ${err.message}`);
+        result.errors.push(`Route ${routeId}: ${err.message}`);
       }
     }
 
-    if (allLabels.length === 0) {
+    if (allSlots.length === 0) {
       result.errors.push('Aucune étiquette à générer');
       return result;
     }
 
-    Logger.log(`[LABELS] 📊 Total: ${allLabels.length} étiquettes pour ${result.processed} routes`);
+    Logger.log(`[LABELS] 📊 Total slots: ${allSlots.length} across ${result.processed} routes`);
 
-    if (!dateDebut) dateDebut = new Date();
-    if (!occasion) occasion = 'ponctuelle';
+    if (!sheetDate)     sheetDate     = new Date();
+    if (!sheetOccasion) sheetOccasion = 'ponctuelle';
 
-    const docUrl = createSingleLabelsDocument(allLabels, dateDebut, occasion, params, dims);
-    Logger.log(`[LABELS] ✅ Document unique: ${docUrl}`);
+    // ── Compute cell dimensions for this layout ────────────────────
+    const dims = calculateCellDimensions(rows, cols);
+
+    // ── Create (or recreate) the Google Sheet ─────────────────────
+    const sheetName = buildSheetName(sheetDate, sheetOccasion);
+    const ss        = createOrReplaceSpreadsheet(sheetName);
+    const sheet     = ss.getActiveSheet();
+
+    // ── Write all page pairs ───────────────────────────────────────
+    writeAllPages(sheet, allSlots, rows, cols, slotsPerPage, dims);
+
+    // ── Freeze nothing, protect nothing, just return URL ──────────
+    const url = ss.getUrl();
+    Logger.log(`[LABELS] ✅ Spreadsheet ready: ${url}`);
 
     result.success = true;
     result.documents.push({
-      labelCount: allLabels.length,
+      labelCount: allSlots.length,
       routeCount: result.processed,
-      url: docUrl
+      url:        url
     });
 
     return result;
 
-  } catch (error) {
-    Logger.log(`[LABELS] ❌ Erreur critique: ${error.message}`);
-    result.errors.push(`Erreur: ${error.message}`);
+  } catch (err) {
+    Logger.log(`[LABELS] ❌ Critical error: ${err.message}`);
+    result.errors.push(`Erreur critique: ${err.message}`);
     return result;
   }
 }
 
 // ============================================================
-// CRÉATION DES ÉTIQUETTES AVEC PRÉ-CHARGEMENT QR
+// SHEET CREATION
 // ============================================================
 
 /**
- * Crée la liste d'étiquettes pour une route
- * ✅ 1 QR par livraison, blob partagé entre toutes les parts
+ * Creates a new spreadsheet, or trashes the existing one with the same name and recreates it.
+ * @param {string} name - Spreadsheet name
+ * @returns {Spreadsheet}
  */
-function createLabelsForRoute(routeId, livraisons, dims) {
-  const labels = [];
+function createOrReplaceSpreadsheet(name) {
+  // Search in Routes folder first, then root
+  const folder = getRoutesFolder();
+  const existing = folder.getFilesByName(name);
+  while (existing.hasNext()) {
+    existing.next().setTrashed(true);
+    Logger.log(`[LABELS] 🗑️ Trashed existing file: ${name}`);
+  }
 
-  for (const livraison of livraisons) {
-    const n = livraison.nombre_personnes || 1;
-    const familleId = String(livraison.id_famille || '');
-    const livraisonId = String(livraison.id_livraison || '');
-    const confirmUrl = buildConfirmUrl(livraisonId, routeId);
+  const ss   = SpreadsheetApp.create(name);
+  const file = DriveApp.getFileById(ss.getId());
+  folder.addFile(file);
+  DriveApp.getRootFolder().removeFile(file);
 
-    Logger.log(`[LABELS]   🔲 QR pour ${livraisonId} (${n} part(s))...`);
-    const qrBlob = fetchQrCode(confirmUrl, dims.qrPx);
+  Logger.log(`[LABELS] ✅ Created spreadsheet: ${name}`);
+  return ss;
+}
 
-    for (let i = 1; i <= n; i++) {
-      labels.push({
-        route_id: String(routeId),
-        famille_id: familleId,
-        livraison_id: livraisonId,
-        part: i,
-        total: n,
-        qr_blob: qrBlob
-      });
+// ============================================================
+// PAGE WRITING
+// ============================================================
+
+/**
+ * Writes all front/back page pairs into the sheet.
+ *
+ * @param {Sheet}    sheet        - Active sheet
+ * @param {Object[]} allSlots     - All label slots
+ * @param {number}   rows         - Label rows per page
+ * @param {number}   cols         - Label cols per page
+ * @param {number}   slotsPerPage - rows × cols
+ */
+function writeAllPages(sheet, allSlots, rows, cols, slotsPerPage, dims) {
+  const totalPages = Math.ceil(allSlots.length / slotsPerPage);
+  Logger.log(`[LABELS] 📄 Writing ${totalPages} page pair(s)...`);
+
+  // Pre-set column widths (done once for all pages)
+  setColumnWidths(sheet, cols, dims.colWidth);
+
+  let currentRow = 1; // 1-indexed
+
+  for (let page = 0; page < totalPages; page++) {
+    const pageSlots = allSlots.slice(page * slotsPerPage, (page + 1) * slotsPerPage);
+
+    Logger.log(`[LABELS] ✍️  Page ${page + 1}/${totalPages}: ${pageSlots.length} slots`);
+
+    // ── FRONT (QR codes) ─────────────────────────────────────────
+    // currentRow = writeSectionHeader(sheet, currentRow, `▶ RECTO — Page ${page + 1}/${totalPages} (QR codes)`);
+    currentRow = writeFrontPage(sheet, currentRow, pageSlots, rows, cols, dims);
+
+    // ── Separator ────────────────────────────────────────────────
+    currentRow = writeSeparatorRow(sheet, currentRow);
+
+    // ── BACK (label text, mirrored) ──────────────────────────────
+    // currentRow = writeSectionHeader(sheet, currentRow, `◀ VERSO — Page ${page + 1}/${totalPages} (étiquettes) — retourner sur bord LONG`);
+    currentRow = writeBackPage(sheet, currentRow, pageSlots, rows, cols, dims);
+
+    // ── Separator between page pairs ─────────────────────────────
+    currentRow = writeSeparatorRow(sheet, currentRow);
+  }
+
+  Logger.log(`[LABELS] ✅ All pages written. Total rows used: ${currentRow - 1}`);
+}
+
+// ────────────────────────────────────────────────────────────
+// FRONT PAGE
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Writes the front page (QR codes only) into the sheet.
+ * Returns the next available row index.
+ *
+ * @param {Sheet}    sheet     - Sheet
+ * @param {number}   startRow  - First row to write (1-indexed)
+ * @param {Object[]} slots     - Slots for this page (may be < rows×cols for last page)
+ * @param {number}   rows      - Label rows
+ * @param {number}   cols      - Label cols
+ * @returns {number} Next row index after this page
+ */
+function writeFrontPage(sheet, startRow, slots, rows, cols, dims) {
+  for (let r = 0; r < rows; r++) {
+    const sheetRow = startRow + r;
+
+    // Set row height dynamically
+    sheet.setRowHeight(sheetRow, dims.rowHeight);
+
+    for (let c = 0; c < cols; c++) {
+      const idx  = r * cols + c;
+      const cell = sheet.getRange(sheetRow, c + 1);
+
+      // Style: white background, centered
+      styleLabelCell(cell);
+
+      if (idx < slots.length) {
+        const slot = slots[idx];
+        // IMAGE mode 4: custom size — must specify height AND width
+        cell.setFormula(`=IMAGE("${slot.qrUrl}",4,${dims.qrSize},${dims.qrSize})`);
+      }
+      // Empty slots stay blank (white)
     }
   }
 
-  return labels;
+  // Draw outer border around the whole front page
+  drawPageBorder(sheet, startRow, rows, cols);
+
+  return startRow + rows;
+}
+
+// ────────────────────────────────────────────────────────────
+// BACK PAGE (mirrored columns)
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Writes the back page (label text) with column mirroring for duplex printing.
+ * Mirroring: slot at front col c → back col (cols-1-c)
+ * So front [0,1,2] → back [2,1,0] (printed col positions stay aligned when flipped).
+ *
+ * @param {Sheet}    sheet     - Sheet
+ * @param {number}   startRow  - First row to write (1-indexed)
+ * @param {Object[]} slots     - Same slots as the corresponding front page
+ * @param {number}   rows      - Label rows
+ * @param {number}   cols      - Label cols
+ * @returns {number} Next row index after this page
+ */
+function writeBackPage(sheet, startRow, slots, rows, cols, dims) {
+  for (let r = 0; r < rows; r++) {
+    const sheetRow = startRow + r;
+    sheet.setRowHeight(sheetRow, dims.rowHeight);
+
+    for (let c = 0; c < cols; c++) {
+      // Mirror: front column c → back column (cols-1-c)
+      const frontCol = (cols - 1) - c;
+      const idx      = r * cols + frontCol;
+      const cell     = sheet.getRange(sheetRow, c + 1);
+
+      styleLabelCell(cell);
+
+      if (idx < slots.length) {
+        const slot = slots[idx];
+        writeBackCellContent(cell, slot, dims.fontSize);
+      }
+    }
+  }
+
+  drawPageBorder(sheet, startRow, rows, cols);
+
+  return startRow + rows;
 }
 
 /**
- * Construit l'URL de confirmation
+ * Writes the three lines of text in a back-page label cell.
+ * Uses rich text to stack Route ID / Delivery ID / Part on separate lines.
+ *
+ * @param {Range}  cell - Single cell range
+ * @param {Object} slot - { routeId, livraisonId, familleId, part, total }
+ */
+function writeBackCellContent(cell, slot, fontSize) {
+  const routeDisplay    = formatRouteDisplay(slot.routeId);
+  const deliveryDisplay = `F_${slot.familleId}`;
+  const partDisplay     = `${slot.part} / ${slot.total}`;
+
+  // Build multi-line string
+  const text = `${routeDisplay}\n${deliveryDisplay}\n${partDisplay}`;
+
+  cell.setValue(text);
+  cell.setFontSize(fontSize);
+  cell.setFontWeight('bold');
+  cell.setFontColor('#000000');
+  cell.setHorizontalAlignment('center');
+  cell.setVerticalAlignment('middle');
+  cell.setWrap(true);
+}
+
+// ============================================================
+// HELPERS — FORMATTING
+// ============================================================
+
+/**
+ * Applies base label cell style (white bg, centered, wrap).
+ * @param {Range} cell
+ */
+function styleLabelCell(cell) {
+  cell.setBackground('#FFFFFF');
+  cell.setHorizontalAlignment('center');
+  cell.setVerticalAlignment('middle');
+  cell.setWrap(true);
+
+  // Thin border on all sides
+  const borderStyle = SpreadsheetApp.BorderStyle.SOLID;
+  cell.setBorder(true, true, true, true, false, false, '#CCCCCC', borderStyle);
+}
+
+/**
+ * Draws a thicker outer border around a block of rows×cols.
+ * @param {Sheet}  sheet
+ * @param {number} startRow - 1-indexed
+ * @param {number} rows
+ * @param {number} cols
+ */
+function drawPageBorder(sheet, startRow, rows, cols) {
+  const range = sheet.getRange(startRow, 1, rows, cols);
+  const thick = SpreadsheetApp.BorderStyle.SOLID_MEDIUM;
+  range.setBorder(true, true, true, true, null, null, '#000000', thick);
+}
+
+/**
+ * Sets all label column widths (done once at the start).
+ * @param {Sheet}  sheet
+ * @param {number} cols
+ */
+function setColumnWidths(sheet, cols, colWidth) {
+  for (let c = 1; c <= cols; c++) {
+    sheet.setColumnWidth(c, colWidth);
+  }
+}
+
+/**
+ * Writes a thin separator row and returns the next row index.
+ * @param {Sheet}  sheet
+ * @param {number} rowIndex - 1-indexed
+ * @returns {number} Next row index
+ */
+function writeSeparatorRow(sheet, rowIndex) {
+  sheet.setRowHeight(rowIndex, SEPARATOR_ROW_HEIGHT_PX);
+  sheet.getRange(rowIndex, 1).setValue('');
+  return rowIndex + 1;
+}
+
+/**
+ * Writes a small section header row (e.g. "▶ RECTO — Page 1/3").
+ * @param {Sheet}  sheet
+ * @param {number} rowIndex - 1-indexed
+ * @param {string} label
+ * @returns {number} Next row index
+ */
+function writeSectionHeader(sheet, rowIndex, label) {
+  sheet.setRowHeight(rowIndex, 18);
+  const cell = sheet.getRange(rowIndex, 1);
+  cell.setValue(label);
+  cell.setFontSize(HEADER_FONT_SIZE);
+  cell.setFontColor('#888888');
+  cell.setFontStyle('italic');
+  return rowIndex + 1;
+}
+
+// ============================================================
+// HELPERS — IDs / URLs
+// ============================================================
+
+/**
+ * Formats a route ID for display on the back label.
+ * e.g. "R001" → "R_001", "R1" → "R_001"
+ * @param {string} routeId
+ * @returns {string}
+ */
+function formatRouteDisplay(routeId) {
+  const num = String(routeId).replace(/^R0*/, '') || '0';
+  return `R_${num.padStart(3, '0')}`;
+}
+
+/**
+ * Builds the delivery confirmation URL (same logic as before).
+ * @param {string} livraisonId
+ * @param {string} routeId
+ * @returns {string}
  */
 function buildConfirmUrl(livraisonId, routeId) {
   const tokens = filterData(CONFIG.SHEETS.TOKENS, row => row.id_route === routeId);
-  const token = tokens.length > 0 ? tokens[0].token : '';
+  const token  = tokens.length > 0 ? tokens[0].token : '';
   const apiUrl = PropertiesService.getScriptProperties().getProperty('API_WEB_URL')
     || ScriptApp.getService().getUrl()
     || 'https://script.google.com';
@@ -195,335 +473,37 @@ function buildConfirmUrl(livraisonId, routeId) {
   return `${apiUrl}?action=confirm_delivery&id_livraison=${encodeURIComponent(livraisonId)}&token=${encodeURIComponent(token)}`;
 }
 
-// ============================================================
-// QR CODE - api.qrserver.com avec retry (max 5 tentatives)
-// ============================================================
-
 /**
- * Télécharge un QR code avec retry et backoff progressif
+ * Builds the QR code image URL using api.qrserver.com.
+ * @param {string} content - URL to encode
+ * @returns {string} Image URL
  */
-function fetchQrCode(content, sizePx) {
-  const size = `${sizePx}x${sizePx}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(content)}`;
-  const MAX_RETRIES = 5;
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
-
-      if (response.getResponseCode() === 200) {
-        Logger.log(`[LABELS] 📷 QR ${size} OK (tentative ${attempt}/${MAX_RETRIES})`);
-        return response.getBlob();
-      }
-
-      Logger.log(`[LABELS] ⚠️ QR tentative ${attempt}/${MAX_RETRIES}: HTTP ${response.getResponseCode()}`);
-    } catch (e) {
-      Logger.log(`[LABELS] ⚠️ QR tentative ${attempt}/${MAX_RETRIES}: ${e.message}`);
-    }
-
-    if (attempt < MAX_RETRIES) Utilities.sleep(800 * attempt);
-  }
-
-  Logger.log(`[LABELS] ❌ QR indisponible après ${MAX_RETRIES} tentatives`);
-  return null;
-}
-
-// ============================================================
-// DOCUMENT UNIQUE - SAUVEGARDE PAR BATCH
-// ============================================================
-
-/**
- * Crée (ou recrée) le document unique Labels_YYYYMMDD_occasion
- *
- * Stratégie batch :
- *   - On écrit SAVE_EVERY lots (paires recto/verso) dans le doc ouvert
- *   - On fait saveAndClose() + openById() entre chaque batch
- *   - Chaque ouverture est une référence fraîche → plus d'accumulation mémoire
- */
-function createSingleLabelsDocument(allLabels, dateDebut, occasion, config, dims) {
-  const rows = config.rows || 7;
-  const cols = config.cols || 3;
-  const perPage = rows * cols;
-
-  const dateStr = Utilities.formatDate(dateDebut, CONFIG.TIMEZONE || 'Europe/Paris', 'yyyyMMdd');
-  const fileName = `Labels_${dateStr}_${occasion}`;
-
-  Logger.log(`[LABELS] 📄 Fichier cible: "${fileName}"`);
-  deleteLabelFileIfExists(fileName);
-
-  // Créer le document vide et le déplacer dans Routes/
-  const initialDoc = DocumentApp.create(fileName);
-  const docId = initialDoc.getId();
-  initialDoc.saveAndClose();
-  moveFileToRoutesFolder(docId);
-  Utilities.sleep(300);
-
-  const totalLots = Math.ceil(allLabels.length / perPage);
-  Logger.log(`[LABELS] 📐 ${allLabels.length} étiquettes → ${totalLots} lot(s), batch de ${SAVE_EVERY}`);
-
-  // Découper les lots en batches de SAVE_EVERY
-  for (let batchStart = 0; batchStart < totalLots; batchStart += SAVE_EVERY) {
-    const batchEnd = Math.min(batchStart + SAVE_EVERY, totalLots);
-    Logger.log(`[LABELS] 📝 Batch lots ${batchStart + 1}–${batchEnd}/${totalLots}...`);
-
-    // Ouvrir une référence fraîche pour chaque batch
-    const doc = DocumentApp.openById(docId);
-    const body = doc.getBody();
-
-    // Réinitialiser les marges (perdues après réouverture)
-    body.setMarginTop(10);
-    body.setMarginBottom(10);
-    body.setMarginLeft(10);
-    body.setMarginRight(10);
-
-    for (let lot = batchStart; lot < batchEnd; lot++) {
-      const isFirstEverLot = (lot === 0);
-      writeLotToBody(body, lot, totalLots, allLabels, perPage, rows, cols, dims, isFirstEverLot);
-    }
-
-    Logger.log(`[LABELS] 💾 Sauvegarde batch ${batchStart + 1}–${batchEnd}...`);
-    doc.saveAndClose();
-    Utilities.sleep(400);
-  }
-
-  const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
-  Logger.log(`[LABELS] ✅ "${fileName}" généré — ${totalLots} lot(s)`);
-  return docUrl;
+function buildQrUrl(content) {
+  const size = `${QR_SOURCE_SIZE_PX}x${QR_SOURCE_SIZE_PX}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(content)}`;
 }
 
 /**
- * Écrit un lot (paire recto/verso) dans un document ouvert
- * @param {Body}    body           - body du document GAS (doc.getBody())
- * @param {number}  lot            - Index du lot courant
- * @param {number}  totalLots      - Nombre total de lots
- * @param {Array}   allLabels      - Toutes les étiquettes
- * @param {number}  perPage        - Étiquettes par page
- * @param {number}  rows
- * @param {number}  cols
- * @param {Object}  dims
- * @param {boolean} isFirstEverLot - true uniquement pour le tout premier lot du document
+ * Builds the spreadsheet name from date and occasion.
+ * e.g. "20260215_zakat_el_fitr"
+ * @param {Date}   date
+ * @param {string} occasion
+ * @returns {string}
  */
-function writeLotToBody(body, lot, totalLots, allLabels, perPage, rows, cols, dims, isFirstEverLot) {
-  const start = lot * perPage;
-  const end = Math.min(start + perPage, allLabels.length);
-  const pageLabels = allLabels.slice(start, end);
-
-  Logger.log(`[LABELS] ✍️ Lot ${lot + 1}/${totalLots} : étiquettes ${start + 1}–${end}`);
-
-  // ---- PAGE RECTO ----
-  if (!isFirstEverLot) body.appendPageBreak();
-  appendSectionTitle(body, `RECTO — étiquettes ${start + 1} à ${end} sur ${allLabels.length}`, false);
-  appendPrintingHint(body, '↩ Retourner sur le bord LONG (gauche) pour imprimer le verso');
-  appendRectoTable(body, pageLabels, rows, cols, dims);
-
-  // ---- PAGE VERSO ----
-  body.appendPageBreak();
-  appendSectionTitle(body, `VERSO — étiquettes ${start + 1} à ${end} sur ${allLabels.length}`, true);
-  appendVersoTable(body, pageLabels, rows, cols, dims);
+function buildSheetName(date, occasion) {
+  const dateStr = Utilities.formatDate(date, CONFIG.TIMEZONE || 'Europe/Paris', 'yyyyMMdd');
+  return `${dateStr}_${occasion}`;
 }
 
 // ============================================================
-// TITRES ET INDICATIONS
+// ROUTES CONFIRMÉES (for the label form — unchanged API)
 // ============================================================
-
-function appendSectionTitle(body, title, isVerso) {
-  const p = body.appendParagraph(title);
-  p.setFontSize(7);
-  p.setForegroundColor(isVerso ? '#7EA6D0' : '#AAAAAA');
-  p.setSpacingAfter(2);
-  p.setSpacingBefore(0);
-}
-
-function appendPrintingHint(body, hint) {
-  const p = body.appendParagraph(hint);
-  p.setFontSize(7);
-  p.setForegroundColor('#BBBBBB');
-  p.setItalic(true);
-  p.setSpacingAfter(3);
-  p.setSpacingBefore(0);
-}
-
-// ============================================================
-// PAGE RECTO - tableau externe + tableau interne 1×3 par cellule
-// ============================================================
-
-function appendRectoTable(body, labels, rows, cols, dims) {
-  const outerTable = body.appendTable();
-  outerTable.setBorderWidth(1);
-  outerTable.setBorderColor('#888888');
-
-  for (let r = 0; r < rows; r++) {
-    const tableRow = outerTable.appendTableRow();
-
-    for (let c = 0; c < cols; c++) {
-      const idx = r * cols + c;
-      const outerCell = tableRow.appendTableCell();
-      outerCell.setPaddingTop(0);
-      outerCell.setPaddingBottom(0);
-      outerCell.setPaddingLeft(0);
-      outerCell.setPaddingRight(0);
-
-      if (idx < labels.length) {
-        fillRectoCell(outerCell, labels[idx], dims);
-      } else {
-        outerCell.appendParagraph('');
-      }
-    }
-  }
-}
 
 /**
- * Tableau interne 1×3 dans chaque cellule recto — fond noir, texte blanc
- *
- * ┌────────────┬─────────────┬──────┐
- * │  R_001     │   F_12345   │      │
- * │  (gauche)  │  (centré)   │  1/3 │ ← centré bas
- * └────────────┴─────────────┴──────┘
+ * Returns confirmed/in-progress routes with delivery counts.
+ * Called by the labelForm.html UI.
+ * @returns {Array<Object>}
  */
-function fillRectoCell(outerCell, label, dims) {
-  outerCell.clear();
-
-  const routeNum = String(label.route_id).replace(/^R0*/, '') || '0';
-  const routeDisplay = `R_${routeNum.padStart(3, '0')}`;
-  const familleDisplay = `F_${String(label.famille_id)}`;
-  const partDisplay = `${label.part}/${label.total}`;
-
-  const innerTable = outerCell.appendTable();
-  innerTable.setBorderWidth(0);
-  const innerRow = innerTable.appendTableRow();
-
-  // ── GAUCHE : R_001, aligné gauche, centré vertical ──
-  const leftCell = innerRow.appendTableCell();
-  leftCell.setBackgroundColor('#000000');
-  leftCell.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
-  leftCell.setPaddingTop(0);    // hauteur pilotée par spacer de la cellule centrale
-  leftCell.setPaddingBottom(0);
-  leftCell.setPaddingLeft(dims.spacingPt + 2);
-  leftCell.setPaddingRight(dims.spacingPt);
-  const pLeft = leftCell.appendParagraph(routeDisplay);
-  pLeft.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
-  const tLeft = pLeft.editAsText();
-  tLeft.setFontSize(dims.fontIdPt);
-  tLeft.setBold(true);
-  tLeft.setForegroundColor('#FFFFFF');
-
-  // ── CENTRE : F_12345, centré horizontal et vertical ──
-  // Un spacer invisible est ajouté pour que la hauteur du recto
-  // s'aligne sur celle du verso (contrôlée par le QR code).
-  const centerCell = innerRow.appendTableCell();
-  centerCell.setBackgroundColor('#000000');
-  centerCell.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
-  centerCell.setPaddingTop(0);   // géré par spacer
-  centerCell.setPaddingBottom(0);
-  centerCell.setPaddingLeft(dims.spacingPt);
-  centerCell.setPaddingRight(dims.spacingPt);
-
-  // Spacer supérieur (invisible) — pousse le texte vers le centre
-  const pSpacerTop = centerCell.appendParagraph('');
-  pSpacerTop.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-  pSpacerTop.editAsText().setFontSize(dims.spacerPt / 2);
-  pSpacerTop.setSpacingBefore(0);
-  pSpacerTop.setSpacingAfter(0);
-
-  const pCenter = centerCell.appendParagraph(familleDisplay);
-  pCenter.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-  const tCenter = pCenter.editAsText();
-  tCenter.setFontSize(dims.fontIdPt);
-  tCenter.setBold(true);
-  tCenter.setForegroundColor('#FFFFFF');
-
-  // Spacer inférieur (symétrique)
-  const pSpacerBot = centerCell.appendParagraph('');
-  pSpacerBot.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-  pSpacerBot.editAsText().setFontSize(dims.spacerPt / 2);
-  pSpacerBot.setSpacingBefore(0);
-  pSpacerBot.setSpacingAfter(0);
-
-  // ── DROITE : 1/3, centré horizontal, aligné en bas ──
-  const rightCell = innerRow.appendTableCell();
-  rightCell.setBackgroundColor('#000000');
-  rightCell.setVerticalAlignment(DocumentApp.VerticalAlignment.BOTTOM);
-  rightCell.setPaddingTop(0);   // hauteur pilotée par spacer de la cellule centrale
-  rightCell.setPaddingBottom(dims.spacingPt);
-  rightCell.setPaddingLeft(dims.spacingPt);
-  rightCell.setPaddingRight(dims.spacingPt + 2);
-  const pRight = rightCell.appendParagraph(partDisplay);
-  pRight.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-  const tRight = pRight.editAsText();
-  tRight.setFontSize(dims.fontPartPt);
-  tRight.setBold(false);
-  tRight.setForegroundColor('#FFFFFF');
-}
-
-// ============================================================
-// PAGE VERSO (colonnes miroir)
-// ============================================================
-
-function appendVersoTable(body, labels, rows, cols, dims) {
-  const table = body.appendTable();
-  table.setBorderWidth(1);
-  table.setBorderColor('#888888');
-
-  for (let r = 0; r < rows; r++) {
-    const tableRow = table.appendTableRow();
-
-    for (let c = 0; c < cols; c++) {
-      const mirrorC = (cols - 1) - c;
-      const idx = r * cols + mirrorC;
-
-      const cell = tableRow.appendTableCell();
-      setLabelCellPadding(cell, dims.spacingPt);
-
-      if (idx < labels.length) {
-        fillVersoCell(cell, labels[idx], dims);
-      } else {
-        cell.appendParagraph('');
-      }
-    }
-  }
-}
-
-function fillVersoCell(cell, label, dims) {
-  cell.clear();
-
-  const pQr = cell.appendParagraph('');
-  pQr.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-  pQr.setSpacingBefore(dims.spacingPt);
-  pQr.setSpacingAfter(dims.spacingPt);
-
-  if (label.qr_blob) {
-    const img = pQr.appendInlineImage(label.qr_blob);
-    img.setWidth(dims.qrPx);
-    img.setHeight(dims.qrPx);
-  } else {
-    const t = pQr.appendText('[QR indisponible]');
-    t.setFontSize(dims.fontPartPt);
-    t.setForegroundColor('#AAAAAA');
-  }
-
-  const pScan = cell.appendParagraph('Scan pour confirmer');
-  pScan.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-  pScan.setFontSize(dims.fontPartPt);
-  pScan.setSpacingBefore(0);
-  pScan.setSpacingAfter(dims.spacingPt);
-}
-
-// ============================================================
-// HELPERS
-// ============================================================
-
-function setLabelCellPadding(cell, spacingPt) {
-  const pad = Math.max(3, spacingPt);
-  cell.setPaddingTop(pad);
-  cell.setPaddingBottom(pad);
-  cell.setPaddingLeft(pad + 2);
-  cell.setPaddingRight(pad + 2);
-}
-
-// ============================================================
-// ROUTES CONFIRMÉES (pour le formulaire)
-// ============================================================
-
 function getConfirmedRoutesForLabels() {
   try {
     const validStatuts = [
@@ -536,17 +516,17 @@ function getConfirmedRoutesForLabels() {
     );
 
     return routes.map(route => {
-      const deliveries = getDeliveriesForRoute(route.id_route);
-      const total = deliveries.reduce((sum, d) => sum + (d.nombre_personnes || 1), 0);
+      const deliveries    = getDeliveriesForRoute(route.id_route);
+      const totalPersonnes = deliveries.reduce((sum, d) => sum + (parseInt(d.nombre_personnes) || 1), 0);
       return {
-        id_route: route.id_route,
+        id_route:          route.id_route,
         nombre_livraisons: deliveries.length,
-        total_personnes: total
+        total_personnes:   totalPersonnes
       };
     });
 
   } catch (error) {
-    Logger.log(`[LABELS] ❌ Erreur récupération routes: ${error.message}`);
+    Logger.log(`[LABELS] ❌ Error fetching routes: ${error.message}`);
     return [];
   }
 }
