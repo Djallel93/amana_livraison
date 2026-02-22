@@ -85,34 +85,12 @@ function planRoutesFromForm(params) {
 }
 
 function sendRoutesToVolunteers() {
-  const ui = SpreadsheetApp.getUi();
+  const html = HtmlService.createHtmlOutputFromFile('ui/sendRoutesForm')
+    .setWidth(880)
+    .setHeight(680)
+    .setTitle('✉️ Envoyer les Itinéraires aux Bénévoles');
 
-  const response = ui.alert(
-    'Envoyer Routes',
-    'Cette fonction enverra les itinéraires à tous les bénévoles dont les routes sont confirmées.\n\n' +
-    'Continuer ?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response !== ui.Button.YES) {
-    return;
-  }
-
-  try {
-    const routes = filterData(CONFIG.SHEETS.ROUTES, row =>
-      row.statut === CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE
-    );
-
-    if (routes.length === 0) {
-      ui.alert('Aucune Route', 'Aucune route confirmée à envoyer.', ui.ButtonSet.OK);
-      return;
-    }
-
-    ui.alert('Envoi Routes', `${routes.length} route(s) confirmée(s) trouvée(s).\nLes emails ont déjà été envoyés lors de la génération des étapes.`, ui.ButtonSet.OK);
-
-  } catch (error) {
-    ui.alert('Erreur', error.message, ui.ButtonSet.OK);
-  }
+  SpreadsheetApp.getUi().showModalDialog(html, 'Envoyer les Itinéraires');
 }
 
 function showReorderStopsInterface() {

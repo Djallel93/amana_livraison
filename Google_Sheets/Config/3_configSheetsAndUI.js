@@ -158,7 +158,7 @@ const CONFIG_ENUMS = {
         EN_ATTENTE: 'En Attente',
         EN_COURS: 'En Cours',
         LIVREE: 'Livrée',
-        SAUTEE: 'Sautée'
+        IGNOREE: 'ignorée'
     },
     OCCASION: {
         ZAKAT_EL_FITR: 'zakat_el_fitr',
