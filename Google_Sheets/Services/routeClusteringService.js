@@ -1,218 +1,199 @@
 /**
  * ====================================================================
- * ROUTE_SERVICE_CLUSTERING.GS - Algorithme de Clustering Adaptatif
+ * ROUTE_SERVICE_CLUSTERING.GS - Algorithme de Clustering Géographique
  * ====================================================================
- * VERSION 2.0 - WITH DISTANCE-BASED SORTING
- * 
- * 🆕 CHANGE: Clusters are now sorted by distance from HQ (FARTHEST FIRST)
- * This ensures R001 is always the farthest route
+ * VERSION 3.0 - CLUSTERING PUREMENT GÉOGRAPHIQUE
+ *
+ * ⚠️ CHANGEMENT v3 :
+ * - Suppression de la contrainte de poids MAX_WEIGHT_PER_CLUSTER_KG
+ * - Le clustering est désormais uniquement basé sur des critères géographiques :
+ *   distance de proximité, diamètre max, compacité, préférence quartier
+ * - Les contraintes de capacité (poids ET parts) sont vérifiées uniquement
+ *   lors de l'assignation des clusters aux véhicules
+ * - Suppression du paramètre poidsPartKg (inutile pour le clustering)
+ *
+ * Clusters triés par distance du QG (le plus loin en premier)
+ * pour garantir que R001 est toujours la route la plus éloignée.
  */
 
 /**
  * Identifie les clusters géographiques
- * 🆕 NOW SORTS BY DISTANCE FROM HQ (FARTHEST FIRST)
- * 
- * @param {Array<Object>} livraisons - Livraisons
- * @param {number} poidsPartKg - Poids moyen par personne
- * @returns {Array<Object>} Clusters sorted by distance from HQ (farthest first)
+ * Clustering purement géographique - aucune contrainte de capacité
+ *
+ * @param {Array<Object>} livraisons - Livraisons avec lat/lng/nombre_personnes
+ * @returns {Array<Object>} Clusters triés par distance du QG (le plus loin en premier)
  */
-function identifierClusters(livraisons, poidsPartKg) {
+function identifierClusters(livraisons) {
     const clusters = [];
 
     const DISTANCE_PROXIMITE = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_PROXIMITE_KM;
     const MAX_DIAMETER = CONFIG.ROUTE_OPTIMIZATION.MAX_CLUSTER_DIAMETER_KM;
-    const MAX_WEIGHT = CONFIG.ROUTE_OPTIMIZATION.MAX_WEIGHT_PER_CLUSTER_KG;
     const MIN_COMPACTNESS = CONFIG.ROUTE_OPTIMIZATION.MIN_COMPACTNESS_RATIO;
     const QUARTIER_PREFERENCE = CONFIG.ROUTE_OPTIMIZATION.QUARTIER_PREFERENCE;
     const ALLOW_CROSS_QUARTIER = CONFIG.ROUTE_OPTIMIZATION.ALLOW_CROSS_QUARTIER;
 
-    Logger.log(`[ROUTES] 📐 Paramètres clustering: proximité=${DISTANCE_PROXIMITE}km, diamètre_max=${MAX_DIAMETER}km`);
+    Logger.log(`[CLUSTERING] 📐 Paramètres: proximité=${DISTANCE_PROXIMITE}km, diamètre_max=${MAX_DIAMETER}km`);
+    Logger.log(`[CLUSTERING] ℹ️  Clustering purement géographique (pas de contrainte de poids)`);
 
-    // Étape 1: Grouper les livraisons au même bâtiment
-    const buildingGroups = groupByBuilding(livraisons, poidsPartKg);
-    Logger.log(`[ROUTES] 🏢 ${buildingGroups.length} groupes de bâtiments identifiés`);
+    // Étape 1 : Grouper les livraisons au même bâtiment
+    const buildingGroups = grouperParBatiment(livraisons);
+    Logger.log(`[CLUSTERING] 🏢 ${buildingGroups.length} groupes de bâtiments identifiés`);
 
-    // Étape 2: Créer les clusters avec contrôles stricts
+    // Étape 2 : Créer les clusters avec contrôles géographiques stricts
     for (const group of buildingGroups) {
-        let bestCluster = null;
-        let bestScore = -1;
+        let meilleurCluster = null;
+        let meilleurScore = -1;
 
-        // Chercher le meilleur cluster existant
         for (const cluster of clusters) {
-            // Check 1: Distance au centre
-            const distToCenter = calculerDistanceHaversine(
-                cluster.centre.lat,
-                cluster.centre.lng,
-                group.centre.lat,
-                group.centre.lng
+            // Vérification 1 : Distance au centre
+            const distCentre = calculerDistanceHaversine(
+                cluster.centre.lat, cluster.centre.lng,
+                group.centre.lat, group.centre.lng
             );
+            if (distCentre > DISTANCE_PROXIMITE) continue;
 
-            if (distToCenter > DISTANCE_PROXIMITE) {
-                continue;
-            }
+            // Vérification 2 : Diamètre maximum
+            const nouveauDiametre = calculateMaxDiameter(cluster.livraisons, group.livraisons);
+            if (nouveauDiametre > MAX_DIAMETER) continue;
 
-            // Check 2: Diamètre maximum
-            const newDiameter = calculateMaxDiameter(cluster.livraisons, group.livraisons);
-            if (newDiameter > MAX_DIAMETER) {
-                continue;
-            }
-
-            // Check 3: Poids total
-            const newWeight = cluster.poids_total + group.poids_total;
-            if (newWeight > MAX_WEIGHT) {
-                continue;
-            }
-
-            // Check 4: Compacité
-            const newCompactness = calculateCompactness(
+            // Vérification 3 : Compacité minimale
+            const nouvelleCompacite = calculateCompactness(
                 [...cluster.livraisons, ...group.livraisons]
             );
-            if (newCompactness < MIN_COMPACTNESS) {
-                continue;
-            }
+            if (nouvelleCompacite < MIN_COMPACTNESS) continue;
 
-            // Check 5: Préférence quartier
-            const sameQuartier = cluster.quartier_id === group.quartier_id;
+            // Vérification 4 : Préférence quartier
+            const memeQuartier = cluster.quartier_id === group.quartier_id;
+            if (!memeQuartier && !ALLOW_CROSS_QUARTIER) continue;
 
-            if (!sameQuartier && !ALLOW_CROSS_QUARTIER) {
-                continue;
-            }
-
-            // Calculer le score
+            // Calcul du score
             let score = 0;
+            if (memeQuartier && QUARTIER_PREFERENCE) score += 10;
+            score += (DISTANCE_PROXIMITE - distCentre) * 2;
+            score += nouvelleCompacite * 5;
 
-            if (sameQuartier && QUARTIER_PREFERENCE) {
-                score += 10;
-            }
-
-            score += (DISTANCE_PROXIMITE - distToCenter) * 2;
-            score += newCompactness * 5;
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestCluster = cluster;
+            if (score > meilleurScore) {
+                meilleurScore = score;
+                meilleurCluster = cluster;
             }
         }
 
-        // Ajouter au meilleur cluster ou créer un nouveau
-        if (bestCluster) {
-            bestCluster.livraisons.push(...group.livraisons);
-            bestCluster.poids_total += group.poids_total;
-            bestCluster.nombre_livraisons += group.livraisons.length;
-            updateClusterCenter(bestCluster);
+        if (meilleurCluster) {
+            // Ajouter au cluster existant
+            meilleurCluster.livraisons.push(...group.livraisons);
+            meilleurCluster.nombre_livraisons += group.livraisons.length;
+            meilleurCluster.nombre_parts += group.nombre_parts;
+            mettreAJourCentre(meilleurCluster);
 
-            Logger.log(`[ROUTES]   Groupe ajouté au cluster ${bestCluster.id} (${bestCluster.nombre_livraisons} livraisons, ${Math.round(bestCluster.poids_total)}kg)`);
+            Logger.log(
+                `[CLUSTERING]   Groupe ajouté au cluster ${meilleurCluster.id} ` +
+                `(${meilleurCluster.nombre_livraisons} livraisons, ${meilleurCluster.nombre_parts} parts)`
+            );
         } else {
-            const newCluster = {
+            // Créer un nouveau cluster
+            const nouveauCluster = {
                 id: `C${clusters.length + 1}`,
                 centre: { ...group.centre },
                 livraisons: [...group.livraisons],
                 quartier_id: group.quartier_id,
                 distance_hq: group.distance_hq,
-                poids_total: group.poids_total,
-                nombre_livraisons: group.livraisons.length
+                nombre_livraisons: group.livraisons.length,
+                nombre_parts: group.nombre_parts
             };
 
-            clusters.push(newCluster);
-            Logger.log(`[ROUTES]   Nouveau cluster ${newCluster.id} créé (${newCluster.nombre_livraisons} livraisons, ${Math.round(newCluster.poids_total)}kg)`);
+            clusters.push(nouveauCluster);
+            Logger.log(
+                `[CLUSTERING]   Nouveau cluster ${nouveauCluster.id} créé ` +
+                `(${nouveauCluster.nombre_livraisons} livraisons, ${nouveauCluster.nombre_parts} parts)`
+            );
         }
     }
 
-    // Étape 3: 🆕 TRIER PAR DISTANCE DU QG (PLUS LOIN EN PREMIER)
-    Logger.log(`[ROUTES] 🗺️ Sorting ${clusters.length} clusters by distance from HQ (FARTHEST FIRST)...`);
+    // Étape 3 : Trier par distance du QG (le plus loin en premier)
+    Logger.log(`[CLUSTERING] 🗺️ Tri de ${clusters.length} clusters par distance du QG (le plus loin en premier)...`);
 
-    clusters.sort((a, b) => {
-        // Sort DESCENDING (farthest first)
-        return b.distance_hq - a.distance_hq;
-    });
+    clusters.sort((a, b) => b.distance_hq - a.distance_hq);
 
-    // Log final des clusters
-    Logger.log(`[ROUTES] 📊 Clusters finaux (triés par distance du QG - plus loin en premier):`);
+    // Journal final
+    Logger.log(`[CLUSTERING] 📊 Clusters finaux (triés par distance du QG) :`);
     clusters.forEach((c, index) => {
-        const diameter = calculateClusterDiameter(c.livraisons);
-        const compactness = calculateCompactness(c.livraisons);
-        Logger.log(`[ROUTES]   ${index + 1}. ${c.id}: ${Math.round(c.distance_hq)}km du QG, ` +
-            `${c.nombre_livraisons} livraisons, ` +
-            `${Math.round(c.poids_total)}kg, ` +
-            `diamètre=${Math.round(diameter * 10) / 10}km, ` +
-            `compacité=${Math.round(compactness * 100)}%`);
+        const diametre = calculateClusterDiameter(c.livraisons);
+        const compacite = calculateCompactness(c.livraisons);
+        Logger.log(
+            `[CLUSTERING]   ${index + 1}. ${c.id}: ${Math.round(c.distance_hq)}km du QG, ` +
+            `${c.nombre_livraisons} livraisons, ${c.nombre_parts} parts, ` +
+            `diamètre=${Math.round(diametre * 10) / 10}km, ` +
+            `compacité=${Math.round(compacite * 100)}%`
+        );
     });
 
     return clusters;
 }
 
 /**
- * Groupe les livraisons par bâtiment (même adresse)
- * UNCHANGED
+ * Groupe les livraisons par bâtiment (même adresse ≈ même coordonnées GPS)
+ *
+ * @param {Array<Object>} livraisons - Livraisons
+ * @returns {Array<Object>} Groupes de bâtiments avec nombre_parts calculé
  */
-function groupByBuilding(livraisons, poidsPartKg) {
-    const groups = [];
-    const processed = new Set();
-    const THRESHOLD_M = CONFIG.ROUTE_OPTIMIZATION.SAME_BUILDING_THRESHOLD_M;
-    const THRESHOLD_KM = THRESHOLD_M / 1000;
+function grouperParBatiment(livraisons) {
+    const groupes = [];
+    const traites = new Set();
+    const SEUIL_KM = CONFIG.ROUTE_OPTIMIZATION.SAME_BUILDING_THRESHOLD_M / 1000;
 
     for (const livraison of livraisons) {
-        if (processed.has(livraison.id_livraison)) {
-            continue;
-        }
+        if (traites.has(livraison.id_livraison)) continue;
 
-        // Trouver toutes les livraisons au même bâtiment (< 50m)
-        const sameBuilding = livraisons.filter(other => {
-            if (processed.has(other.id_livraison)) return false;
-
+        // Trouver toutes les livraisons au même bâtiment (< seuil)
+        const memeBatiment = livraisons.filter(autre => {
+            if (traites.has(autre.id_livraison)) return false;
             const dist = calculerDistanceHaversine(
-                livraison.latitude,
-                livraison.longitude,
-                other.latitude,
-                other.longitude
+                livraison.latitude, livraison.longitude,
+                autre.latitude, autre.longitude
             );
-
-            return dist < THRESHOLD_KM;
+            return dist < SEUIL_KM;
         });
 
-        // Marquer comme traité
-        sameBuilding.forEach(l => processed.add(l.id_livraison));
+        memeBatiment.forEach(l => traites.add(l.id_livraison));
 
-        // Calculer poids total
-        const totalWeight = sameBuilding.reduce((sum, l) =>
-            sum + (l.nombre_personnes * poidsPartKg), 0
+        // Nombre total de parts = somme des nombre_personnes
+        const totalParts = memeBatiment.reduce(
+            (sum, l) => sum + (parseInt(l.nombre_personnes) || 0), 0
         );
 
-        // Calculer distance au QG
+        // Distance au QG
         const distHQ = calculerDistanceHaversine(
-            CONFIG.HQ.LAT,
-            CONFIG.HQ.LNG,
-            livraison.latitude,
-            livraison.longitude
+            CONFIG.HQ.LAT, CONFIG.HQ.LNG,
+            livraison.latitude, livraison.longitude
         );
 
-        groups.push({
-            centre: {
-                lat: livraison.latitude,
-                lng: livraison.longitude
-            },
-            livraisons: sameBuilding,
-            poids_total: totalWeight,
+        groupes.push({
+            centre: { lat: livraison.latitude, lng: livraison.longitude },
+            livraisons: memeBatiment,
+            nombre_parts: totalParts,
             quartier_id: livraison.id_quartier,
             distance_hq: distHQ
         });
 
-        if (sameBuilding.length > 1) {
-            Logger.log(`[ROUTES] 🏢 Même bâtiment: ${sameBuilding.length} livraisons groupées (${Math.round(totalWeight)}kg)`);
+        if (memeBatiment.length > 1) {
+            Logger.log(
+                `[CLUSTERING] 🏢 Même bâtiment: ${memeBatiment.length} livraisons groupées ` +
+                `(${totalParts} parts)`
+            );
         }
     }
 
-    return groups;
+    return groupes;
 }
 
 /**
- * Met à jour le centre d'un cluster
- * UNCHANGED
+ * Met à jour le centre d'un cluster (barycentre des livraisons)
+ * et recalcule la distance au QG
+ *
+ * @param {Object} cluster - Cluster à mettre à jour
  */
-function updateClusterCenter(cluster) {
-    if (cluster.livraisons.length === 0) {
-        return;
-    }
+function mettreAJourCentre(cluster) {
+    if (cluster.livraisons.length === 0) return;
 
     const totalLat = cluster.livraisons.reduce((sum, l) => sum + l.latitude, 0);
     const totalLng = cluster.livraisons.reduce((sum, l) => sum + l.longitude, 0);
@@ -220,11 +201,9 @@ function updateClusterCenter(cluster) {
     cluster.centre.lat = totalLat / cluster.livraisons.length;
     cluster.centre.lng = totalLng / cluster.livraisons.length;
 
-    // 🆕 UPDATE: Also recalculate distance to HQ when center changes
+    // Recalculer la distance au QG après déplacement du centre
     cluster.distance_hq = calculerDistanceHaversine(
-        CONFIG.HQ.LAT,
-        CONFIG.HQ.LNG,
-        cluster.centre.lat,
-        cluster.centre.lng
+        CONFIG.HQ.LAT, CONFIG.HQ.LNG,
+        cluster.centre.lat, cluster.centre.lng
     );
 }

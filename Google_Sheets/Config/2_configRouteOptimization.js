@@ -39,15 +39,6 @@ const CONFIG_ROUTE_OPTIMIZATION = {
     },
 
     /**
-     * Poids maximum par cluster en kg
-     */
-    get MAX_WEIGHT_PER_CLUSTER_KG() {
-        return parseFloat(
-            PropertiesService.getScriptProperties().getProperty('ROUTE_MAX_WEIGHT_PER_CLUSTER_KG') || '700'
-        );
-    },
-
-    /**
      * Seuil en mètres pour considérer que 2 adresses sont identiques
      */
     get SAME_BUILDING_THRESHOLD_M() {
@@ -89,15 +80,6 @@ const CONFIG_ROUTE_OPTIMIZATION = {
     },
 
     /**
-     * Capacité max en kg considérée comme "petite voiture"
-     */
-    get CAPACITE_PETITE_VOITURE_KG() {
-        return parseFloat(
-            PropertiesService.getScriptProperties().getProperty('ROUTE_CAPACITE_PETITE_VOITURE_KG') || '400'
-        );
-    },
-
-    /**
      * Distance en km au-delà de laquelle une route est considérée "éloignée"
      */
     get DISTANCE_LIVRAISON_ISOLEE_KM() {
@@ -109,19 +91,5 @@ const CONFIG_ROUTE_OPTIMIZATION = {
     /**
      * Distance en km pour regrouper des clusters très éloignés ensemble
      */
-    DISTANCE_REGROUPE_ELOIGNES_KM: 30,
-
-    /**
-     * Capacités par défaut des véhicules (en kg)
-     */
-    get CAPACITE_BERLINE_KG() {
-        return parseFloat(
-            PropertiesService.getScriptProperties().getProperty('ROUTE_CAPACITE_BERLINE_KG') || '400'
-        );
-    },
-    get CAPACITE_BREAK_KG() {
-        return parseFloat(
-            PropertiesService.getScriptProperties().getProperty('ROUTE_CAPACITE_BREAK_KG') || '500'
-        );
-    }
+    DISTANCE_REGROUPE_ELOIGNES_KM: 30
 };
