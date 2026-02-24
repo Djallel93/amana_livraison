@@ -2,15 +2,12 @@
  * ====================================================================
  * ROUTE_SERVICE_CLUSTERING.GS - Algorithme de Clustering Géographique
  * ====================================================================
- * VERSION 3.0 - CLUSTERING PUREMENT GÉOGRAPHIQUE
+ * VERSION 4.0 - CORRECTION BUG poids_total
  *
- * ⚠️ CHANGEMENT v3 :
- * - Suppression de la contrainte de poids MAX_WEIGHT_PER_CLUSTER_KG
- * - Le clustering est désormais uniquement basé sur des critères géographiques :
- *   distance de proximité, diamètre max, compacité, préférence quartier
- * - Les contraintes de capacité (poids ET parts) sont vérifiées uniquement
- *   lors de l'assignation des clusters aux véhicules
- * - Suppression du paramètre poidsPartKg (inutile pour le clustering)
+ * ⚠️ CHANGEMENT v4 :
+ * - Ajout du paramètre poids_moyen_kg à identifierClusters et grouperParBatiment
+ * - Calcul de poids_total = nombre_parts * poids_moyen_kg sur chaque groupe/cluster
+ * - Recalcul de poids_total lors de chaque fusion de groupe dans un cluster existant
  *
  * Clusters triés par distance du QG (le plus loin en premier)
  * pour garantir que R001 est toujours la route la plus éloignée.
@@ -18,12 +15,13 @@
 
 /**
  * Identifie les clusters géographiques
- * Clustering purement géographique - aucune contrainte de capacité
+ * Clustering purement géographique - contraintes de capacité vérifiées à l'assignation
  *
- * @param {Array<Object>} livraisons - Livraisons avec lat/lng/nombre_personnes
+ * @param {Array<Object>} livraisons     - Livraisons avec lat/lng/nombre_personnes
+ * @param {number}        poids_moyen_kg - Poids moyen par personne (kg)
  * @returns {Array<Object>} Clusters triés par distance du QG (le plus loin en premier)
  */
-function identifierClusters(livraisons) {
+function identifierClusters(livraisons, poids_moyen_kg) {
     const clusters = [];
 
     const DISTANCE_PROXIMITE = CONFIG.ROUTE_OPTIMIZATION.DISTANCE_PROXIMITE_KM;
@@ -32,11 +30,14 @@ function identifierClusters(livraisons) {
     const QUARTIER_PREFERENCE = CONFIG.ROUTE_OPTIMIZATION.QUARTIER_PREFERENCE;
     const ALLOW_CROSS_QUARTIER = CONFIG.ROUTE_OPTIMIZATION.ALLOW_CROSS_QUARTIER;
 
+    const poidsParPart = parseFloat(poids_moyen_kg) || 0;
+
     Logger.log(`[CLUSTERING] 📐 Paramètres: proximité=${DISTANCE_PROXIMITE}km, diamètre_max=${MAX_DIAMETER}km`);
-    Logger.log(`[CLUSTERING] ℹ️  Clustering purement géographique (pas de contrainte de poids)`);
+    Logger.log(`[CLUSTERING] ⚖️  Poids moyen par personne: ${poidsParPart}kg`);
+    Logger.log(`[CLUSTERING] ℹ️  Clustering purement géographique (contraintes capacité vérifiées à l'assignation)`);
 
     // Étape 1 : Grouper les livraisons au même bâtiment
-    const buildingGroups = grouperParBatiment(livraisons);
+    const buildingGroups = grouperParBatiment(livraisons, poidsParPart);
     Logger.log(`[CLUSTERING] 🏢 ${buildingGroups.length} groupes de bâtiments identifiés`);
 
     // Étape 2 : Créer les clusters avec contrôles géographiques stricts
@@ -79,15 +80,18 @@ function identifierClusters(livraisons) {
         }
 
         if (meilleurCluster) {
-            // Ajouter au cluster existant
+            // Fusionner le groupe dans le cluster existant
             meilleurCluster.livraisons.push(...group.livraisons);
             meilleurCluster.nombre_livraisons += group.livraisons.length;
             meilleurCluster.nombre_parts += group.nombre_parts;
+            meilleurCluster.poids_total = meilleurCluster.nombre_parts * poidsParPart;
             mettreAJourCentre(meilleurCluster);
 
             Logger.log(
                 `[CLUSTERING]   Groupe ajouté au cluster ${meilleurCluster.id} ` +
-                `(${meilleurCluster.nombre_livraisons} livraisons, ${meilleurCluster.nombre_parts} parts)`
+                `(${meilleurCluster.nombre_livraisons} livraisons, ` +
+                `${meilleurCluster.nombre_parts} parts, ` +
+                `${Math.round(meilleurCluster.poids_total)}kg)`
             );
         } else {
             // Créer un nouveau cluster
@@ -98,20 +102,22 @@ function identifierClusters(livraisons) {
                 quartier_id: group.quartier_id,
                 distance_hq: group.distance_hq,
                 nombre_livraisons: group.livraisons.length,
-                nombre_parts: group.nombre_parts
+                nombre_parts: group.nombre_parts,
+                poids_total: group.poids_total
             };
 
             clusters.push(nouveauCluster);
             Logger.log(
                 `[CLUSTERING]   Nouveau cluster ${nouveauCluster.id} créé ` +
-                `(${nouveauCluster.nombre_livraisons} livraisons, ${nouveauCluster.nombre_parts} parts)`
+                `(${nouveauCluster.nombre_livraisons} livraisons, ` +
+                `${nouveauCluster.nombre_parts} parts, ` +
+                `${Math.round(nouveauCluster.poids_total)}kg)`
             );
         }
     }
 
     // Étape 3 : Trier par distance du QG (le plus loin en premier)
     Logger.log(`[CLUSTERING] 🗺️ Tri de ${clusters.length} clusters par distance du QG (le plus loin en premier)...`);
-
     clusters.sort((a, b) => b.distance_hq - a.distance_hq);
 
     // Journal final
@@ -122,6 +128,7 @@ function identifierClusters(livraisons) {
         Logger.log(
             `[CLUSTERING]   ${index + 1}. ${c.id}: ${Math.round(c.distance_hq)}km du QG, ` +
             `${c.nombre_livraisons} livraisons, ${c.nombre_parts} parts, ` +
+            `${Math.round(c.poids_total)}kg, ` +
             `diamètre=${Math.round(diametre * 10) / 10}km, ` +
             `compacité=${Math.round(compacite * 100)}%`
         );
@@ -131,12 +138,14 @@ function identifierClusters(livraisons) {
 }
 
 /**
- * Groupe les livraisons par bâtiment (même adresse ≈ même coordonnées GPS)
+ * Groupe les livraisons par bâtiment (même adresse ≈ mêmes coordonnées GPS)
+ * Calcule poids_total = nombre_parts * poids_moyen_kg pour chaque groupe
  *
- * @param {Array<Object>} livraisons - Livraisons
- * @returns {Array<Object>} Groupes de bâtiments avec nombre_parts calculé
+ * @param {Array<Object>} livraisons     - Livraisons
+ * @param {number}        poidsParPart   - Poids par personne en kg
+ * @returns {Array<Object>} Groupes de bâtiments avec nombre_parts et poids_total calculés
  */
-function grouperParBatiment(livraisons) {
+function grouperParBatiment(livraisons, poidsParPart) {
     const groupes = [];
     const traites = new Set();
     const SEUIL_KM = CONFIG.ROUTE_OPTIMIZATION.SAME_BUILDING_THRESHOLD_M / 1000;
@@ -161,6 +170,9 @@ function grouperParBatiment(livraisons) {
             (sum, l) => sum + (parseInt(l.nombre_personnes) || 0), 0
         );
 
+        // Poids total du groupe
+        const poidsTotal = totalParts * poidsParPart;
+
         // Distance au QG
         const distHQ = calculerDistanceHaversine(
             CONFIG.HQ.LAT, CONFIG.HQ.LNG,
@@ -171,6 +183,7 @@ function grouperParBatiment(livraisons) {
             centre: { lat: livraison.latitude, lng: livraison.longitude },
             livraisons: memeBatiment,
             nombre_parts: totalParts,
+            poids_total: poidsTotal,
             quartier_id: livraison.id_quartier,
             distance_hq: distHQ
         });
@@ -178,7 +191,7 @@ function grouperParBatiment(livraisons) {
         if (memeBatiment.length > 1) {
             Logger.log(
                 `[CLUSTERING] 🏢 Même bâtiment: ${memeBatiment.length} livraisons groupées ` +
-                `(${totalParts} parts)`
+                `(${totalParts} parts, ${Math.round(poidsTotal)}kg)`
             );
         }
     }

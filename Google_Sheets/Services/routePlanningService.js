@@ -2,6 +2,12 @@
  * ====================================================================
  * ROUTE_SERVICE_PLANNING.GS - Planification et Orchestration des Routes
  * ====================================================================
+ * VERSION 4.0
+ *
+ * ⚠️ CHANGEMENT v4 :
+ * - Passage de params.poids_moyen_kg vers identifierClusters
+ * - Passage de nombrePartMax (depuis getVehicleTypes) vers assignerClustersAuxVehicules
+ *
  * Contient : planRoutes(), separateOutliers(), getAvailableVolunteers()
  * Responsabilité : Orchestrer le processus complet de planification
  */
@@ -50,8 +56,8 @@ function planRoutes(params) {
             result.outliers = outliers;
         }
 
-        // 3. Récupérer les bénévoles disponibles
-        const benevoles = getAvailableVolunteers(params);
+        // 3. Récupérer les bénévoles disponibles (avec véhicule valide)
+        const benevoles = getBenevolesPourPlanification(params);
         Logger.log(`[ROUTES] 👥 ${benevoles.length} bénévoles disponibles`);
 
         if (benevoles.length === 0) {
@@ -59,16 +65,14 @@ function planRoutes(params) {
             return result;
         }
 
-        // 4. Identifier les clusters géographiques (version améliorée)
-        const clusters = identifierClusters(normal, params.poids_moyen_kg);
+        // 4. Identifier les clusters géographiques
+        // ⚠️ On passe poids_moyen_kg pour que chaque cluster ait poids_total calculé
+        const poidsParPart = parseFloat(params.poids_moyen_kg) || 0;
+        const clusters = identifierClusters(normal, poidsParPart);
         Logger.log(`[ROUTES] 🗺️ ${clusters.length} clusters identifiés`);
 
-        // 5. Attribuer les clusters aux véhicules
-        const routes = assignerClustersAuxVehicules(
-            clusters,
-            benevoles,
-            params
-        );
+        // 5. Attribuer les clusters aux véhicules (best-fit + split si nécessaire)
+        const routes = assignerClustersAuxVehicules(clusters, benevoles, params);
         Logger.log(`[ROUTES] 🚗 ${routes.length} routes créées`);
 
         // 6. Sauvegarder les routes
@@ -88,9 +92,9 @@ function planRoutes(params) {
 
         Logger.log('[ROUTES] ========================================');
         Logger.log(`[ROUTES] ✅ Planification terminée`);
-        Logger.log(`[ROUTES] Routes créées: ${result.created}`);
-        Logger.log(`[ROUTES] Outliers: ${result.outliers.length}`);
-        Logger.log(`[ROUTES] Avertissements: ${result.warnings.length}`);
+        Logger.log(`[ROUTES] Routes créées   : ${result.created}`);
+        Logger.log(`[ROUTES] Outliers        : ${result.outliers.length}`);
+        Logger.log(`[ROUTES] Avertissements  : ${result.warnings.length}`);
         Logger.log('[ROUTES] ========================================');
 
         return result;
@@ -103,7 +107,7 @@ function planRoutes(params) {
 }
 
 /**
- * Sépare les livraisons normales des outliers (très éloignées)
+ * Sépare les livraisons normales des outliers (très éloignées du QG)
  * @param {Array} livraisons - Toutes les livraisons
  * @returns {Object} {normal: Array, outliers: Array}
  */
@@ -114,10 +118,8 @@ function separateOutliers(livraisons) {
 
     for (const livraison of livraisons) {
         const distHQ = calculerDistanceHaversine(
-            CONFIG.HQ.LAT,
-            CONFIG.HQ.LNG,
-            livraison.latitude,
-            livraison.longitude
+            CONFIG.HQ.LAT, CONFIG.HQ.LNG,
+            livraison.latitude, livraison.longitude
         );
 
         livraison._distance_hq = distHQ;
@@ -145,81 +147,21 @@ function getUnassignedDeliveriesForDate(date) {
 }
 
 /**
- * Récupère les bénévoles disponibles
- * @param {Object} params - Paramètres
- * @returns {Array<Object>}
+ * Récupère les bénévoles avec un véhicule valide pour la planification
+ * Délègue à getVolunteersWithVehicle() défini dans apiService.js
+ *
+ * @param {Object} params - Paramètres de planification
+ * @returns {Array<Object>} Bénévoles avec vehicule.capaciteKg > 0
  */
-function getAvailableVolunteers(params) {
-    // 1. Récupérer tous les bénévoles actifs et validés
-    const response = listVolunteers({
-        actif: true,
-        statut: 'Validé'
-    });
+function getBenevolesPourPlanification(params) {
+    const volunteers = getVolunteersWithVehicle();
 
-    if (!response || !response.volunteers) {
-        return [];
-    }
+    Logger.log(`[ROUTES] 👥 ${volunteers.length} bénévoles avec véhicule valide (capaciteKg > 0)`);
 
-    let volunteers = response.volunteers;
-
-    // 2. Enrichir avec les informations de véhicule
-    volunteers = volunteers.map(v => {
-        if (v.idVehicule) {
-            v.vehicule = getVehiculeInfo(v.idVehicule);
-        }
-        return v;
-    });
-
-    // 3. Filtrer ceux qui ont un véhicule ou peuvent en avoir un prêté
-    volunteers = volunteers.filter(v => {
-        return v.vehicule &&
-            v.vehicule.type !== 'Sans permis' &&
-            (v.vehicule.capaciteKg > 0 || v.vehicule.type === 'Permis');
-    });
-
-    // 4. Ajouter les véhicules prêtés configurés
+    // Ajouter les véhicules prêtés configurés
     if (params.vehicules_pretes && params.vehicules_pretes.length > 0) {
-        volunteers = assignVehiculesPrets(volunteers, params.vehicules_pretes);
+        return assignVehiculesPrets(volunteers, params.vehicules_pretes);
     }
 
-    return volunteers;
-}
-
-/**
- * Récupère les informations d'un véhicule
- * @param {number} vehiculeId - ID du véhicule
- * @returns {Object}
- */
-function getVehiculeInfo(vehiculeId) {
-    const vehiclesResponse = getVehicleTypes();
-
-    if (!vehiclesResponse || !vehiclesResponse.vehicles) {
-        return null;
-    }
-
-    let vehicle = vehiclesResponse.vehicles.find(v => v.id === vehiculeId);
-
-    if (vehicle) {
-        // Compléter les capacités manquantes
-        if (!vehicle.capaciteKg || vehicle.capaciteKg === '') {
-            if (vehicle.type === 'Berline') {
-                vehicle.capaciteKg = CONFIG.ROUTE_OPTIMIZATION.CAPACITE_BERLINE_KG;
-            } else if (vehicle.type === 'Break') {
-                vehicle.capaciteKg = CONFIG.ROUTE_OPTIMIZATION.CAPACITE_BREAK_KG;
-            }
-        }
-    }
-
-    return vehicle;
-}
-
-/**
- * Assigne les véhicules prêtés aux bénévoles
- * @param {Array} volunteers - Bénévoles
- * @param {Array} vehiculesPrets - Véhicules prêtés configurés
- * @returns {Array}
- */
-function assignVehiculesPrets(volunteers, vehiculesPrets) {
-    // Cette fonction sera appelée avec la config manuelle de l'admin
     return volunteers;
 }
