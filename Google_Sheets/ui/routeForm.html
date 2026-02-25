@@ -207,6 +207,19 @@
       margin-top: 5px;
     }
 
+    /* ── WEIGHT PAIR ── */
+    .weight-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 560px) {
+      .weight-pair {
+        grid-template-columns: 1fr;
+      }
+    }
+
     /* ── BUTTONS ── */
     .button-container {
       display: flex;
@@ -353,7 +366,6 @@
       color: var(--muted);
     }
 
-    /* Main KPI row */
     .kpi-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -386,7 +398,6 @@
       letter-spacing: .05em;
     }
 
-    /* Secondary stats row */
     .stats-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -416,8 +427,6 @@
       flex-shrink: 0;
     }
 
-    .stat-pill-body {}
-
     .stat-pill-value {
       font-size: 18px;
       font-weight: 700;
@@ -432,7 +441,6 @@
       letter-spacing: .04em;
     }
 
-    /* Route breakdown table */
     .breakdown-section {
       background: var(--bg);
       border: 1px solid var(--border);
@@ -506,16 +514,10 @@
       color: #065f46;
     }
 
-    .badge-orange {
-      background: #ffedd5;
-      color: #92400e;
-    }
-
     .mono {
       font-family: 'DM Mono', monospace;
     }
 
-    /* Warnings */
     .warnings-box {
       background: var(--warning-bg);
       border: 1px solid var(--warning-border);
@@ -606,10 +608,19 @@
             </div>
 
             <div class="form-group">
-              <label for="poids_moyen_kg">Poids moyen par personne (kg)</label>
-              <input type="number" id="poids_moyen_kg" name="poids_moyen_kg" min="1" max="30" value="20" step="0.5"
-                required>
-              <div class="help-text">Utilisé pour calculer le poids total de chaque route</div>
+              <label>Poids moyen par personne (kg)</label>
+              <div class="weight-pair">
+                <div>
+                  <input type="number" id="poids_moyen_kg" name="poids_moyen_kg" min="1" max="100" value="20" step="0.5"
+                    required>
+                  <div class="help-text">🏠 Domicile — poids par personne</div>
+                </div>
+                <div>
+                  <input type="number" id="poids_moyen_hotel_kg" name="poids_moyen_hotel_kg" min="0" max="100" value="15"
+                    step="0.1">
+                  <div class="help-text">🏨 Hôtel — poids par personne (généralement plus léger)</div>
+                </div>
+              </div>
             </div>
 
             <div class="form-group">
@@ -621,6 +632,7 @@
                 livraisons</div>
             </div>
           </div>
+
         </div>
 
         <div class="button-container">
@@ -643,7 +655,6 @@
           <p id="results-subtitle">Résumé de la planification</p>
         </div>
 
-        <!-- KPI cards -->
         <div class="kpi-row">
           <div class="kpi-card">
             <div class="kpi-value" id="stat-routes">0</div>
@@ -663,7 +674,6 @@
           </div>
         </div>
 
-        <!-- Secondary stats -->
         <div class="stats-row">
           <div class="stat-pill">
             <div class="stat-pill-icon">👥</div>
@@ -695,7 +705,6 @@
           </div>
         </div>
 
-        <!-- Route breakdown -->
         <div class="breakdown-section" id="breakdown-section">
           <div class="breakdown-title">📋 Détail par route</div>
           <table class="breakdown-table">
@@ -713,7 +722,6 @@
           </table>
         </div>
 
-        <!-- Warnings -->
         <div id="warnings-box" class="warnings-box" style="display:none;">
           <h4>⚠️ Avertissements</h4>
           <ul id="warnings-list"></ul>
@@ -742,6 +750,7 @@
         max_livraisons: parseInt(document.getElementById('max_livraisons').value),
         occasion: document.querySelector('input[name="occasion"]:checked').value,
         poids_moyen_kg: parseFloat(document.getElementById('poids_moyen_kg').value),
+        poids_moyen_hotel_kg: parseFloat(document.getElementById('poids_moyen_hotel_kg').value) || 5,
         relivre: document.getElementById('relivre').checked,
         vehicules_pretes: [],
         binomes: []
@@ -781,24 +790,20 @@
       const benevoles = new Set(routes.map(r => r.id_benevole)).size;
       const avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
 
-      // KPIs
       document.getElementById('stat-routes').textContent = result.created;
       document.getElementById('stat-deliveries').textContent = livTotal;
       document.getElementById('stat-beneficiaires').textContent = partsTotal;
       document.getElementById('stat-poids').textContent = Math.round(poidsTotal) + ' kg';
 
-      // Pills
       document.getElementById('stat-benevoles').textContent = benevoles;
       document.getElementById('stat-distance').textContent = Math.round(distTotal) + ' km';
       document.getElementById('stat-avg-livraisons').textContent = avgLiv;
       document.getElementById('stat-warnings').textContent = warnings.length;
 
-      // Subtitle
       const dateStr = document.getElementById('date_livraison').value;
       document.getElementById('results-subtitle').textContent =
         `${result.created} routes générées pour le ${dateStr}`;
 
-      // Breakdown table
       const tbody = document.getElementById('breakdown-tbody');
       tbody.innerHTML = '';
 
@@ -821,11 +826,9 @@
           tbody.appendChild(tr);
         });
       } else {
-        // Fallback: just show route count without detail
         document.getElementById('breakdown-section').style.display = 'none';
       }
 
-      // Warnings
       if (warnings.length > 0) {
         const ul = document.getElementById('warnings-list');
         ul.innerHTML = '';

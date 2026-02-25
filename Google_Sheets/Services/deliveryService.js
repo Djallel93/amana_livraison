@@ -2,8 +2,6 @@
  * ====================================================================
  * DELIVERY_SERVICE.GS - Service de Gestion des Livraisons
  * ====================================================================
- * Version ultra-simplifiée - idQuartier déjà dans family!
- * ~200 lignes
  */
 
 /**
@@ -155,6 +153,7 @@ function createDelivery(family, coords, filters, idNumber) {
     adresse: family.adresse,
     latitude: coords.latitude,
     longitude: coords.longitude,
+    hotel: family.hotel === true || family.hotel === 'true' || false,
     disponibilite_debut: filters.date_livraison ? new Date(filters.date_livraison + ' 09:00:00') : null,
     disponibilite_fin: filters.date_livraison ? new Date(filters.date_livraison + ' 18:00:00') : null,
     nombre_personnes: (parseInt(family.nombreAdulte) || 0) + (parseInt(family.nombreEnfant) || 0),
@@ -254,6 +253,24 @@ function getNextIdNumber(sheetName, prefix, colIndex) {
 
 /**
  * Sauvegarde livraisons
+ *
+ * Ordre des colonnes (⚠️ CHANGEMENT v3 — col 7 = hotel, colonnes suivantes décalées) :
+ *  1  id_livraison
+ *  2  id_famille
+ *  3  id_quartier
+ *  4  adresse
+ *  5  latitude
+ *  6  longitude
+ *  7  hotel           ✅ CHANGEMENT v3 : nouvelle colonne
+ *  8  disponibilite_debut
+ *  9  disponibilite_fin
+ * 10  nombre_personnes
+ * 11  statut
+ * 12  priorite
+ * 13  type_aide
+ * 14  besoins_speciaux
+ * 15  date_creation
+ * 16  date_modification
  */
 function saveDeliveriesToSheet(deliveries) {
   if (deliveries.length === 0) return;
@@ -265,6 +282,7 @@ function saveDeliveriesToSheet(deliveries) {
     d.adresse,
     d.latitude,
     d.longitude,
+    d.hotel === true,
     d.disponibilite_debut,
     d.disponibilite_fin,
     d.nombre_personnes,

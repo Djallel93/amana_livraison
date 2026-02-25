@@ -181,8 +181,8 @@ function showPlanRoutesForm() {
   }
 
   const html = HtmlService.createHtmlOutputFromFile('ui/routeForm')
-    .setWidth(700)
-    .setHeight(900)
+    .setWidth(650)
+    .setHeight(950)
     .setTitle('🗺️ Planifier les Routes');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Planifier les Routes');

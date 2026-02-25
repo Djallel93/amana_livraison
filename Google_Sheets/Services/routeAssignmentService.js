@@ -2,6 +2,12 @@
  * ====================================================================
  * ROUTE_SERVICE_ASSIGNMENT.GS - Service d'Assignation des Routes
  * ====================================================================
+ *
+ * ⚠️ CHANGEMENT v3 (hôtel) :
+ * - splitCluster() calcule maintenant le poids de chaque livraison
+ *   individuellement en tenant compte du type hôtel/domicile,
+ *   au lieu d'utiliser un poids uniforme poidsParPart.
+ *   Les valeurs poids_moyen_kg et poids_moyen_hotel_kg proviennent de params.
  */
 
 // ============================================================
@@ -14,7 +20,7 @@
  *
  * @param {Array<Object>} clusters  - Clusters triés par distance DESC
  * @param {Array<Object>} benevoles - Bénévoles avec vehicule.capaciteKg > 0
- * @param {Object}        params    - Paramètres (max_livraisons, poids_moyen_kg...)
+ * @param {Object}        params    - Paramètres (max_livraisons, poids_moyen_kg, poids_moyen_hotel_kg...)
  * @returns {Array<Object>} Routes à sauvegarder
  */
 function assignerClustersAuxVehicules(clusters, benevoles, params) {
@@ -89,7 +95,7 @@ function assignerClustersAuxVehicules(clusters, benevoles, params) {
                 `(${spliteur.vehicule.type})`);
 
             const { sousCluster, reste } = splitCluster(
-                cluster, spliteur, poidsParPart, maxLivraisonsParRoute
+                cluster, spliteur, poidsParPart, maxLivraisonsParRoute, params
             );
 
             // Créer la route pour la première partie
@@ -203,15 +209,25 @@ function vehiculeCompatible(vehicule, cluster, maxLivraisonsParRoute) {
  * - sousCluster : livraisons prises séquentiellement jusqu'aux contraintes du véhicule
  * - reste        : livraisons restantes (remises en file)
  *
+ * ⚠️ CHANGEMENT v3 : chaque livraison est pesée individuellement selon son type
+ *    (hôtel ou domicile) via le calcul inline estHotel, au lieu du poids uniforme
+ *    poidsParPart = poids_total / nombre_parts.
+ *    Les valeurs poids_moyen_kg et poids_moyen_hotel_kg viennent de params.
+ *
  * @param {Object} cluster              - Cluster à découper
  * @param {Object} benevole             - Bénévole assigné à la première partie
- * @param {number} poidsParPart         - Poids moyen par personne (kg)
+ * @param {number} poidsParPart         - Poids moyen domicile par personne (kg) [conservé pour compatibilité]
  * @param {number} maxLivraisonsParRoute - Limite de livraisons par route
+ * @param {Object} params               - Paramètres de planification (poids_moyen_kg, poids_moyen_hotel_kg)
  * @returns {{ sousCluster: Object, reste: Object }}
  */
-function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute) {
+function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute, params) {
     const capaciteKg = parseFloat(benevole.vehicule.capaciteKg) || 0;
     const nombrePartMax = parseFloat(benevole.vehicule.nombrePartMax) || 0;
+
+
+    const poids_moyen_kg = parseFloat((params && params.poids_moyen_kg) || poidsParPart) || 0;
+    const poids_moyen_hotel_kg = parseFloat((params && params.poids_moyen_hotel_kg) || poids_moyen_kg) || 0;
 
     const livraisonsA = [];
     const livraisonsB = [];
@@ -221,9 +237,12 @@ function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute) {
     // Remplir séquentiellement jusqu'aux contraintes
     for (const livraison of cluster.livraisons) {
         const parts = parseInt(livraison.nombre_personnes) || 0;
-        const poids = parts * poidsParPart;
 
-        const poidsApres = poidsA + poids;
+
+        const estHotel = livraison.hotel === true || livraison.hotel === 'TRUE' || livraison.hotel === 'true';
+        const poidsLivraison = parts * (estHotel ? poids_moyen_hotel_kg : poids_moyen_kg);
+
+        const poidsApres = poidsA + poidsLivraison;
         const partsApres = partsA + parts;
         const nbLivraisons = livraisonsA.length + 1;
 
@@ -254,8 +273,13 @@ function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute) {
     };
 
     // Construire le reste (sous-cluster B)
+
     const partsB = livraisonsB.reduce((s, l) => s + (parseInt(l.nombre_personnes) || 0), 0);
-    const poidsB = partsB * poidsParPart;
+    const poidsB = livraisonsB.reduce((sum, l) => {
+        const estHotel = l.hotel === true || l.hotel === 'TRUE' || l.hotel === 'true';
+        const parts = parseInt(l.nombre_personnes) || 0;
+        return sum + parts * (estHotel ? poids_moyen_hotel_kg : poids_moyen_kg);
+    }, 0);
     const centreB = livraisonsB.length > 0 ? calculerCentre(livraisonsB) : centreA;
 
     const reste = {

@@ -8,6 +8,9 @@
  * - Passage de params.poids_moyen_kg vers identifierClusters
  * - Passage de nombrePartMax (depuis getVehicleTypes) vers assignerClustersAuxVehicules
  *
+ * ⚠️ CHANGEMENT v3 (hôtel) :
+ * - Passage de params.poids_moyen_hotel_kg comme 3e argument à identifierClusters()
+ *
  * Contient : planRoutes(), separateOutliers(), getAvailableVolunteers()
  * Responsabilité : Orchestrer le processus complet de planification
  */
@@ -66,9 +69,14 @@ function planRoutes(params) {
         }
 
         // 4. Identifier les clusters géographiques
-        // ⚠️ On passe poids_moyen_kg pour que chaque cluster ait poids_total calculé
+        // ⚠️ CHANGEMENT v3 : on passe également poids_moyen_hotel_kg pour le calcul
+        //    différencié domicile / hôtel dans chaque cluster
         const poidsParPart = parseFloat(params.poids_moyen_kg) || 0;
-        const clusters = identifierClusters(normal, poidsParPart);
+        const clusters = identifierClusters(
+            normal,
+            poidsParPart,
+            params.poids_moyen_hotel_kg
+        );
         Logger.log(`[ROUTES] 🗺️ ${clusters.length} clusters identifiés`);
 
         // 5. Attribuer les clusters aux véhicules (best-fit + split si nécessaire)
