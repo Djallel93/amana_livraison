@@ -115,6 +115,122 @@ function showReorderStopsInterface() {
 }
 
 /**
+ * Régénère les liens Google Maps pour toutes les routes en statut Brouillon.
+ * Lit l'ordre des stops depuis etapes_route (ordre_passage ASC),
+ * recalcule le lien Maps, met à jour lien_maps et date_modification.
+ */
+function regenerateAllMapsLinks() {
+  const ui = SpreadsheetApp.getUi();
+
+  const confirm = ui.alert(
+    'Régénérer les Liens Maps',
+    'Cette action va régénérer les liens Google Maps pour toutes les routes en statut Brouillon.\n\n' +
+    'Continuer ?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm !== ui.Button.YES) return;
+
+  try {
+    Logger.log('[MAPS] 🗺️ Démarrage de la régénération des liens Maps...');
+
+    // 1. Récupérer les routes en statut Brouillon uniquement
+    const brouillonRoutes = filterData(
+      CONFIG.SHEETS.ROUTES,
+      row => normalizeStatut(row.statut) === CONFIG.ENUMS.STATUT_ROUTE.BROUILLON
+    );
+
+    if (brouillonRoutes.length === 0) {
+      ui.alert(
+        'Aucune route',
+        'Aucune route en statut Brouillon trouvée.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
+
+    Logger.log(`[MAPS] 📋 ${brouillonRoutes.length} route(s) Brouillon trouvée(s)`);
+
+    // 2. Récupérer la config QG
+    const hqConfig = getCurrentHqConfig();
+    if (!hqConfig || !hqConfig.lat || !hqConfig.lng) {
+      ui.alert(
+        'Configuration manquante',
+        'Les coordonnées du QG ne sont pas configurées.\nVeuillez les configurer dans Configuration > Adresse QG.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
+
+    const hqCoords = { lat: hqConfig.lat, lng: hqConfig.lng };
+
+    // 3. Traiter chaque route
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const route of brouillonRoutes) {
+      try {
+        const routeId = route.id_route;
+        Logger.log(`[MAPS] 🔄 Traitement route ${routeId}...`);
+
+        // Récupérer les stops de livraison dans leur ordre actuel (ordre_passage ASC)
+        const stops = getDeliveryStopsForRoute(routeId);
+
+        if (stops.length === 0) {
+          Logger.log(`[MAPS] ⚠️ Route ${routeId}: aucun stop de livraison — ignorée`);
+          skipped++;
+          continue;
+        }
+
+        // Récupérer les coordonnées complètes pour chaque stop
+        const deliveriesOrdered = stops.map(stop => {
+          const delivery = getDeliveryById(stop.id_livraison);
+          if (!delivery) {
+            throw new Error(`Livraison ${stop.id_livraison} introuvable`);
+          }
+          return delivery;
+        });
+
+        // Régénérer le lien Maps avec l'ordre actuel des stops
+        const newLienMaps = generateGoogleMapsLink(deliveriesOrdered, hqCoords);
+
+        // Mettre à jour lien_maps et date_modification dans la feuille
+        updateRowById(
+          CONFIG.SHEETS.ROUTES,
+          routeId,
+          CONFIG.COLUMNS.ROUTES.ID_ROUTE,
+          {
+            lien_maps: newLienMaps,
+            date_modification: getCurrentDateTime()
+          }
+        );
+
+        Logger.log(`[MAPS] ✅ Route ${routeId}: lien Maps régénéré (${stops.length} stops)`);
+        updated++;
+
+      } catch (err) {
+        Logger.log(`[MAPS] ❌ Route ${route.id_route}: ${err.message}`);
+        errors.push(`Route ${route.id_route} : ${err.message}`);
+      }
+    }
+
+    // 4. Résumé
+    Logger.log(`[MAPS] 🎉 Terminé: ${updated} mis à jour, ${skipped} ignorés, ${errors.length} erreurs`);
+
+    let summary = `✅ ${updated} lien(s) Maps régénéré(s) avec succès.`;
+    if (skipped > 0) summary += `\n⏭️ ${skipped} route(s) ignorée(s) (aucun stop).`;
+    if (errors.length > 0) summary += `\n\n❌ Erreurs :\n${errors.join('\n')}`;
+
+    ui.alert('Régénération terminée', summary, ui.ButtonSet.OK);
+
+  } catch (error) {
+    Logger.log(`[MAPS] ❌ Erreur critique: ${error.message}`);
+    ui.alert('Erreur', `Erreur lors de la régénération :\n${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
  * Récupère les routes en brouillon pour le formulaire
  * @returns {Array}
  */

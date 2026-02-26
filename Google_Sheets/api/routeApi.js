@@ -2,7 +2,7 @@
  * ====================================================================
  * ROUTE_API.GS - API Web pour les Actions des Bénévoles
  * ====================================================================
- * v2.0 - Réécriture complète
+ * v2.1 - force_active token support
  *
  * Actions disponibles :
  *   ping              - Test de connexion (pas de token requis)
@@ -10,11 +10,6 @@
  *   confirm_delivery  - Stop → Livrée (toujours, peu importe statut précédent)
  *   skip_delivery     - Stop → ignorée (toujours, peu importe statut précédent)
  *   finish_route      - Route → Terminée (seulement si tous stops finaux)
- *
- * Logique token :
- *   - Généré à l'envoi de l'email (via emailService.js)
- *   - Inclus dans chaque URL de bouton de l'email
- *   - Expiré immédiatement quand la route passe à Terminée
  */
 
 // ============================================================
@@ -149,9 +144,6 @@ function handleConfirmDelivery(routeId, params) {
 
     Logger.log(`[API] ✅ Livraison ${livraisonId} → Livrée`);
 
-    // Vérifier si la route est complète
-    checkAndCompleteRoute(routeId);
-
     return htmlSuccess(
         'Livraison confirmée !',
         `La livraison a été enregistrée.<br>Merci !`,
@@ -188,9 +180,6 @@ function handleSkipDelivery(routeId, params) {
     // Notifier l'admin
     sendSkipNotificationToAdmin(routeId, livraisonId);
 
-    // Vérifier si la route est complète
-    checkAndCompleteRoute(routeId);
-
     return htmlSuccess(
         'Livraison ignorée',
         `La livraison a été marquée comme ignorée.<br>L'administrateur a été notifié.`,
@@ -199,8 +188,9 @@ function handleSkipDelivery(routeId, params) {
 }
 
 /**
- * Termine manuellement la route (bouton "J'ai fini")
+ * Termine manuellement la route (bouton "J'ai fini").
  * Accepté seulement si tous les stops sont dans un état final.
+ * C'est le seul endroit où la route passe à Terminée et où le token expire.
  */
 function handleFinishRoute(routeId) {
     Logger.log(`[API] 🏁 finish_route — ${routeId}`);
@@ -224,7 +214,9 @@ function handleFinishRoute(routeId) {
         );
     }
 
+    // Mark route as complete then expire the token
     completeRoute(routeId);
+    expireToken(routeId);
 
     return htmlSuccess(
         'Route terminée !',
@@ -238,22 +230,8 @@ function handleFinishRoute(routeId) {
 // ============================================================
 
 /**
- * Vérifie si tous les stops de livraison sont dans un état final,
- * et si oui, termine la route + expire le token.
- */
-function checkAndCompleteRoute(routeId) {
-    const stops = getDeliveryStopsForRoute(routeId);
-
-    const allDone = stops.every(s => isStopFinal(s.statut));
-
-    if (allDone) {
-        Logger.log(`[API] 🏁 Tous les stops finaux → Route ${routeId} terminée automatiquement`);
-        completeRoute(routeId);
-    }
-}
-
-/**
- * Passe la route à Terminée et expire son token.
+ * Passe la route à Terminée et met à jour date_fin.
+ * Appelé uniquement depuis handleFinishRoute() — jamais automatiquement.
  */
 function completeRoute(routeId) {
     updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.TERMINEE);
@@ -265,17 +243,18 @@ function completeRoute(routeId) {
         { date_fin: getCurrentDateTime() }
     );
 
-    expireToken(routeId);
-
-    Logger.log(`[API] ✅ Route ${routeId} → Terminée, token expiré`);
+    Logger.log(`[API] ✅ Route ${routeId} → Terminée`);
 }
 
 /**
- * Expire immédiatement le token d'une route.
+ * Expire le token d'une route en backdatant date_expiration.
+ * Appelé par handleFinishRoute() quand le driver clique "J'ai fini".
+ * Ne touche PAS à force_active — si force_active = true, l'admin
+ * garde la main pour réactiver le lien malgré l'expiration.
  */
 function expireToken(routeId) {
     try {
-        const tokens = filterData(CONFIG.SHEETS.TOKENS, row => row.id_route === routeId);
+        const tokens = filterData(CONFIG.SHEETS.TOKENS, row => String(row.id_route) === String(routeId));
         if (tokens.length === 0) return;
 
         const tokenRow = tokens[0];
@@ -283,10 +262,10 @@ function expireToken(routeId) {
             CONFIG.SHEETS.TOKENS,
             tokenRow.token,
             CONFIG.COLUMNS.TOKENS.TOKEN,
-            { date_expiration: getCurrentDateTime() }  // maintenant = expiré
+            { date_expiration: getCurrentDateTime() }  // backdate → expiré
         );
 
-        Logger.log(`[API] 🔒 Token expiré pour route ${routeId}`);
+        Logger.log(`[API] 🔒 Token expiré pour route ${routeId} (force_active non modifié)`);
     } catch (err) {
         Logger.log(`[API] ⚠️ Impossible d'expirer le token: ${err.message}`);
     }
@@ -347,27 +326,40 @@ function updateStopStatus(etapeId, newStatut) {
 
 /**
  * Valide un token depuis la feuille tokens.
+ *
+ * Logique force_active :
+ *   force_active = true  → toujours valide (expiration ignorée)
+ *   force_active = false AND current_time < expiration  → valide
+ *   force_active = false AND current_time >= expiration → invalide
+ *
+ * @param {string} token
+ * @returns {{ valid: boolean, routeId: string|null, error: string|null }}
  */
 function validateToken(token) {
     try {
         const rows = filterData(CONFIG.SHEETS.TOKENS, row => row.token === token);
 
         if (rows.length === 0) {
-            return { valid: false, error: 'Token invalide ou introuvable.' };
+            return { valid: false, routeId: null, error: 'Token invalide ou introuvable.' };
         }
 
         const tokenData = rows[0];
         const expiration = parseDate(tokenData.date_expiration);
 
-        if (!expiration || isTokenExpired(expiration)) {
-            return { valid: false, error: 'Ce lien a expiré. Contactez l\'administrateur.' };
+        // Delegate to the shared isTokenValid() helper (defined in emailService.js)
+        if (!isTokenValid(tokenData.force_active, expiration)) {
+            return {
+                valid: false,
+                routeId: null,
+                error: 'Ce lien a expiré. Contactez l\'administrateur.'
+            };
         }
 
         return { valid: true, routeId: tokenData.id_route, error: null };
 
     } catch (err) {
         Logger.log(`[API] ❌ validateToken: ${err.message}`);
-        return { valid: false, error: 'Erreur de validation du token.' };
+        return { valid: false, routeId: null, error: 'Erreur de validation du token.' };
     }
 }
 

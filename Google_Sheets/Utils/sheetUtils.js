@@ -22,32 +22,6 @@ function getSheet(sheetName) {
 }
 
 /**
- * Crée une nouvelle feuille si elle n'existe pas
- * @param {string} sheetName - Nom de la feuille
- * @param {Array<string>} headers - En-têtes des colonnes
- * @returns {Sheet} L'objet Sheet
- */
-function createSheetIfNotExists(sheetName, headers = []) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(sheetName);
-
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-
-    // Ajouter les en-têtes si fournis
-    if (headers.length > 0) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-      sheet.setFrozenRows(1);
-    }
-
-    Logger.log(`[SHEETS] ✅ Feuille créée: ${sheetName}`);
-  }
-
-  return sheet;
-}
-
-/**
  * Obtient toutes les données d'une feuille (sans en-tête)
  * @param {string} sheetName - Nom de la feuille
  * @returns {Array<Array>} Tableau 2D des données
@@ -238,34 +212,34 @@ function filterData(sheetName, predicate) {
 const ID_COUNTER_CACHE = {};
 
 function generateNextId(sheetName, prefix, colIndex) {
-    // Create a cache key for this sheet/prefix combination
-    const cacheKey = `${sheetName}_${prefix}`;
-    
-    // If we haven't cached this counter yet, read from sheet
-    if (ID_COUNTER_CACHE[cacheKey] === undefined) {
-        const data = getAllData(sheetName);
-        
-        if (data.length === 0) {
-            ID_COUNTER_CACHE[cacheKey] = 1;
-        } else {
-            // Extract existing numbers
-            const numbers = data
-                .map(row => row[colIndex - 1])
-                .filter(id => id && typeof id === 'string' && id.startsWith(prefix))
-                .map(id => parseInt(id.substring(prefix.length)))
-                .filter(num => !isNaN(num));
-            
-            const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
-            ID_COUNTER_CACHE[cacheKey] = maxNumber + 1;
-        }
+  // Create a cache key for this sheet/prefix combination
+  const cacheKey = `${sheetName}_${prefix}`;
+
+  // If we haven't cached this counter yet, read from sheet
+  if (ID_COUNTER_CACHE[cacheKey] === undefined) {
+    const data = getAllData(sheetName);
+
+    if (data.length === 0) {
+      ID_COUNTER_CACHE[cacheKey] = 1;
+    } else {
+      // Extract existing numbers
+      const numbers = data
+        .map(row => row[colIndex - 1])
+        .filter(id => id && typeof id === 'string' && id.startsWith(prefix))
+        .map(id => parseInt(id.substring(prefix.length)))
+        .filter(num => !isNaN(num));
+
+      const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+      ID_COUNTER_CACHE[cacheKey] = maxNumber + 1;
     }
-    
-    // Get current counter and increment for next call
-    const currentNumber = ID_COUNTER_CACHE[cacheKey];
-    ID_COUNTER_CACHE[cacheKey]++;
-    
-    // Format with padding (ex: 001, 042)
-    return `${prefix}${String(currentNumber).padStart(3, '0')}`;
+  }
+
+  // Get current counter and increment for next call
+  const currentNumber = ID_COUNTER_CACHE[cacheKey];
+  ID_COUNTER_CACHE[cacheKey]++;
+
+  // Format with padding (ex: 001, 042)
+  return `${prefix}${String(currentNumber).padStart(3, '0')}`;
 }
 
 /**
@@ -273,8 +247,8 @@ function generateNextId(sheetName, prefix, colIndex) {
  * Call this if you need to force re-reading from sheet
  */
 function resetIdCounterCache() {
-    Object.keys(ID_COUNTER_CACHE).forEach(key => delete ID_COUNTER_CACHE[key]);
-    Logger.log('[CACHE] ID counter cache reset');
+  Object.keys(ID_COUNTER_CACHE).forEach(key => delete ID_COUNTER_CACHE[key]);
+  Logger.log('[CACHE] ID counter cache reset');
 }
 
 /**
