@@ -162,14 +162,27 @@ function getUnassignedDeliveriesForDate(date) {
  * @returns {Array<Object>} Bénévoles avec vehicule.capaciteKg > 0
  */
 function getBenevolesPourPlanification(params) {
-    const volunteers = getVolunteersWithVehicle();
+    let benevoles = getVolunteersWithVehicle();
 
-    Logger.log(`[ROUTES] 👥 ${volunteers.length} bénévoles avec véhicule valide (capaciteKg > 0)`);
+    Logger.log(`[ROUTES] 👥 ${benevoles.length} bénévoles avec véhicule valide (capaciteKg > 0)`);
 
     // Ajouter les véhicules prêtés configurés
     if (params.vehicules_pretes && params.vehicules_pretes.length > 0) {
-        return assignVehiculesPrets(volunteers, params.vehicules_pretes);
+        benevoles = assignVehiculesPrets(benevoles, params.vehicules_pretes);
     }
 
-    return volunteers;
+    // ── AJOUT : bénévoles permis appairés avec véhicules temporaires ──
+    if (params.date_livraison) {
+        try {
+            const permisVolunteers = getPairedPermisVolunteers(params.date_livraison);
+            if (permisVolunteers.length > 0) {
+                benevoles = benevoles.concat(permisVolunteers);
+                Logger.log(`[ROUTES] 🚗 ${permisVolunteers.length} bénévole(s) permis ajouté(s) via véhicules temporaires`);
+            }
+        } catch (err) {
+            Logger.log(`[ROUTES] ⚠️ Erreur intégration véhicules temporaires: ${err.message}`);
+        }
+    }
+
+    return benevoles;
 }

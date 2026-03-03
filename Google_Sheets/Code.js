@@ -51,8 +51,8 @@ function onOpen() {
         .addSeparator()
         .addItem('🏢 Adresse QG (Headquarters)', 'showHqAddressConfig')
         .addItem('🎛️ Paramètres Optimisation Routes', 'showRouteOptimizationConfig')
-      // .addSeparator()
-      // .addItem('📄 Templates Email', 'manageEmailTemplates')
+        .addSeparator()                                                         // ← AJOUT
+        .addItem('🚗 Gérer Véhicules Temporaires', 'ouvrirGestionVehiculesTmp') // ← AJOUT
     )
 
     // ========================================
@@ -73,7 +73,6 @@ function onOpen() {
     .addSubMenu(
       ui.createMenu('❓ Aide')
         .addItem('📖 Documentation', 'showDocumentation')
-        .addItem('🔧 Initialiser Système', 'initializeSystem')
         .addItem('ℹ️ À Propos', 'showAbout')
     )
 

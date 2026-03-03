@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 22px 28px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 13px;
+            opacity: .85;
+        }
+
+        .form-content {
+            padding: 24px 28px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #4a5568;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        select,
+        input[type="datetime-local"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            color: #2d3748;
+            background: white;
+            transition: border-color .15s;
+        }
+
+        select:focus,
+        input[type="datetime-local"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, .12);
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+            cursor: pointer;
+        }
+
+        .checkbox-row label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 400;
+        }
+
+        .help-text {
+            font-size: 11px;
+            color: #718096;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .alert {
+            padding: 12px 14px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left: 4px solid #38a169;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border-left: 4px solid #e53e3e;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            padding: 16px 28px;
+            background: #f7fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .15s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 14px rgba(102, 126, 234, .3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(102, 126, 234, .4);
+        }
+
+        .btn-primary:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #4a5568;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #f7fafc;
+            border-color: #cbd5e0;
+        }
+
+        .loading-types {
+            font-size: 13px;
+            color: #718096;
+            font-style: italic;
+            padding: 8px 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1>🚗 Véhicules Temporaires</h1>
+                <p>Ajouter un véhicule disponible pour une période</p>
+            </div>
+
+            <div class="form-content">
+                <div id="alert-success" class="alert alert-success"></div>
+                <div id="alert-error" class="alert alert-error"></div>
+
+                <form id="tmpVehicleForm">
+
+                    <div class="form-group">
+                        <label for="id_type_vehicule">Type de véhicule</label>
+                        <div id="type-loading" class="loading-types">Chargement des types…</div>
+                        <select id="id_type_vehicule" name="id_type_vehicule" style="display:none;" required>
+                            <option value="">-- Sélectionner --</option>
+                        </select>
+                        <div class="help-text">Seuls les véhicules avec capacité > 0 sont listés.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="disponibilite_debut">Disponible à partir du</label>
+                        <input type="datetime-local" id="disponibilite_debut" name="disponibilite_debut" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="disponibilite_fin">Disponible jusqu'au</label>
+                        <input type="datetime-local" id="disponibilite_fin" name="disponibilite_fin" required>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="actif" name="actif" checked>
+                            <label for="actif">Actif (disponible pour planification)</label>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+
+            <div class="button-container">
+                <button type="button" class="btn-secondary" onclick="google.script.host.close()">
+                    Annuler
+                </button>
+                <button type="submit" form="tmpVehicleForm" class="btn-primary" id="submitBtn" disabled>
+                    💾 Ajouter le véhicule
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', function () {
+            google.script.run
+                .withSuccessHandler(populateVehicleTypes)
+                .withFailureHandler(function (err) {
+                    document.getElementById('type-loading').textContent = 'Erreur : ' + err.message;
+                })
+                .getVehicleTypesForForm();
+        });
+
+        function populateVehicleTypes(types) {
+            const loading = document.getElementById('type-loading');
+            const select = document.getElementById('id_type_vehicule');
+
+            loading.style.display = 'none';
+            select.style.display = 'block';
+
+            if (!types || types.length === 0) {
+                select.innerHTML = '<option value="">Aucun type disponible</option>';
+                return;
+            }
+
+            types.forEach(function (t) {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                select.appendChild(opt);
+            });
+
+            document.getElementById('submitBtn').disabled = false;
+        }
+
+        document.getElementById('tmpVehicleForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const debut = document.getElementById('disponibilite_debut').value;
+            const fin = document.getElementById('disponibilite_fin').value;
+
+            if (!debut || !fin) {
+                showAlert('error', 'Les deux dates sont obligatoires.');
+                return;
+            }
+            if (new Date(fin) <= new Date(debut)) {
+                showAlert('error', 'La date de fin doit être après la date de début.');
+                return;
+            }
+
+            const formData = {
+                id_type_vehicule: document.getElementById('id_type_vehicule').value,
+                disponibilite_debut: debut,
+                disponibilite_fin: fin,
+                actif: document.getElementById('actif').checked
+            };
+
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = '…Enregistrement';
+
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    if (result.success) {
+                        showAlert('success', '✅ Véhicule ' + result.id + ' ajouté avec succès !');
+                        setTimeout(function () { google.script.host.close(); }, 1800);
+                    } else {
+                        showAlert('error', result.error || 'Erreur inconnue.');
+                        resetSubmit();
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    showAlert('error', 'Erreur : ' + err.message);
+                    resetSubmit();
+                })
+                .saveTmpVehicleFromForm(formData);
+        });
+
+        function showAlert(type, msg) {
+            var el = document.getElementById('alert-' + type);
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(function () { el.style.display = 'none'; }, 5000);
+        }
+
+        function resetSubmit() {
+            var btn = document.getElementById('submitBtn');
+            btn.disabled = false;
+            btn.textContent = '💾 Ajouter le véhicule';
+        }
+    </script>
+</body>
+
+</html>
