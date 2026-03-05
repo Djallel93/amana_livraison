@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --blue: #4facfe;
+            --blue2: #00f2fe;
+            --grad: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --purple: #764ba2;
+            --grad2: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --green: #38a169;
+            --orange: #e67e22;
+            --red: #e53e3e;
+            --yellow: #f6c90e;
+            --surface: #ffffff;
+            --bg: #f0f7ff;
+            --border: #e2edf7;
+            --text: #1a2533;
+            --muted: #64748b;
+            --radius: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── FORM PHASE ──────────────────────────────────────── */
+        #phase-form {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .form-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            box-shadow: 0 8px 40px rgba(79, 172, 254, .18);
+            overflow: hidden;
+            width: 100%;
+            max-width: 520px;
+        }
+
+        .form-header {
+            background: var(--grad);
+            color: #fff;
+            padding: 28px 32px;
+            text-align: center;
+        }
+
+        .form-header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .form-header p {
+            font-size: 13px;
+            opacity: .85;
+        }
+
+        .form-body {
+            padding: 28px 32px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        input[type="date"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #fff;
+            color: var(--text);
+            transition: border-color .15s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, .15);
+        }
+
+        .weight-pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .help {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .form-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding: 20px 32px;
+            background: var(--bg);
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── BUTTONS ─────────────────────────────────────────── */
+        .btn {
+            padding: 11px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .15s;
+        }
+
+        .btn-primary {
+            background: var(--grad);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(79, 172, 254, .35);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, .45);
+        }
+
+        .btn-primary:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: var(--muted);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg);
+        }
+
+        .btn-email {
+            background: linear-gradient(135deg, #38a169 0%, #276749 100%);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(56, 161, 105, .3);
+        }
+
+        .btn-email:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(56, 161, 105, .4);
+        }
+
+        .btn-email:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .btn-back {
+            background: #fff;
+            color: var(--muted);
+            border: 2px solid var(--border);
+            font-size: 13px;
+            padding: 8px 18px;
+        }
+
+        /* ── LOADING ─────────────────────────────────────────── */
+        #phase-loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 52px;
+            height: 52px;
+            border: 4px solid var(--border);
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            animation: spin .85s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── RESULTS PHASE ───────────────────────────────────── */
+        #phase-results {
+            display: none;
+            padding: 0;
+        }
+
+        /* STICKY TOPBAR */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--grad);
+            color: #fff;
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 16px rgba(79, 172, 254, .3);
+        }
+
+        .topbar-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .topbar-sub {
+            font-size: 12px;
+            opacity: .85;
+            margin-top: 2px;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* CONTENT */
+        .results-content {
+            padding: 28px;
+            max-width: 1140px;
+            margin: 0 auto;
+        }
+
+        /* ── SECTION TITLES ─────────────────────────────────── */
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin: 0 0 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ── SECTION 1 : TILES ───────────────────────────────── */
+        .tiles-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .tile {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 22px 20px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, .06);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-left: 4px solid transparent;
+            transition: transform .15s, box-shadow .15s;
+        }
+
+        .tile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, .1);
+        }
+
+        .tile-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .tile-value {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .tile-label {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .tile-blue {
+            border-color: var(--blue);
+        }
+
+        .tile-blue .tile-icon {
+            background: rgba(79, 172, 254, .12);
+        }
+
+        .tile-blue .tile-value {
+            color: #0369a1;
+        }
+
+        .tile-green {
+            border-color: var(--green);
+        }
+
+        .tile-green .tile-icon {
+            background: rgba(56, 161, 105, .12);
+        }
+
+        .tile-green .tile-value {
+            color: #276749;
+        }
+
+        .tile-purple {
+            border-color: var(--purple);
+        }
+
+        .tile-purple .tile-icon {
+            background: rgba(118, 75, 162, .12);
+        }
+
+        .tile-purple .tile-value {
+            color: var(--purple);
+        }
+
+        /* ── SECTION 2 : PROGRESS + PIE ─────────────────────── */
+        .section2-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.4fr;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 22px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, .06);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 16px;
+        }
+
+        .progress-pct {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--blue);
+            text-align: center;
+            margin-bottom: 12px;
+            line-height: 1;
+        }
+
+        .progress-bar-wrap {
+            background: var(--bg);
+            border-radius: 20px;
+            height: 18px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 20px;
+            background: var(--grad);
+            transition: width 1s ease;
+        }
+
+        .progress-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .progress-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .progress-row:last-child {
+            border-bottom: none;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 220px;
+        }
+
+        /* ── SECTION 3 : POIDS ───────────────────────────────── */
+        .section3-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .weight-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .weight-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .weight-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+
+        .weight-label {
+            font-weight: 600;
+        }
+
+        .weight-val {
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .weight-track {
+            background: var(--bg);
+            border-radius: 6px;
+            height: 10px;
+            overflow: hidden;
+        }
+
+        .weight-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 1s ease;
+        }
+
+        .wf-blue {
+            background: var(--grad);
+        }
+
+        .wf-green {
+            background: linear-gradient(135deg, #38a169, #276749);
+        }
+
+        .wf-orange {
+            background: linear-gradient(135deg, #e67e22, #d35400);
+        }
+
+        .weight-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .ws-item {
+            background: var(--bg);
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ws-icon {
+            font-size: 22px;
+        }
+
+        .ws-val {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .ws-lbl {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* ── ALERT ───────────────────────────────────────────── */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left: 4px solid #38a169;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border-left: 4px solid #e53e3e;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ═══════════════════════════ PHASE FORM ═══════════════════════════ -->
+    <div id="phase-form">
+        <div class="form-card">
+            <div class="form-header">
+                <h1>📊 Statistiques</h1>
+                <p>Sélectionnez la date et l'occasion pour afficher les statistiques</p>
+            </div>
+            <div class="form-body">
+                <div class="form-group">
+                    <label for="f-date">Date</label>
+                    <input type="date" id="f-date">
+                </div>
+                <div class="form-group">
+                    <label for="f-occasion">Occasion</label>
+                    <select id="f-occasion">
+                        <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
+                        <option value="recolte">🌾 Récolte</option>
+                        <option value="ponctuelle">📦 Ponctuelle</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Poids moyen par personne (kg)</label>
+                    <div class="weight-pair">
+                        <div>
+                            <input type="number" id="f-poids-dom" value="20" min="1" max="100" step="0.5">
+                            <div class="help">🏠 Domicile</div>
+                        </div>
+                        <div>
+                            <input type="number" id="f-poids-hot" value="15" min="0" max="100" step="0.1">
+                            <div class="help">🏨 Hôtel</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-footer">
+                <button class="btn btn-secondary" onclick="google.script.host.close()">Fermer</button>
+                <button class="btn btn-primary" onclick="loadStats()">Afficher les statistiques</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════ PHASE LOADING ════════════════════════ -->
+    <div id="phase-loading">
+        <div class="spinner"></div>
+        <div style="color:var(--muted);font-size:15px;">Calcul des statistiques…</div>
+    </div>
+
+    <!-- ═══════════════════════════ PHASE RESULTS ════════════════════════ -->
+    <div id="phase-results">
+
+        <div class="topbar">
+            <div>
+                <div class="topbar-title">📊 Statistiques</div>
+                <div class="topbar-sub" id="topbar-sub"></div>
+            </div>
+            <div class="topbar-actions">
+                <div id="alert-email" class="alert alert-success" style="margin:0;display:none;"></div>
+                <button class="btn btn-back" onclick="goBack()">← Retour</button>
+                <button class="btn btn-email" id="btn-email" onclick="sendEmail()">✉️ Envoyer par email</button>
+            </div>
+        </div>
+
+        <div class="results-content">
+
+            <!-- SECTION 1 : CHIFFRES GLOBAUX -->
+            <div class="section-title">📦 Chiffres globaux</div>
+            <div class="tiles-grid">
+                <div class="tile tile-blue">
+                    <div class="tile-icon">📦</div>
+                    <div>
+                        <div class="tile-value" id="t-livraisons">—</div>
+                        <div class="tile-label">Livraisons</div>
+                    </div>
+                </div>
+                <div class="tile tile-green">
+                    <div class="tile-icon">🗺️</div>
+                    <div>
+                        <div class="tile-value" id="t-routes">—</div>
+                        <div class="tile-label">Routes</div>
+                    </div>
+                </div>
+                <div class="tile tile-purple">
+                    <div class="tile-icon">👥</div>
+                    <div>
+                        <div class="tile-value" id="t-parts">—</div>
+                        <div class="tile-label">Bénéficiaires</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2 : PROGRESSION + CAMEMBERT -->
+            <div class="section-title">📈 Progression des livraisons</div>
+            <div class="section2-grid">
+
+                <div class="card">
+                    <div class="card-title">Taux de complétion</div>
+                    <div class="progress-pct" id="pct-val">0%</div>
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill" id="pct-bar" style="width:0%"></div>
+                    </div>
+                    <div class="progress-detail" id="status-detail"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Répartition par statut</div>
+                    <div class="chart-wrap">
+                        <canvas id="pie-chart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- SECTION 3 : POIDS -->
+            <div class="section-title">⚖️ Données de poids</div>
+            <div class="section3-grid">
+
+                <div class="card">
+                    <div class="card-title">Comparaison des poids</div>
+                    <div class="chart-wrap" style="height:180px;">
+                        <canvas id="bar-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Détail</div>
+                    <div class="weight-summary">
+                        <div class="ws-item">
+                            <div class="ws-icon">🎁</div>
+                            <div>
+                                <div class="ws-val" id="ws-donne">— kg</div>
+                                <div class="ws-lbl" id="ws-donne-sub">Poids donné</div>
+                            </div>
+                        </div>
+                        <div class="ws-item">
+                            <div class="ws-icon">🚗</div>
+                            <div>
+                                <div class="ws-val" id="ws-livre">— kg</div>
+                                <div class="ws-lbl">Poids livré (routes)</div>
+                            </div>
+                        </div>
+                        <div class="ws-item">
+                            <div class="ws-icon">🧮</div>
+                            <div>
+                                <div class="ws-val" id="ws-calcule">— kg</div>
+                                <div class="ws-lbl">Poids calculé (parts × poids)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div><!-- /results-content -->
+    </div><!-- /phase-results -->
+
+    <script>
+        // ── Couleurs par statut ───────────────────────────────────
+        const STATUS_COLORS = {
+            'Non Assignée': '#94a3b8',
+            'Assignée': '#4facfe',
+            'En Cours': '#f6c90e',
+            'Livrée': '#38a169',
+            'Annulée': '#e53e3e'
+        };
+
+        let _statsData = null;
+        let _params = null;
+        let _pieChart = null;
+        let _barChart = null;
+
+        // ── Init date par défaut ──────────────────────────────────
+        window.addEventListener('load', function () {
+            document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+        });
+
+        // ── Chargement des stats ──────────────────────────────────
+        function loadStats() {
+            const date = document.getElementById('f-date').value;
+            const occasion = document.getElementById('f-occasion').value;
+            const dom = parseFloat(document.getElementById('f-poids-dom').value) || 20;
+            const hot = parseFloat(document.getElementById('f-poids-hot').value) || 15;
+
+            if (!date) { alert('Veuillez sélectionner une date.'); return; }
+
+            _params = { date, occasion, poids_moyen_kg: dom, poids_moyen_hotel_kg: hot };
+
+            document.getElementById('phase-form').style.display = 'none';
+            document.getElementById('phase-loading').style.display = 'flex';
+
+            google.script.run
+                .withSuccessHandler(renderResults)
+                .withFailureHandler(function (err) {
+                    document.getElementById('phase-loading').style.display = 'none';
+                    document.getElementById('phase-form').style.display = 'flex';
+                    alert('Erreur : ' + err.message);
+                })
+                .getStatsData(_params);
+        }
+
+        // ── Retour au formulaire ──────────────────────────────────
+        function goBack() {
+            if (_pieChart) { _pieChart.destroy(); _pieChart = null; }
+            if (_barChart) { _barChart.destroy(); _barChart = null; }
+            document.getElementById('phase-results').style.display = 'none';
+            document.getElementById('phase-form').style.display = 'flex';
+            document.getElementById('alert-email').style.display = 'none';
+        }
+
+        // ── Rendu des résultats ───────────────────────────────────
+        function renderResults(data) {
+            _statsData = data;
+            document.getElementById('phase-loading').style.display = 'none';
+
+            const labelOcc = { zakat_el_fitr: '🌙 Zakat El Fitr', recolte: '🌾 Récolte', ponctuelle: '📦 Ponctuelle' };
+            document.getElementById('topbar-sub').textContent = data.date + ' · ' + (labelOcc[data.occasion] || data.occasion);
+
+            // Section 1 — tiles
+            document.getElementById('t-livraisons').textContent = data.global.totalLivraisons;
+            document.getElementById('t-routes').textContent = data.global.totalRoutes;
+            document.getElementById('t-parts').textContent = data.global.totalParts;
+
+            // Section 2 — progression
+            const pct = data.statuts.pourcentageTermine;
+            document.getElementById('pct-val').textContent = pct + '%';
+            document.getElementById('pct-bar').style.width = pct + '%';
+
+            const detail = document.getElementById('status-detail');
+            detail.innerHTML = '';
+            Object.entries(data.statuts.counts).forEach(function ([statut, count]) {
+                if (count === 0) return;
+                const color = STATUS_COLORS[statut] || '#94a3b8';
+                const div = document.createElement('div');
+                div.className = 'progress-row';
+                div.innerHTML =
+                    '<span><span class="dot" style="background:' + color + '"></span>' + statut + '</span>' +
+                    '<strong>' + count + '</strong>';
+                detail.appendChild(div);
+            });
+
+            // Pie chart
+            const pieLabels = [], pieData = [], pieColors = [];
+            Object.entries(data.statuts.counts).forEach(function ([statut, count]) {
+                if (count === 0) return;
+                pieLabels.push(statut);
+                pieData.push(count);
+                pieColors.push(STATUS_COLORS[statut] || '#94a3b8');
+            });
+
+            if (_pieChart) _pieChart.destroy();
+            _pieChart = new Chart(document.getElementById('pie-chart'), {
+                type: 'doughnut',
+                data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: pieColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } }
+                    }
+                }
+            });
+
+            // Section 3 — poids
+            const p = data.poids;
+            const maxPoids = Math.max(p.poidsDonne, p.poidsLivre, p.poidsCalcule, 1);
+
+            document.getElementById('ws-donne').textContent = p.poidsDonne + ' kg';
+            document.getElementById('ws-donne-sub').textContent = 'Poids donné (' + p.nbDons + ' don(s))';
+            document.getElementById('ws-livre').textContent = p.poidsLivre + ' kg';
+            document.getElementById('ws-calcule').textContent = p.poidsCalcule + ' kg';
+
+            if (_barChart) _barChart.destroy();
+            _barChart = new Chart(document.getElementById('bar-chart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Donné', 'Livré (routes)', 'Calculé'],
+                    datasets: [{
+                        data: [p.poidsDonne, p.poidsLivre, p.poidsCalcule],
+                        backgroundColor: [
+                            'rgba(79,172,254,.75)',
+                            'rgba(56,161,105,.75)',
+                            'rgba(230,126,34,.75)'
+                        ],
+                        borderColor: ['#4facfe', '#38a169', '#e67e22'],
+                        borderWidth: 2,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: function (v) { return v + ' kg'; } },
+                            grid: { color: 'rgba(0,0,0,.05)' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            document.getElementById('phase-results').style.display = 'block';
+        }
+
+        // ── Envoi email ───────────────────────────────────────────
+        function sendEmail() {
+            const btn = document.getElementById('btn-email');
+            btn.disabled = true;
+            btn.textContent = '…Envoi en cours';
+
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    btn.disabled = false;
+                    btn.textContent = '✉️ Envoyer par email';
+                    const alertEl = document.getElementById('alert-email');
+                    if (result.success) {
+                        alertEl.className = 'alert alert-success';
+                        alertEl.textContent = '✅ Email envoyé à ' + result.sent + ' destinataire(s)';
+                    } else {
+                        alertEl.className = 'alert alert-error';
+                        alertEl.textContent = '❌ ' + result.error;
+                    }
+                    alertEl.style.display = 'block';
+                    setTimeout(function () { alertEl.style.display = 'none'; }, 5000);
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    btn.textContent = '✉️ Envoyer par email';
+                    const alertEl = document.getElementById('alert-email');
+                    alertEl.className = 'alert alert-error';
+                    alertEl.textContent = '❌ ' + err.message;
+                    alertEl.style.display = 'block';
+                })
+                .sendStatsEmail(_statsData, _params);
+        }
+    </script>
+</body>
+
+</html>

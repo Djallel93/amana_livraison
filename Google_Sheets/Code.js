@@ -4,17 +4,11 @@
  * =====================================================================
  */
 
-/**
- * Fonction appelée à l'ouverture du spreadsheet
- * Crée le menu personnalisé
- */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
   ui.createMenu('📦 ' + CONFIG.APP_NAME)
-    // ========================================
-    // LIVRAISONS
-    // ========================================
+
     .addSubMenu(
       ui.createMenu('📋 Livraisons')
         .addItem('➕ Générer Livraisons', 'showGenerateDeliveriesForm')
@@ -25,9 +19,6 @@ function onOpen() {
         .addItem('🔄 Mettre à Jour Statuts', 'updateDeliveryStatuses')
     )
 
-    // ========================================
-    // ROUTES
-    // ========================================
     .addSubMenu(
       ui.createMenu('🗺️ Routes')
         .addItem('📍 Planifier Routes', 'showPlanRoutesForm')
@@ -36,14 +27,11 @@ function onOpen() {
         .addItem('🏷️ Générer Étiquettes', 'showGenerateLabelsForm')
         .addSeparator()
         .addItem('🔧 Réorganiser Étapes', 'showReorderStopsInterface')
-        .addItem('🗺️ Régénérer Liens Maps', 'regenerateAllMapsLinks')  // ← NOUVEAU
+        .addItem('🗺️ Régénérer Liens Maps', 'regenerateAllMapsLinks')
         .addSeparator()
         .addItem('📊 Voir Toutes les Routes', 'viewAllRoutes')
     )
 
-    // ========================================
-    // CONFIGURATION
-    // ========================================
     .addSubMenu(
       ui.createMenu('⚙️ Configuration')
         .addItem('🔑 Configurer API Keys', 'showApiKeysConfig')
@@ -51,13 +39,12 @@ function onOpen() {
         .addSeparator()
         .addItem('🏢 Adresse QG (Headquarters)', 'showHqAddressConfig')
         .addItem('🎛️ Paramètres Optimisation Routes', 'showRouteOptimizationConfig')
-        .addSeparator()                                                         // ← AJOUT
-        .addItem('🚗 Gérer Véhicules Temporaires', 'ouvrirGestionVehiculesTmp') // ← AJOUT
+        .addSeparator()
+        .addItem('🚗 Gérer Véhicules Temporaires', 'ouvrirGestionVehiculesTmp')
+        .addSeparator()
+        .addItem('📊 Statistiques', 'showStatisticsForm')
     )
 
-    // ========================================
-    // SYNCHRONISATION
-    // ========================================
     .addSubMenu(
       ui.createMenu('🔄 Synchronisation')
         .addItem('🔃 Actualiser Données APIs', 'refreshApiData')
@@ -66,9 +53,6 @@ function onOpen() {
         .addItem('🏓 Tester Connexion APIs', 'testApiConnections')
     )
 
-    // ========================================
-    // AIDE
-    // ========================================
     .addSeparator()
     .addSubMenu(
       ui.createMenu('❓ Aide')
