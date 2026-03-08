@@ -5,13 +5,11 @@
  */
 
 function showGenerateDeliveriesForm() {
-  // Vérifier que les APIs sont configurées
   if (!isApiConfigured()) {
-    const ui = SpreadsheetApp.getUi();
-    ui.alert(
+    SpreadsheetApp.getUi().alert(
       'Configuration Manquante',
       CONFIG.MESSAGES.ERROR_API_KEY_MISSING,
-      ui.ButtonSet.OK
+      SpreadsheetApp.getUi().ButtonSet.OK
     );
     return;
   }
@@ -32,12 +30,10 @@ function viewAllDeliveries() {
 
     let message = `📊 STATISTIQUES DES LIVRAISONS\n\n`;
     message += `Total : ${stats.total} livraisons\n\n`;
-
     message += `Par Statut :\n`;
+
     Object.entries(stats.byStatus).forEach(([status, count]) => {
-      if (count > 0) {
-        message += `  • ${status} : ${count}\n`;
-      }
+      if (count > 0) message += `  • ${status} : ${count}\n`;
     });
 
     message += `\nTotal Personnes : ${stats.totalPersonnes}\n`;
@@ -48,12 +44,9 @@ function viewAllDeliveries() {
 
     ui.alert('Statistiques des Livraisons', message, ui.ButtonSet.OK);
 
-    // Naviguer vers la feuille Livraison
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(CONFIG.SHEETS.LIVRAISON);
-    if (sheet) {
-      ss.setActiveSheet(sheet);
-    }
+    if (sheet) ss.setActiveSheet(sheet);
 
   } catch (error) {
     ui.alert('Erreur', error.message, ui.ButtonSet.OK);
@@ -69,9 +62,7 @@ function searchDelivery() {
     ui.ButtonSet.OK_CANCEL
   );
 
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
+  if (response.getSelectedButton() !== ui.Button.OK) return;
 
   const searchTerm = response.getResponseText().trim();
 
@@ -81,37 +72,29 @@ function searchDelivery() {
   }
 
   try {
-    // Chercher d'abord par ID livraison
     let delivery = getDeliveryById(searchTerm);
 
-    // Sinon chercher par ID famille
     if (!delivery) {
       const deliveries = filterData(CONFIG.SHEETS.LIVRAISON, function (row) {
         return row.id_famille === searchTerm;
       });
-
-      if (deliveries.length > 0) {
-        delivery = deliveries[0];
-      }
+      if (deliveries.length > 0) delivery = deliveries[0];
     }
 
     if (!delivery) {
-      ui.alert(
-        'Introuvable',
-        `Aucune livraison trouvée pour "${searchTerm}"`,
-        ui.ButtonSet.OK
-      );
+      ui.alert('Introuvable', `Aucune livraison trouvée pour "${searchTerm}"`, ui.ButtonSet.OK);
       return;
     }
 
-    // Afficher les détails
     let message = `📦 DÉTAILS DE LA LIVRAISON\n\n`;
     message += `ID Livraison : ${delivery.id_livraison}\n`;
     message += `Famille : ${delivery.id_famille}\n`;
     message += `Quartier : ${delivery.id_quartier}\n`;
     message += `Adresse : ${delivery.adresse}\n`;
     message += `Personnes : ${delivery.nombre_personnes}\n`;
+    message += `Avec enfant : ${delivery.avec_enfant ? 'Oui' : 'Non'}\n`;
     message += `Statut : ${delivery.statut}\n`;
+    message += `Conditionnement : ${delivery.statut_conditionnement || 'En attente'}\n`;
     message += `Priorité : ${delivery.priorite}\n`;
     message += `Type : ${delivery.type_aide}\n`;
 
@@ -121,7 +104,6 @@ function searchDelivery() {
 
     ui.alert('Détails de la Livraison', message, ui.ButtonSet.OK);
 
-    // Naviguer vers la ligne dans la feuille
     const sheet = getSheet(CONFIG.SHEETS.LIVRAISON);
     const rowIndex = delivery._rowIndex;
     if (rowIndex) {
@@ -139,17 +121,13 @@ function updateDeliveryStatuses() {
 
   const response = ui.alert(
     'Mettre à Jour les Statuts',
-    'Cette fonction permet de synchroniser les statuts des livraisons.\n\n' +
-    'Continuer ?',
+    'Cette fonction permet de synchroniser les statuts des livraisons.\n\nContinuer ?',
     ui.ButtonSet.YES_NO
   );
 
-  if (response !== ui.Button.YES) {
-    return;
-  }
+  if (response !== ui.Button.YES) return;
 
   try {
-    // Pour l'instant, juste afficher les statistiques
     const stats = countDeliveriesByStatus();
 
     let message = 'Statuts actuels :\n\n';
@@ -158,7 +136,6 @@ function updateDeliveryStatuses() {
     });
 
     message += '\nLes statuts sont mis à jour automatiquement lors de la gestion des routes.';
-
     ui.alert('Statuts des Livraisons', message, ui.ButtonSet.OK);
 
   } catch (error) {
@@ -167,15 +144,38 @@ function updateDeliveryStatuses() {
 }
 
 /**
- * PHASE 3 - Planification des Routes
+ * Ouvre le formulaire de génération de la feuille de conditionnement.
  */
+function showPackagingForm() {
+  const html = HtmlService.createHtmlOutputFromFile('ui/packagingForm')
+    .setWidth(600)
+    .setHeight(450)
+    .setTitle('📦 Feuille de Conditionnement');
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Feuille de Conditionnement');
+}
+
+/**
+ * Appelé depuis le formulaire HTML pour lancer la génération.
+ * @param {Object} params - { date, occasion }
+ * @returns {Object}
+ */
+function generatePackagingSheetFromForm(params) {
+  try {
+    Logger.log(`[MENU] 📦 Génération feuille conditionnement: ${JSON.stringify(params)}`);
+    return generatePackagingSheet(params);
+  } catch (error) {
+    Logger.log(`[MENU] ❌ Erreur: ${error.message}`);
+    throw error;
+  }
+}
+
 function showPlanRoutesForm() {
   if (!isApiConfigured()) {
-    const ui = SpreadsheetApp.getUi();
-    ui.alert(
+    SpreadsheetApp.getUi().alert(
       'Configuration Manquante',
       CONFIG.MESSAGES.ERROR_API_KEY_MISSING,
-      ui.ButtonSet.OK
+      SpreadsheetApp.getUi().ButtonSet.OK
     );
     return;
   }

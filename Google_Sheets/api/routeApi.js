@@ -2,45 +2,34 @@
  * ====================================================================
  * ROUTE_API.GS - API Web pour les Actions des Bénévoles
  * ====================================================================
- * v2.1 - force_active token support
- *
  * Actions disponibles :
- *   ping              - Test de connexion (pas de token requis)
- *   start_route       - Démarre la route + tous les stops → En Cours
- *   confirm_delivery  - Stop → Livrée (toujours, peu importe statut précédent)
- *   skip_delivery     - Stop → ignorée (toujours, peu importe statut précédent)
- *   finish_route      - Route → Terminée (seulement si tous stops finaux)
+ *   ping                - Test de connexion (pas de token requis)
+ *   start_route         - Démarre la route + tous les stops → En Cours
+ *   confirm_delivery    - Stop → Livrée
+ *   skip_delivery       - Stop → ignorée
+ *   finish_route        - Route → Terminée
+ *   update_stop_status  - Met à jour le statut de conditionnement d'une livraison (sans token)
  */
 
 // ============================================================
 // ROUTER PRINCIPAL
 // ============================================================
 
-/**
- * Point d'entrée GET
- */
 function doGet(e) {
     return routeRequest(e);
 }
 
-/**
- * Point d'entrée POST (même comportement)
- */
 function doPost(e) {
     return routeRequest(e);
 }
 
-/**
- * Router principal
- */
 function routeRequest(e) {
     const action = e.parameter.action;
     const token = e.parameter.token;
 
-    Logger.log(`[API] 📡 /${action} — token: ${token ? token.substring(0, 8) + '…' : 'none'}`);
+    Logger.log(`[API] 📡 /${action} — token: ${token ? token.substring(0, 8) + '…' : 'aucun'}`);
 
     try {
-        // ── Ping sans token ───────────────────────────────────────
         if (action === 'ping') {
             return jsonOk({
                 status: 'ok',
@@ -50,7 +39,11 @@ function routeRequest(e) {
             });
         }
 
-        // ── Toutes les autres actions nécessitent un token ────────
+        // Endpoint sans token — équipe de conditionnement
+        if (action === 'update_stop_status') {
+            return handleUpdateStopStatus(e.parameter);
+        }
+
         if (!token) {
             return htmlError('Token manquant', 'Lien invalide ou incomplet.');
         }
@@ -81,9 +74,6 @@ function routeRequest(e) {
 // HANDLERS
 // ============================================================
 
-/**
- * Démarre la route → En Cours + TOUS les stops de livraison → En Cours
- */
 function handleStartRoute(routeId) {
     Logger.log(`[API] ▶️ start_route — ${routeId}`);
 
@@ -94,16 +84,14 @@ function handleStartRoute(routeId) {
         return htmlInfo('Route déjà terminée', `La route ${routeId} est déjà terminée.`, '🏁');
     }
 
-    // Mettre à jour le statut de la route
     updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.EN_COURS);
     Logger.log(`[API] ✅ Route ${routeId} → En Cours`);
 
-    // Mettre tous les stops de livraison (pas retour QG) → En Cours
     const stops = getDeliveryStopsForRoute(routeId);
     let updated = 0;
     for (const stop of stops) {
-        // Ne pas écraser les stops déjà traités
-        if (stop.statut === CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE) {
+        if (stop.statut === CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE ||
+            stop.statut === CONFIG.ENUMS.STATUT_ETAPE.PRETE) {
             updateStopStatus(stop.id_etape, CONFIG.ENUMS.STATUT_ETAPE.EN_COURS);
             updated++;
         }
@@ -118,10 +106,6 @@ function handleStartRoute(routeId) {
     );
 }
 
-/**
- * Confirme une livraison → stop Livrée, delivery Livrée
- * Fonctionne quel que soit le statut précédent du stop.
- */
 function handleConfirmDelivery(routeId, params) {
     const livraisonId = params.id_livraison;
     Logger.log(`[API] ✅ confirm_delivery — route ${routeId}, livraison ${livraisonId}`);
@@ -131,7 +115,6 @@ function handleConfirmDelivery(routeId, params) {
     const stop = findStopByLivraison(routeId, livraisonId);
     if (!stop) return htmlError('Étape introuvable', `Aucune étape pour la livraison ${livraisonId} dans la route ${routeId}.`);
 
-    // Toujours mettre à jour (même si déjà Livrée — idempotent)
     updateStopStatus(stop.id_etape, CONFIG.ENUMS.STATUT_ETAPE.LIVREE);
     updateRowById(
         CONFIG.SHEETS.ETAPES_ROUTE,
@@ -139,22 +122,13 @@ function handleConfirmDelivery(routeId, params) {
         CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE,
         { heure_fin: getCurrentDateTime() }
     );
-
     updateDeliveryStatus(livraisonId, CONFIG.ENUMS.STATUT_LIVRAISON.LIVREE);
 
     Logger.log(`[API] ✅ Livraison ${livraisonId} → Livrée`);
 
-    return htmlSuccess(
-        'Livraison confirmée !',
-        `La livraison a été enregistrée.<br>Merci !`,
-        '✅'
-    );
+    return htmlSuccess('Livraison confirmée !', `La livraison a été enregistrée.<br>Merci !`, '✅');
 }
 
-/**
- * Saute une livraison → stop ignorée, notif admin
- * Fonctionne quel que soit le statut précédent du stop.
- */
 function handleSkipDelivery(routeId, params) {
     const livraisonId = params.id_livraison;
     Logger.log(`[API] ⏭️ skip_delivery — route ${routeId}, livraison ${livraisonId}`);
@@ -169,15 +143,11 @@ function handleSkipDelivery(routeId, params) {
         CONFIG.SHEETS.ETAPES_ROUTE,
         stop.id_etape,
         CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE,
-        {
-            heure_fin: getCurrentDateTime(),
-            commentaire: 'Ignorée par le bénévole'
-        }
+        { heure_fin: getCurrentDateTime(), commentaire: 'Ignorée par le bénévole' }
     );
 
     Logger.log(`[API] ⏭️ Livraison ${livraisonId} → ignorée`);
 
-    // Notifier l'admin
     sendSkipNotificationToAdmin(routeId, livraisonId);
 
     return htmlSuccess(
@@ -187,11 +157,6 @@ function handleSkipDelivery(routeId, params) {
     );
 }
 
-/**
- * Termine manuellement la route (bouton "J'ai fini").
- * Accepté seulement si tous les stops sont dans un état final.
- * C'est le seul endroit où la route passe à Terminée et où le token expire.
- */
 function handleFinishRoute(routeId) {
     Logger.log(`[API] 🏁 finish_route — ${routeId}`);
 
@@ -209,12 +174,11 @@ function handleFinishRoute(routeId) {
         const ids = pendingStops.map(s => s.id_livraison).join(', ');
         return htmlError(
             'Livraisons en attente',
-            `${pendingStops.length} livraison(s) ne sont pas encore traitées : ${ids}.<br>
-       Veuillez les marquer comme Livrées ou Ignorées avant de terminer.`
+            `${pendingStops.length} livraison(s) non traitée(s) : ${ids}.<br>
+             Veuillez les marquer comme Livrées ou Ignorées avant de terminer.`
         );
     }
 
-    // Mark route as complete then expire the token
     completeRoute(routeId);
     expireToken(routeId);
 
@@ -225,33 +189,89 @@ function handleFinishRoute(routeId) {
     );
 }
 
+/**
+ * Met à jour le statut de conditionnement d'une livraison.
+ * Endpoint sans token — réservé à l'équipe de conditionnement interne.
+ */
+function handleUpdateStopStatus(params) {
+    const livraisonId = params.id_livraison;
+    const statut = params.statut;
+
+    Logger.log(`[API] 📦 update_stop_status — livraison ${livraisonId}, statut ${statut}`);
+
+    if (!livraisonId) return htmlError('Paramètre manquant', 'id_livraison requis.');
+    if (!statut) return htmlError('Paramètre manquant', 'statut requis.');
+
+    const statutsValides = [
+        ...Object.values(CONFIG.ENUMS.STATUT_ETAPE)
+    ];
+    if (!statutsValides.includes(statut)) {
+        return htmlError('Statut invalide', `Statut "${statut}" non reconnu.`);
+    }
+
+    const livraison = getDeliveryById(livraisonId);
+    if (!livraison) {
+        return htmlError('Livraison introuvable', `La livraison ${livraisonId} est introuvable.`);
+    }
+
+    // Mettre à jour statut_conditionnement sur la livraison
+    updateRowById(
+        CONFIG.SHEETS.LIVRAISON,
+        livraisonId,
+        CONFIG.COLUMNS.LIVRAISON.ID_LIVRAISON,
+        {
+            statut_conditionnement: statut,
+            date_modification: getCurrentDateTime()
+        }
+    );
+    Logger.log(`[API] ✅ Livraison ${livraisonId} → statut_conditionnement: ${statut}`);
+
+    // Si un stop existe pour cette livraison, le mettre à jour aussi
+    const etapes = filterData(
+        CONFIG.SHEETS.ETAPES_ROUTE,
+        row => row.id_livraison === livraisonId
+    );
+
+    if (etapes.length > 0) {
+        const etape = etapes[0];
+        updateStopStatus(etape.id_etape, statut);
+        Logger.log(`[API] ✅ Étape ${etape.id_etape} → ${statut}`);
+
+        // Vérifier si toutes les livraisons de la route sont Prêtes
+        if (statut === CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE) {
+            const routeId = etape.id_route;
+            if (toutesLivraisonsPretes(routeId)) {
+                Logger.log(`[API] 🟢 Toutes livraisons Prêtes pour route ${routeId} → passage Prête`);
+                passerRouteEnPrete(routeId);
+            }
+        }
+    } else if (statut === CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE) {
+        // Pas de stops encore — on vérifiera à la création des stops dans saveRoute()
+        Logger.log(`[API] ℹ️ Aucun stop trouvé pour ${livraisonId} — statut_conditionnement conservé pour vérification ultérieure`);
+    }
+
+    return htmlSuccess(
+        'Colis marqué Prêt !',
+        `La livraison <strong>${livraisonId}</strong> a été marquée comme prête.<br>Merci !`,
+        '📦'
+    );
+}
+
 // ============================================================
 // HELPERS MÉTIER
 // ============================================================
 
-/**
- * Passe la route à Terminée et met à jour date_fin.
- * Appelé uniquement depuis handleFinishRoute() — jamais automatiquement.
- */
 function completeRoute(routeId) {
     updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.TERMINEE);
-
     updateRowById(
         CONFIG.SHEETS.ROUTES,
         routeId,
         CONFIG.COLUMNS.ROUTES.ID_ROUTE,
         { date_fin: getCurrentDateTime() }
     );
-
     Logger.log(`[API] ✅ Route ${routeId} → Terminée`);
 }
 
-/**
- * Expire le token d'une route en backdatant date_expiration.
- * Appelé par handleFinishRoute() quand le driver clique "J'ai fini".
- * Ne touche PAS à force_active — si force_active = true, l'admin
- * garde la main pour réactiver le lien malgré l'expiration.
- */
 function expireToken(routeId) {
     try {
         const tokens = filterData(CONFIG.SHEETS.TOKENS, row => String(row.id_route) === String(routeId));
@@ -262,19 +282,14 @@ function expireToken(routeId) {
             CONFIG.SHEETS.TOKENS,
             tokenRow.token,
             CONFIG.COLUMNS.TOKENS.TOKEN,
-            { date_expiration: getCurrentDateTime() }  // backdate → expiré
+            { date_expiration: getCurrentDateTime() }
         );
-
-        Logger.log(`[API] 🔒 Token expiré pour route ${routeId} (force_active non modifié)`);
+        Logger.log(`[API] 🔒 Token expiré pour route ${routeId}`);
     } catch (err) {
         Logger.log(`[API] ⚠️ Impossible d'expirer le token: ${err.message}`);
     }
 }
 
-/**
- * Retourne le stop d'une route pour une livraison donnée.
- * Cherche sans contrainte de statut (permissif).
- */
 function findStopByLivraison(routeId, livraisonId) {
     const stops = filterData(
         CONFIG.SHEETS.ETAPES_ROUTE,
@@ -283,10 +298,6 @@ function findStopByLivraison(routeId, livraisonId) {
     return stops.length > 0 ? stops[0] : null;
 }
 
-/**
- * Retourne tous les stops de livraison (exclut retour QG).
- * Triés par ordre_passage.
- */
 function getDeliveryStopsForRoute(routeId) {
     const stops = filterData(
         CONFIG.SHEETS.ETAPES_ROUTE,
@@ -297,24 +308,15 @@ function getDeliveryStopsForRoute(routeId) {
     return stops.sort((a, b) => (a.ordre_passage || 0) - (b.ordre_passage || 0));
 }
 
-/**
- * Retourne les stops d'une route (alias utilisé dans l'ancien code).
- */
 function getStopsForRoute(routeId) {
     return getDeliveryStopsForRoute(routeId);
 }
 
-/**
- * Un stop est "final" s'il est Livrée ou ignorée.
- */
 function isStopFinal(statut) {
     return statut === CONFIG.ENUMS.STATUT_ETAPE.LIVREE ||
         statut === CONFIG.ENUMS.STATUT_ETAPE.IGNOREE;
 }
 
-/**
- * Met à jour le statut d'un stop (étape).
- */
 function updateStopStatus(etapeId, newStatut) {
     updateRowById(
         CONFIG.SHEETS.ETAPES_ROUTE,
@@ -324,17 +326,6 @@ function updateStopStatus(etapeId, newStatut) {
     );
 }
 
-/**
- * Valide un token depuis la feuille tokens.
- *
- * Logique force_active :
- *   force_active = true  → toujours valide (expiration ignorée)
- *   force_active = false AND current_time < expiration  → valide
- *   force_active = false AND current_time >= expiration → invalide
- *
- * @param {string} token
- * @returns {{ valid: boolean, routeId: string|null, error: string|null }}
- */
 function validateToken(token) {
     try {
         const rows = filterData(CONFIG.SHEETS.TOKENS, row => row.token === token);
@@ -346,13 +337,8 @@ function validateToken(token) {
         const tokenData = rows[0];
         const expiration = parseDate(tokenData.date_expiration);
 
-        // Delegate to the shared isTokenValid() helper (defined in emailService.js)
         if (!isTokenValid(tokenData.force_active, expiration)) {
-            return {
-                valid: false,
-                routeId: null,
-                error: 'Ce lien a expiré. Contactez l\'administrateur.'
-            };
+            return { valid: false, routeId: null, error: 'Ce lien a expiré. Contactez l\'administrateur.' };
         }
 
         return { valid: true, routeId: tokenData.id_route, error: null };
@@ -363,9 +349,6 @@ function validateToken(token) {
     }
 }
 
-/**
- * Envoie une notification à l'admin pour une livraison ignorée.
- */
 function sendSkipNotificationToAdmin(routeId, livraisonId) {
     try {
         const delivery = getDeliveryById(livraisonId);
@@ -385,7 +368,6 @@ function sendSkipNotificationToAdmin(routeId, livraisonId) {
                 `- Réassigner à un autre bénévole\n` +
                 `- Contacter la famille\n`
         });
-
         Logger.log(`[API] 📧 Notification admin envoyée pour ${livraisonId}`);
     } catch (err) {
         Logger.log(`[API] ⚠️ Notification admin échouée: ${err.message}`);
@@ -396,96 +378,72 @@ function sendSkipNotificationToAdmin(routeId, livraisonId) {
 // RÉPONSES HTML
 // ============================================================
 
-/**
- * Page de succès (vert)
- */
 function htmlSuccess(title, bodyHtml, emoji) {
     return buildHtmlPage(title, bodyHtml, emoji, '#22543d', '#c6f6d5', '#38a169');
 }
 
-/**
- * Page d'info (bleu)
- */
 function htmlInfo(title, bodyHtml, emoji) {
     return buildHtmlPage(title, bodyHtml, emoji, '#2c5282', '#bee3f8', '#3182ce');
 }
 
-/**
- * Page d'erreur (rouge)
- */
 function htmlError(title, bodyHtml) {
     return buildHtmlPage(title, bodyHtml, '⚠️', '#742a2a', '#fed7d7', '#e53e3e');
 }
 
-/**
- * Constructeur de page HTML de feedback.
- */
 function buildHtmlPage(title, bodyHtml, emoji, textColor, bgColor, accentColor) {
     const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 20px;
-    }
-    .card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-      padding: 48px 40px;
-      text-align: center;
-      max-width: 420px;
-      width: 100%;
-    }
-    .emoji { font-size: 72px; margin-bottom: 24px; line-height: 1; }
-    h1 {
-      font-size: 22px;
-      font-weight: 700;
-      color: ${textColor};
-      margin-bottom: 16px;
-    }
-    .message {
-      font-size: 15px;
-      color: #4a5568;
-      line-height: 1.7;
-      padding: 16px;
-      background: ${bgColor};
-      border-radius: 8px;
-      border-left: 4px solid ${accentColor};
-    }
-    .timestamp {
-      margin-top: 24px;
-      font-size: 12px;
-      color: #a0aec0;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        }
+        .card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+        padding: 48px 40px;
+        text-align: center;
+        max-width: 420px;
+        width: 100%;
+        }
+        .emoji { font-size: 72px; margin-bottom: 24px; line-height: 1; }
+        h1 { font-size: 22px; font-weight: 700; color: ${textColor}; margin-bottom: 16px; }
+        .message {
+        font-size: 15px;
+        color: #4a5568;
+        line-height: 1.7;
+        padding: 16px;
+        background: ${bgColor};
+        border-radius: 8px;
+        border-left: 4px solid ${accentColor};
+        }
+        .timestamp { margin-top: 24px; font-size: 12px; color: #a0aec0; }
+    </style>
 </head>
 <body>
-  <div class="card">
-    <div class="emoji">${emoji}</div>
-    <h1>${title}</h1>
-    <div class="message">${bodyHtml}</div>
-    <div class="timestamp">${new Date().toLocaleString('fr-FR')}</div>
-  </div>
+    <div class="card">
+        <div class="emoji">${emoji}</div>
+        <h1>${title}</h1>
+        <div class="message">${bodyHtml}</div>
+        <div class="timestamp">${new Date().toLocaleString('fr-FR')}</div>
+    </div>
 </body>
 </html>`;
 
     return HtmlService.createHtmlOutput(html);
 }
 
-/**
- * Réponse JSON (pour ping et debug)
- */
 function jsonOk(data) {
     return ContentService
         .createTextOutput(JSON.stringify(data))

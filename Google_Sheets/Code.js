@@ -17,6 +17,8 @@ function onOpen() {
         .addItem('🔍 Rechercher Livraison', 'searchDelivery')
         .addSeparator()
         .addItem('🔄 Mettre à Jour Statuts', 'updateDeliveryStatuses')
+        .addSeparator()
+        .addItem('📦 Feuille de Conditionnement', 'showPackagingForm')
     )
 
     .addSubMenu(

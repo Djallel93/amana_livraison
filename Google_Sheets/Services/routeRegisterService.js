@@ -1,11 +1,9 @@
 /**
- * Sauvegarde une route en statut BROUILLON
- * Optimise l'ordre TSP, génère le lien Maps, crée les étapes
- *
- * @param {Object} route  - Données de la route (benevole, livraisons, poids_total, distance_totale)
- * @param {Object} params - Paramètres de planification (date_livraison, occasion, relivre...)
- * @returns {Object|null} Route sauvegardée ou null si erreur
+ * ====================================================================
+ * ROUTE_REGISTER_SERVICE.GS - Sauvegarde et Enregistrement des Routes
+ * ====================================================================
  */
+
 function saveRoute(route, params) {
     try {
         const tempId = generateNextId(
@@ -16,7 +14,6 @@ function saveRoute(route, params) {
 
         Logger.log(`[ROUTES] 💾 Sauvegarde route ${tempId}...`);
 
-        // Optimiser l'ordre des livraisons avant de créer les étapes
         const hqConfig = getCurrentHqConfig();
         let livraisonsOptimisees = route.livraisons;
 
@@ -34,17 +31,14 @@ function saveRoute(route, params) {
             Logger.log(`[ROUTES] ⚠️ Optimisation ignorée (QG non configuré ou livraison unique)`);
         }
 
-        // Générer le lien Google Maps après optimisation
         let lienMaps = '';
         if (hqConfig && hqConfig.lat && hqConfig.lng) {
             lienMaps = generateGoogleMapsLink(livraisonsOptimisees, {
                 lat: hqConfig.lat,
                 lng: hqConfig.lng
             });
-            Logger.log(`[ROUTES] 🗺️ Lien Maps: ${lienMaps ? 'généré' : 'non généré'}`);
         }
 
-        // Construire les données de la route
         const routeData = {
             id_route: tempId,
             id_benevole: route.benevole.id,
@@ -86,15 +80,12 @@ function saveRoute(route, params) {
             routeData.date_modification
         ];
 
-        // Sauvegarder la route
         appendRow(CONFIG.SHEETS.ROUTES, rowData);
-        Logger.log(`[ROUTES] ✅ Route ${tempId} sauvegardée (statut: BROUILLON, lien Maps: ${lienMaps ? 'oui' : 'non'})`);
+        Logger.log(`[ROUTES] ✅ Route ${tempId} sauvegardée`);
 
-        // Créer les étapes avec l'ordre optimisé
         createOptimizedEtapes(tempId, livraisonsOptimisees);
-        Logger.log(`[ROUTES] ✅ ${livraisonsOptimisees.length} étapes optimisées + retour QG créés`);
+        Logger.log(`[ROUTES] ✅ Étapes créées pour ${tempId}`);
 
-        // Mettre à jour le statut des livraisons → ASSIGNEE
         for (const livraison of livraisonsOptimisees) {
             const updated = updateDeliveryStatus(
                 livraison.id_livraison,
@@ -104,7 +95,10 @@ function saveRoute(route, params) {
                 Logger.log(`[ROUTES] ⚠️ Échec mise à jour statut de ${livraison.id_livraison}`);
             }
         }
-        Logger.log(`[ROUTES] ✅ Statut mis à jour pour ${livraisonsOptimisees.length} livraisons`);
+
+        // Vérifier si toutes les livraisons de la route étaient déjà conditionnées
+        // avant la création des stops (feuille conditionnement générée en avance)
+        _verifierConditionnementApresCreation(tempId, livraisonsOptimisees);
 
         return {
             ...routeData,
@@ -114,21 +108,111 @@ function saveRoute(route, params) {
 
     } catch (error) {
         Logger.log(`[ROUTES] ❌ Erreur sauvegarde route: ${error.message}`);
-        Logger.log(`[ROUTES] ❌ Route NON sauvegardée - livraisons NON mises à jour`);
         return null;
     }
 }
 
 /**
- * Calcule le centre géographique (barycentre) d'un ensemble de livraisons
+ * Après la création des stops, vérifie si toutes les livraisons
+ * ont déjà statut_conditionnement = Prête (feuille conditionnement
+ * générée avant la planification des routes).
+ * Si oui → route passe directement à Prête et l'email est envoyé.
  *
- * @param {Array<Object>} livraisons - Livraisons avec latitude/longitude
- * @returns {{ lat: number, lng: number }}
+ * @param {string} routeId
+ * @param {Array}  livraisons
  */
-function calculerCentre(livraisons) {
-    if (!livraisons || livraisons.length === 0) {
-        return { lat: 0, lng: 0 };
+function _verifierConditionnementApresCreation(routeId, livraisons) {
+    const toutesPretes = livraisons.every(l => {
+        const liv = getDeliveryById(l.id_livraison);
+        return liv && liv.statut_conditionnement === CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE;
+    });
+
+    if (!toutesPretes) return;
+
+    Logger.log(`[ROUTES] 🟢 Toutes livraisons déjà Prêtes pour route ${routeId} → passage Prête`);
+
+    // Mettre à jour les étapes au statut Prête
+    const stops = getDeliveryStopsForRoute(routeId);
+    for (const stop of stops) {
+        updateStopStatus(stop.id_etape, CONFIG.ENUMS.STATUT_ETAPE.PRETE);
     }
+
+    passerRouteEnPrete(routeId);
+}
+
+/**
+ * Crée les étapes optimisées pour une route (livraisons + retour QG).
+ *
+ * @param {string} routeId
+ * @param {Array}  livraisonsOptimisees
+ */
+function createOptimizedEtapes(routeId, livraisonsOptimisees) {
+    Logger.log(`[ROUTES] 📝 Création de ${livraisonsOptimisees.length} étapes + retour QG pour ${routeId}...`);
+
+    const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
+    const rows = [];
+
+    for (let i = 0; i < livraisonsOptimisees.length; i++) {
+        const livraison = livraisonsOptimisees[i];
+
+        const etapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        rows.push([
+            etapeId,
+            routeId,
+            livraison.id_livraison,
+            i + 1,
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
+            null,
+            null,
+            ''
+        ]);
+
+        if (i < 3 || i === livraisonsOptimisees.length - 1) {
+            Logger.log(`[ROUTES]    ✅ Étape ${etapeId} → ${livraison.id_livraison} (ordre ${i + 1})`);
+        } else if (i === 3) {
+            Logger.log(`[ROUTES]    ... (${livraisonsOptimisees.length - 4} étapes supplémentaires)`);
+        }
+    }
+
+    // Retour au QG
+    const hqConfig = getCurrentHqConfig();
+
+    if (hqConfig && hqConfig.lat && hqConfig.lng) {
+        const hqEtapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        rows.push([
+            hqEtapeId,
+            routeId,
+            null,
+            livraisonsOptimisees.length + 1,
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
+            null,
+            null,
+            `Retour au QG - ${hqConfig.address}`
+        ]);
+
+        Logger.log(`[ROUTES]    🏢 Retour QG: ${hqEtapeId} (ordre ${livraisonsOptimisees.length + 1})`);
+    } else {
+        Logger.log(`[ROUTES]    ⚠️ QG non configuré — retour QG ignoré`);
+    }
+
+    if (rows.length > 0) {
+        sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+        Logger.log(`[ROUTES] ✅ ${rows.length} étapes insérées pour ${routeId}`);
+    }
+}
+
+function calculerCentre(livraisons) {
+    if (!livraisons || livraisons.length === 0) return { lat: 0, lng: 0 };
 
     const totalLat = livraisons.reduce((sum, l) => sum + l.latitude, 0);
     const totalLng = livraisons.reduce((sum, l) => sum + l.longitude, 0);
@@ -159,8 +243,6 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
         url += `&destination=${encodeURIComponent(destination)}`;
 
         if (livraisonsOptimisees.length > 0) {
-            // ✅ Dédupliquer les coordonnées identiques (ex: cluster de même adresse)
-            // On conserve uniquement la première occurrence de chaque paire lat/lng
             const seen = new Set();
             const waypointsUniques = livraisonsOptimisees
                 .map(l => `${l.latitude},${l.longitude}`)
@@ -172,15 +254,14 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
 
             const nbIgnores = livraisonsOptimisees.length - waypointsUniques.length;
             if (nbIgnores > 0) {
-                Logger.log(`[ROUTES] 🗺️ Déduplication: ${nbIgnores} adresse(s) en double supprimée(s) du lien Maps`);
+                Logger.log(`[ROUTES] 🗺️ ${nbIgnores} adresse(s) dupliquée(s) retirée(s) du lien Maps`);
             }
 
             url += `&waypoints=${encodeURIComponent(waypointsUniques.join('|'))}`;
         }
 
         url += `&travelmode=driving`;
-
-        Logger.log(`[ROUTES] 🗺️ Lien Maps généré (${livraisonsOptimisees.length} arrêts, waypoints dédupliqués)`);
+        Logger.log(`[ROUTES] 🗺️ Lien Maps généré (${livraisonsOptimisees.length} arrêts)`);
         return url;
 
     } catch (error) {
