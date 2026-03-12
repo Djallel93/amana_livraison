@@ -1,734 +1,187 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 
 <head>
   <base target="_top">
-  <link
-    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
-  <style>
-    :root {
-      --blue-start: #4facfe;
-      --blue-end: #00f2fe;
-      --gradient: linear-gradient(135deg, var(--blue-start) 0%, var(--blue-end) 100%);
-      --surface: #ffffff;
-      --bg: #f0f7ff;
-      --border: #e2edf7;
-      --text: #1a2533;
-      --muted: #64748b;
-      --success: #10b981;
-      --warning-bg: #fffbeb;
-      --warning-border: #f59e0b;
-      --warning-text: #92400e;
-      --radius: 12px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: var(--bg);
-      min-height: 100vh;
-      padding: 24px 16px;
-      color: var(--text);
-    }
-
-    .container {
-      max-width: 860px;
-      margin: 0 auto;
-    }
-
-    /* ── CARD ── */
-    .card {
-      background: var(--surface);
-      border-radius: var(--radius);
-      box-shadow: 0 4px 24px rgba(79, 172, 254, .12);
-      overflow: hidden;
-      margin-bottom: 20px;
-    }
-
-    /* ── HEADER ── */
-    .header {
-      background: var(--gradient);
-      color: white;
-      padding: 28px 32px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .header-icon {
-      width: 52px;
-      height: 52px;
-      background: rgba(255, 255, 255, .2);
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 26px;
-      flex-shrink: 0;
-    }
-
-    .header h1 {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-
-    .header p {
-      font-size: 13px;
-      opacity: .85;
-    }
-
-    /* ── FORM ── */
-    .form-content {
-      padding: 28px 32px;
-    }
-
-    .section {
-      margin-bottom: 28px;
-      padding: 20px;
-      background: var(--bg);
-      border-radius: 10px;
-      border-left: 3px solid var(--blue-start);
-    }
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 18px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .form-group {
-      margin-bottom: 18px;
-    }
-
-    .form-group:last-child {
-      margin-bottom: 0;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    input[type="date"],
-    input[type="number"],
-    select {
-      width: 100%;
-      padding: 10px 14px;
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: inherit;
-      color: var(--text);
-      background: white;
-      transition: border-color .15s;
-    }
-
-    input:focus,
-    select:focus {
-      outline: none;
-      border-color: var(--blue-start);
-      box-shadow: 0 0 0 3px rgba(79, 172, 254, .15);
-    }
-
-    .radio-group {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-
-    .radio-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all .15s;
-    }
-
-    .radio-item:has(input:checked) {
-      border-color: var(--blue-start);
-      background: rgba(79, 172, 254, .06);
-    }
-
-    .radio-item input[type="radio"] {
-      accent-color: var(--blue-start);
-    }
-
-    .radio-item label {
-      margin: 0;
-      cursor: pointer;
-      font-size: 13px;
-    }
-
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    .checkbox-row input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      accent-color: var(--blue-start);
-    }
-
-    .checkbox-row label {
-      margin: 0;
-      cursor: pointer;
-      font-size: 13px;
-    }
-
-    .help-text {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 5px;
-    }
-
-    /* ── WEIGHT PAIR ── */
-    .weight-pair {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-
-    @media (max-width: 560px) {
-      .weight-pair {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* ── BUTTONS ── */
-    .button-container {
-      display: flex;
-      gap: 12px;
-      justify-content: flex-end;
-      padding: 20px 32px;
-      background: var(--bg);
-      border-top: 1px solid var(--border);
-    }
-
-    button {
-      padding: 11px 28px;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all .15s;
-    }
-
-    .btn-primary {
-      background: var(--gradient);
-      color: white;
-      box-shadow: 0 4px 14px rgba(79, 172, 254, .35);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(79, 172, 254, .45);
-    }
-
-    .btn-primary:disabled {
-      opacity: .5;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .btn-secondary {
-      background: white;
-      color: var(--muted);
-      border: 2px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      border-color: #cbd5e0;
-      background: var(--bg);
-    }
-
-    /* ── ALERTS ── */
-    .alert {
-      padding: 14px 18px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      display: none;
-      font-size: 14px;
-      animation: slideIn .25s ease-out;
-    }
-
-    @keyframes slideIn {
-      from {
-        transform: translateY(-8px);
-        opacity: 0;
-      }
-
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
-    }
-
-    .alert-success {
-      background: #d1fae5;
-      color: #065f46;
-      border-left: 4px solid var(--success);
-    }
-
-    .alert-error {
-      background: #fee2e2;
-      color: #7f1d1d;
-      border-left: 4px solid #ef4444;
-    }
-
-    .alert-warning {
-      background: var(--warning-bg);
-      color: var(--warning-text);
-      border-left: 4px solid var(--warning-border);
-    }
-
-    /* ── LOADING ── */
-    .loading {
-      display: none;
-      text-align: center;
-      padding: 60px 32px;
-    }
-
-    .spinner {
-      border: 3px solid var(--border);
-      border-top: 3px solid var(--blue-start);
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    .loading-text {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .loading-sub {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 6px;
-    }
-
-    /* ── RESULTS ── */
-    .results {
-      display: none;
-      padding: 32px;
-    }
-
-    .results-header {
-      text-align: center;
-      margin-bottom: 28px;
-    }
-
-    .results-header h2 {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-
-    .results-header p {
-      font-size: 14px;
-      color: var(--muted);
-    }
-
-    .kpi-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 14px;
-      margin-bottom: 20px;
-    }
-
-    .kpi-card {
-      background: var(--gradient);
-      color: white;
-      border-radius: 10px;
-      padding: 18px 16px;
-      text-align: center;
-      box-shadow: 0 4px 14px rgba(79, 172, 254, .25);
-    }
-
-    .kpi-card .kpi-value {
-      font-size: 34px;
-      font-weight: 700;
-      font-family: 'DM Mono', monospace;
-      line-height: 1;
-      margin-bottom: 6px;
-    }
-
-    .kpi-card .kpi-label {
-      font-size: 12px;
-      font-weight: 500;
-      opacity: .9;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-    }
-
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .stat-pill {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .stat-pill-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: rgba(79, 172, 254, .12);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-
-    .stat-pill-value {
-      font-size: 18px;
-      font-weight: 700;
-      font-family: 'DM Mono', monospace;
-    }
-
-    .stat-pill-label {
-      font-size: 11px;
-      color: var(--muted);
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
-
-    .breakdown-section {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 20px;
-    }
-
-    .breakdown-title {
-      padding: 14px 18px;
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      color: var(--muted);
-      border-bottom: 1px solid var(--border);
-      background: white;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .breakdown-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .breakdown-table th {
-      padding: 10px 16px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--muted);
-      text-align: left;
-      background: white;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .breakdown-table td {
-      padding: 11px 16px;
-      font-size: 13px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .breakdown-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .breakdown-table tr:nth-child(even) td {
-      background: rgba(240, 247, 255, .6);
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 9px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    .badge-blue {
-      background: rgba(79, 172, 254, .15);
-      color: #0369a1;
-    }
-
-    .badge-green {
-      background: #d1fae5;
-      color: #065f46;
-    }
-
-    .mono {
-      font-family: 'DM Mono', monospace;
-    }
-
-    .warnings-box {
-      background: var(--warning-bg);
-      border: 1px solid var(--warning-border);
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-
-    .warnings-box h4 {
-      color: var(--warning-text);
-      font-size: 13px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .warnings-box ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    .warnings-box li {
-      font-size: 12px;
-      color: var(--warning-text);
-      padding: 5px 0;
-      border-bottom: 1px solid #fde68a;
-    }
-
-    .warnings-box li:last-child {
-      border-bottom: none;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <?!= include('styles'); ?>
 </head>
 
 <body>
-  <div class="container">
+  <div class="page-wrap">
     <div class="card">
-      <div class="header">
-        <div class="header-icon">🗺️</div>
-        <div>
+
+      <div class="form-header">
+        <div class="form-header__icon">🗺️</div>
+        <div class="form-header__text">
           <h1>Planifier les Routes</h1>
           <p>Optimiser l'attribution des livraisons aux bénévoles</p>
         </div>
       </div>
 
-      <!-- Alerts -->
-      <div class="form-content" id="alerts-zone">
-        <div id="alert-success" class="alert alert-success"></div>
-        <div id="alert-error" class="alert alert-error"></div>
-        <div id="alert-warning" class="alert alert-warning"></div>
+      <!-- FORM STATE -->
+      <div id="formState">
+        <div class="form-body">
+          <div id="alert-success" class="alert alert--success"></div>
+          <div id="alert-error" class="alert alert--error"></div>
+          <div id="alert-warning" class="alert alert--warning"></div>
+
+          <form id="routeForm">
+
+            <div class="form-section">
+              <div class="form-section__title">📅 Configuration de base</div>
+
+              <div class="form-group">
+                <label for="date_livraison">Date de livraison</label>
+                <input type="date" id="date_livraison" required>
+              </div>
+
+              <div class="form-group">
+                <label for="max_livraisons">Livraisons maximum par bénévole</label>
+                <input type="number" id="max_livraisons" min="1" max="30" value="10" required>
+                <div class="help-text">Limite le nombre d'arrêts par route</div>
+              </div>
+
+              <div class="form-group">
+                <label>Occasion</label>
+                <div class="radio-group">
+                  <div class="checkbox-row" style="flex:none; padding: 8px 14px;">
+                    <input type="radio" id="occ-zakat" name="occasion" value="zakat_el_fitr" checked>
+                    <label for="occ-zakat">🌙 Zakat El Fitr</label>
+                  </div>
+                  <div class="checkbox-row" style="flex:none; padding: 8px 14px;">
+                    <input type="radio" id="occ-recolte" name="occasion" value="recolte">
+                    <label for="occ-recolte">🌾 Récolte</label>
+                  </div>
+                  <div class="checkbox-row" style="flex:none; padding: 8px 14px;">
+                    <input type="radio" id="occ-ponctuelle" name="occasion" value="ponctuelle">
+                    <label for="occ-ponctuelle">📦 Ponctuelle</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Poids moyen par personne (kg)</label>
+                <div class="form-row">
+                  <div>
+                    <input type="number" id="poids_moyen_kg" min="1" max="100" value="20" step="0.5" required>
+                    <div class="help-text">🏠 Domicile</div>
+                  </div>
+                  <div>
+                    <input type="number" id="poids_moyen_hotel_kg" min="0" max="100" value="15" step="0.1">
+                    <div class="help-text">🏨 Hôtel (généralement plus léger)</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group mb-0">
+                <div class="checkbox-row" onclick="toggleRelivre()">
+                  <input type="checkbox" id="relivre" checked>
+                  <label for="relivre">Route avec retour au QG (relivre)</label>
+                </div>
+                <div class="help-text mt-4">Si coché, les bénévoles devront revenir au QG après les livraisons</div>
+              </div>
+            </div>
+
+          </form>
+        </div>
+
+        <div class="form-footer">
+          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
+          <button type="submit" form="routeForm" class="btn btn--primary">✨ Planifier les Routes</button>
+        </div>
       </div>
 
-      <!-- Form -->
-      <form id="routeForm">
-        <div class="form-content">
-
-          <div class="section">
-            <div class="section-title">📅 Configuration de base</div>
-
-            <div class="form-group">
-              <label for="date_livraison">Date de livraison</label>
-              <input type="date" id="date_livraison" name="date_livraison" required>
-            </div>
-
-            <div class="form-group">
-              <label for="max_livraisons">Livraisons maximum par bénévole</label>
-              <input type="number" id="max_livraisons" name="max_livraisons" min="1" max="30" value="10" required>
-              <div class="help-text">Limite le nombre d'arrêts par route</div>
-            </div>
-
-            <div class="form-group">
-              <label>Occasion</label>
-              <div class="radio-group">
-                <div class="radio-item">
-                  <input type="radio" id="zakat" name="occasion" value="zakat_el_fitr" checked>
-                  <label for="zakat">🌙 Zakat El Fitr</label>
-                </div>
-                <div class="radio-item">
-                  <input type="radio" id="recolte" name="occasion" value="recolte">
-                  <label for="recolte">🌾 Récolte</label>
-                </div>
-                <div class="radio-item">
-                  <input type="radio" id="ponctuelle" name="occasion" value="ponctuelle">
-                  <label for="ponctuelle">📦 Ponctuelle</label>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Poids moyen par personne (kg)</label>
-              <div class="weight-pair">
-                <div>
-                  <input type="number" id="poids_moyen_kg" name="poids_moyen_kg" min="1" max="100" value="20" step="0.5"
-                    required>
-                  <div class="help-text">🏠 Domicile — poids par personne</div>
-                </div>
-                <div>
-                  <input type="number" id="poids_moyen_hotel_kg" name="poids_moyen_hotel_kg" min="0" max="100" value="15"
-                    step="0.1">
-                  <div class="help-text">🏨 Hôtel — poids par personne (généralement plus léger)</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <div class="checkbox-row">
-                <input type="checkbox" id="relivre" name="relivre" checked>
-                <label for="relivre">Route avec retour au QG (relivre)</label>
-              </div>
-              <div class="help-text" style="margin-top: 6px;">Si coché, les bénévoles devront revenir au QG après les
-                livraisons</div>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="button-container">
-          <button type="button" class="btn-secondary" onclick="closeDialog()">Annuler</button>
-          <button type="submit" class="btn-primary" id="submitBtn">✨ Planifier les Routes</button>
-        </div>
-      </form>
-
-      <!-- Loading -->
-      <div id="loading" class="loading">
+      <!-- LOADING STATE -->
+      <div id="loadingState" class="loading-state">
         <div class="spinner"></div>
-        <div class="loading-text">Planification en cours…</div>
-        <div class="loading-sub">Clustering géographique · Attribution · Optimisation TSP</div>
+        <div class="loading-state__text">Planification en cours…</div>
+        <div class="loading-state__sub">Clustering géographique · Attribution · Optimisation TSP</div>
       </div>
 
-      <!-- Results -->
-      <div id="results" class="results">
+      <!-- RESULTS STATE -->
+      <div id="resultsState" class="results-state">
         <div class="results-header">
           <h2>✅ Routes planifiées</h2>
-          <p id="results-subtitle">Résumé de la planification</p>
+          <p id="results-subtitle"></p>
         </div>
+        <div class="results-body">
 
-        <div class="kpi-row">
-          <div class="kpi-card">
-            <div class="kpi-value" id="stat-routes">0</div>
-            <div class="kpi-label">Routes créées</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-value" id="stat-deliveries">0</div>
-            <div class="kpi-label">Livraisons assignées</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-value" id="stat-beneficiaires">0</div>
-            <div class="kpi-label">Bénéficiaires</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-value" id="stat-poids">0 kg</div>
-            <div class="kpi-label">Poids total</div>
-          </div>
-        </div>
-
-        <div class="stats-row">
-          <div class="stat-pill">
-            <div class="stat-pill-icon">👥</div>
-            <div class="stat-pill-body">
-              <div class="stat-pill-value" id="stat-benevoles">0</div>
-              <div class="stat-pill-label">Bénévoles mobilisés</div>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="stat-routes">0</div>
+              <div class="kpi-card__label">Routes créées</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="stat-deliveries">0</div>
+              <div class="kpi-card__label">Livraisons assignées</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="stat-beneficiaires">0</div>
+              <div class="kpi-card__label">Bénéficiaires</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="stat-poids">0 kg</div>
+              <div class="kpi-card__label">Poids total</div>
             </div>
           </div>
-          <div class="stat-pill">
-            <div class="stat-pill-icon">📏</div>
-            <div class="stat-pill-body">
-              <div class="stat-pill-value" id="stat-distance">0 km</div>
-              <div class="stat-pill-label">Distance totale</div>
+
+          <div class="stat-grid">
+            <div class="stat-pill">
+              <div class="stat-pill__icon">👥</div>
+              <div>
+                <div class="stat-pill__value" id="stat-benevoles">0</div>
+                <div class="stat-pill__label">Bénévoles mobilisés</div>
+              </div>
+            </div>
+            <div class="stat-pill">
+              <div class="stat-pill__icon">📏</div>
+              <div>
+                <div class="stat-pill__value" id="stat-distance">0 km</div>
+                <div class="stat-pill__label">Distance totale</div>
+              </div>
+            </div>
+            <div class="stat-pill">
+              <div class="stat-pill__icon">📦</div>
+              <div>
+                <div class="stat-pill__value" id="stat-avg">0</div>
+                <div class="stat-pill__label">Moy. livraisons / route</div>
+              </div>
+            </div>
+            <div class="stat-pill">
+              <div class="stat-pill__icon">⚠️</div>
+              <div>
+                <div class="stat-pill__value" id="stat-warnings">0</div>
+                <div class="stat-pill__label">Avertissements</div>
+              </div>
             </div>
           </div>
-          <div class="stat-pill">
-            <div class="stat-pill-icon">📦</div>
-            <div class="stat-pill-body">
-              <div class="stat-pill-value" id="stat-avg-livraisons">0</div>
-              <div class="stat-pill-label">Moy. livraisons/route</div>
-            </div>
+
+          <div class="data-table-wrap" id="breakdown-section">
+            <div class="data-table-title">📋 Détail par route</div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Route</th>
+                  <th>Bénévole</th>
+                  <th>Livraisons</th>
+                  <th>Poids</th>
+                  <th>Distance</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody id="breakdown-tbody"></tbody>
+            </table>
           </div>
-          <div class="stat-pill">
-            <div class="stat-pill-icon">⚠️</div>
-            <div class="stat-pill-body">
-              <div class="stat-pill-value" id="stat-warnings">0</div>
-              <div class="stat-pill-label">Avertissements</div>
-            </div>
+
+          <div id="warnings-box" class="warnings-box hidden">
+            <div class="warnings-box__title">⚠️ Avertissements</div>
+            <ul id="warnings-list"></ul>
           </div>
-        </div>
 
-        <div class="breakdown-section" id="breakdown-section">
-          <div class="breakdown-title">📋 Détail par route</div>
-          <table class="breakdown-table">
-            <thead>
-              <tr>
-                <th>Route</th>
-                <th>Bénévole</th>
-                <th>Livraisons</th>
-                <th>Poids</th>
-                <th>Distance</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody id="breakdown-tbody"></tbody>
-          </table>
         </div>
-
-        <div id="warnings-box" class="warnings-box" style="display:none;">
-          <h4>⚠️ Avertissements</h4>
-          <ul id="warnings-list"></ul>
-        </div>
-
-        <div class="button-container" style="padding: 0; margin-top: 4px; background: none; border: none;">
-          <button class="btn-primary" onclick="closeDialog()">Fermer</button>
+        <div class="form-footer">
+          <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
         </div>
       </div>
 
@@ -736,16 +189,20 @@
   </div>
 
   <script>
-    window.addEventListener('load', () => {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      document.getElementById('date_livraison').value = tomorrow.toISOString().split('T')[0];
+    window.addEventListener('load', function () {
+      var d = new Date();
+      d.setDate(d.getDate() + 1);
+      document.getElementById('date_livraison').value = d.toISOString().split('T')[0];
     });
+
+    function toggleRelivre() {
+      var cb = document.getElementById('relivre');
+      cb.checked = !cb.checked;
+    }
 
     document.getElementById('routeForm').addEventListener('submit', function (e) {
       e.preventDefault();
-
-      const params = {
+      var params = {
         date_livraison: document.getElementById('date_livraison').value,
         max_livraisons: parseInt(document.getElementById('max_livraisons').value),
         occasion: document.querySelector('input[name="occasion"]:checked').value,
@@ -755,107 +212,74 @@
         vehicules_pretes: [],
         binomes: []
       };
-
-      document.getElementById('routeForm').style.display = 'none';
-      document.getElementById('alerts-zone').style.display = 'none';
-      document.getElementById('loading').style.display = 'block';
-
+      setState('loading');
       google.script.run
         .withSuccessHandler(onPlanSuccess)
-        .withFailureHandler(onPlanError)
+        .withFailureHandler(function (e) { setState('form'); showAlert('error', 'Erreur : ' + e.message); })
         .planRoutesFromForm(params);
     });
 
     function onPlanSuccess(result) {
-      document.getElementById('loading').style.display = 'none';
-
-      if (!result.success) {
-        document.getElementById('routeForm').style.display = 'block';
-        document.getElementById('alerts-zone').style.display = 'block';
-        showAlert('error', 'Échec : ' + (result.errors.join(', ') || 'Erreur inconnue'));
-        return;
-      }
-
+      if (!result.success) { setState('form'); showAlert('error', 'Échec : ' + (result.errors.join(', ') || 'Erreur inconnue')); return; }
       populateResults(result);
-      document.getElementById('results').style.display = 'block';
+      setState('results');
     }
 
     function populateResults(result) {
-      const routes = result.routes || [];
-      const warnings = result.warnings || [];
-      const poidsTotal = routes.reduce((s, r) => s + (r.poids_total_kg || 0), 0);
-      const distTotal = routes.reduce((s, r) => s + (r.distance_totale_km || 0), 0);
-      const livTotal = routes.reduce((s, r) => s + (r.livraisons ? r.livraisons.length : 0), 0);
-      const partsTotal = routes.reduce((s, r) => s + (r.nombre_parts || 0), 0);
-      const benevoles = new Set(routes.map(r => r.id_benevole)).size;
-      const avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
+      var routes = result.routes || [];
+      var warnings = result.warnings || [];
+      var poidsTotal = routes.reduce(function (s, r) { return s + (r.poids_total_kg || 0); }, 0);
+      var distTotal = routes.reduce(function (s, r) { return s + (r.distance_totale_km || 0); }, 0);
+      var livTotal = routes.reduce(function (s, r) { return s + (r.livraisons ? r.livraisons.length : 0); }, 0);
+      var partsTotal = routes.reduce(function (s, r) { return s + (r.nombre_parts || 0); }, 0);
+      var benevoles = new Set(routes.map(function (r) { return r.id_benevole; })).size;
+      var avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
 
       document.getElementById('stat-routes').textContent = result.created;
       document.getElementById('stat-deliveries').textContent = livTotal;
       document.getElementById('stat-beneficiaires').textContent = partsTotal;
       document.getElementById('stat-poids').textContent = Math.round(poidsTotal) + ' kg';
-
       document.getElementById('stat-benevoles').textContent = benevoles;
       document.getElementById('stat-distance').textContent = Math.round(distTotal) + ' km';
-      document.getElementById('stat-avg-livraisons').textContent = avgLiv;
+      document.getElementById('stat-avg').textContent = avgLiv;
       document.getElementById('stat-warnings').textContent = warnings.length;
+      document.getElementById('results-subtitle').textContent = result.created + ' routes générées pour le ' + document.getElementById('date_livraison').value;
 
-      const dateStr = document.getElementById('date_livraison').value;
-      document.getElementById('results-subtitle').textContent =
-        `${result.created} routes générées pour le ${dateStr}`;
-
-      const tbody = document.getElementById('breakdown-tbody');
+      var tbody = document.getElementById('breakdown-tbody');
       tbody.innerHTML = '';
-
-      if (routes.length > 0) {
-        routes.forEach(r => {
-          const livCount = r.livraisons ? r.livraisons.length : '—';
-          const poids = r.poids_total_kg ? Math.round(r.poids_total_kg) + ' kg' : '—';
-          const dist = r.distance_totale_km ? Math.round(r.distance_totale_km * 10) / 10 + ' km' : '—';
-          const nom = r.benevole_nom || r.id_benevole || '—';
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td><span class="mono badge badge-blue">${r.id_route}</span></td>
-            <td><strong>${nom}</strong></td>
-            <td><span class="mono">${livCount}</span></td>
-            <td><span class="mono">${poids}</span></td>
-            <td><span class="mono">${dist}</span></td>
-            <td><span class="badge badge-green">✓ Brouillon</span></td>
-          `;
-          tbody.appendChild(tr);
-        });
-      } else {
-        document.getElementById('breakdown-section').style.display = 'none';
-      }
+      routes.forEach(function (r) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><span class="mono badge badge--cyan">' + r.id_route + '</span></td>' +
+          '<td><strong>' + (r.benevole_nom || r.id_benevole || '—') + '</strong></td>' +
+          '<td class="mono">' + (r.livraisons ? r.livraisons.length : '—') + '</td>' +
+          '<td class="mono">' + (r.poids_total_kg ? Math.round(r.poids_total_kg) + ' kg' : '—') + '</td>' +
+          '<td class="mono">' + (r.distance_totale_km ? Math.round(r.distance_totale_km * 10) / 10 + ' km' : '—') + '</td>' +
+          '<td><span class="badge badge--green">✓ Brouillon</span></td>';
+        tbody.appendChild(tr);
+      });
+      if (routes.length === 0) document.getElementById('breakdown-section').style.display = 'none';
 
       if (warnings.length > 0) {
-        const ul = document.getElementById('warnings-list');
+        var ul = document.getElementById('warnings-list');
         ul.innerHTML = '';
-        warnings.forEach(w => {
-          const li = document.createElement('li');
-          li.textContent = w.message || w;
-          ul.appendChild(li);
-        });
-        document.getElementById('warnings-box').style.display = 'block';
+        warnings.forEach(function (w) { var li = document.createElement('li'); li.textContent = w.message || w; ul.appendChild(li); });
+        document.getElementById('warnings-box').classList.remove('hidden');
       }
     }
 
-    function onPlanError(error) {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('routeForm').style.display = 'block';
-      document.getElementById('alerts-zone').style.display = 'block';
-      showAlert('error', 'Erreur : ' + error.message);
+    function setState(s) {
+      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
+      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
+      document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
     }
 
-    function showAlert(type, message) {
-      const el = document.getElementById('alert-' + type);
-      el.textContent = message;
-      el.style.display = 'block';
-      setTimeout(() => el.style.display = 'none', 6000);
+    function showAlert(type, msg) {
+      var el = document.getElementById('alert-' + type);
+      el.textContent = msg;
+      el.classList.add('alert--visible', 'alert--' + type);
+      setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
     }
-
-    function closeDialog() { google.script.host.close(); }
   </script>
 </body>
 

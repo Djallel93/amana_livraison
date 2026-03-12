@@ -6,6 +6,15 @@
  */
 
 /**
+ * Inclut un fichier HTML (pour les styles partagés)
+ * @param {string} filename
+ * @returns {string}
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
  * Génère les étiquettes depuis le formulaire
  * @param {Object} params - Paramètres du formulaire
  * @returns {Object}
@@ -35,9 +44,10 @@ function generateLabelsFromForm(params) {
  * Affiche le formulaire de configuration des API Keys
  */
 function showApiKeysConfig() {
-  const html = HtmlService.createHtmlOutputFromFile('ui/configApiKeys')
+  const html = HtmlService.createTemplateFromFile('ui/configApiKeys')
+    .evaluate()
     .setWidth(600)
-    .setHeight(500)
+    .setHeight(560)
     .setTitle('🔑 Configuration des API Keys');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Configuration des API Keys');
@@ -47,9 +57,10 @@ function showApiKeysConfig() {
  * Affiche le formulaire de configuration des emails
  */
 function showEmailConfig() {
-  const html = HtmlService.createHtmlOutputFromFile('ui/configEmail')
+  const html = HtmlService.createTemplateFromFile('ui/configEmail')
+    .evaluate()
     .setWidth(600)
-    .setHeight(800)
+    .setHeight(580)
     .setTitle('📧 Configuration Email');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Configuration Email');
@@ -59,9 +70,10 @@ function showEmailConfig() {
  * Affiche le formulaire de configuration du QG
  */
 function showHqAddressConfig() {
-  const html = HtmlService.createHtmlOutputFromFile('ui/configHq')
+  const html = HtmlService.createTemplateFromFile('ui/configHq')
+    .evaluate()
     .setWidth(600)
-    .setHeight(700)
+    .setHeight(520)
     .setTitle('🏢 Adresse du QG');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Adresse du QG');
@@ -71,9 +83,10 @@ function showHqAddressConfig() {
  * Affiche le formulaire de configuration de l'optimisation routes
  */
 function showRouteOptimizationConfig() {
-  const html = HtmlService.createHtmlOutputFromFile('ui/configRouteOptimization')
+  const html = HtmlService.createTemplateFromFile('ui/configRouteOptimization')
+    .evaluate()
     .setWidth(700)
-    .setHeight(700)
+    .setHeight(680)
     .setTitle('🎛️ Paramètres Optimisation Routes');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Paramètres Optimisation Routes');
@@ -153,7 +166,6 @@ function testApiConnections() {
 
     ui.alert('Résultats des Tests', message, ui.ButtonSet.OK);
 
-    // Aussi logger dans la console
     logApiStatus();
 
   } catch (error) {

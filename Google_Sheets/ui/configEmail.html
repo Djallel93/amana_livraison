@@ -1,309 +1,120 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 
 <head>
   <base target="_top">
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
-
-    .container {
-      max-width: 700px;
-      margin: 0 auto;
-    }
-
-    .card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
-
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 30px;
-      text-align: center;
-    }
-
-    .header h1 {
-      font-size: 28px;
-      margin-bottom: 10px;
-      font-weight: 600;
-    }
-
-    .form-content {
-      padding: 30px;
-    }
-
-    .section {
-      margin-bottom: 30px;
-      padding: 20px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border-left: 4px solid #667eea;
-    }
-
-    .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #2d3748;
-      margin-bottom: 15px;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      color: #4a5568;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    input[type="text"],
-    input[type="email"],
-    textarea {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e2e8f0;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: border-color 0.2s;
-      font-family: inherit;
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
-
-    input:focus,
-    textarea:focus {
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-
-    .help-text {
-      font-size: 12px;
-      color: #718096;
-      margin-top: 5px;
-      font-style: italic;
-    }
-
-    .button-container {
-      display: flex;
-      gap: 15px;
-      justify-content: flex-end;
-      padding: 20px 30px;
-      background: #f7fafc;
-      border-top: 1px solid #e2e8f0;
-    }
-
-    button {
-      padding: 12px 30px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-family: inherit;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    }
-
-    .btn-secondary {
-      background: white;
-      color: #4a5568;
-      border: 2px solid #e2e8f0;
-    }
-
-    .btn-secondary:hover {
-      background: #f7fafc;
-      border-color: #cbd5e0;
-    }
-
-    .alert {
-      padding: 16px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      display: none;
-    }
-
-    .alert-success {
-      background: #c6f6d5;
-      color: #22543d;
-      border-left: 4px solid #38a169;
-    }
-
-    .alert-error {
-      background: #fed7d7;
-      color: #742a2a;
-      border-left: 4px solid #e53e3e;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <?!= include('styles'); ?>
 </head>
 
 <body>
-  <div class="container">
+  <div class="page-wrap">
     <div class="card">
-      <div class="header">
-        <h1>📧 Configuration des Emails</h1>
-        <p>Personnaliser les emails envoyés aux bénévoles</p>
+
+      <div class="form-header">
+        <div class="form-header__icon">📧</div>
+        <div class="form-header__text">
+          <h1>Configuration des Emails</h1>
+          <p>Personnaliser les emails envoyés aux bénévoles</p>
+        </div>
       </div>
 
-      <div class="form-content">
-        <div id="alert-success" class="alert alert-success"></div>
-        <div id="alert-error" class="alert alert-error"></div>
+      <!-- FORM STATE -->
+      <div id="formState">
+        <div class="form-body">
+          <div id="alert-success" class="alert alert--success"></div>
+          <div id="alert-error" class="alert alert--error"></div>
 
-        <form id="emailForm">
+          <form id="emailForm">
 
-          <div class="section">
-            <div class="section-title">Expéditeur</div>
-
-            <div class="form-group">
-              <label for="fromName">Nom de l'expéditeur</label>
-              <input type="text" id="fromName" name="fromName" required>
-              <div class="help-text">
-                Ex: Association AMANA
+            <div class="form-section">
+              <div class="form-section__title">✉️ Expéditeur</div>
+              <div class="form-group">
+                <label for="fromName">Nom de l'expéditeur</label>
+                <input type="text" id="fromName" placeholder="Association AMANA" required>
+              </div>
+              <div class="form-group">
+                <label for="adminEmail">Email administrateur</label>
+                <input type="email" id="adminEmail" placeholder="admin@association.org" required>
+                <div class="help-text">Pour recevoir les notifications (livraisons sautées, etc.)</div>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="adminEmail">Email administrateur</label>
-              <input type="email" id="adminEmail" name="adminEmail" required>
-              <div class="help-text">
-                Pour recevoir les notifications (livraisons sautées, etc.)
+            <div class="form-section">
+              <div class="form-section__title">🗺️ Email de Route</div>
+              <div class="form-group">
+                <label for="subjectRoute">Sujet de l'email</label>
+                <input type="text" id="subjectRoute" placeholder="Votre Itinéraire de Livraison - {ID_ROUTE}" required>
               </div>
             </div>
-          </div>
 
-          <div class="section">
-            <div class="section-title">Email de Route</div>
-
-            <div class="form-group">
-              <label for="subjectRoute">Sujet de l'email</label>
-              <input type="text" id="subjectRoute" name="subjectRoute" required>
-              <div class="help-text">
-                Ex: Votre Itinéraire de Livraison - {ID_ROUTE}
+            <div class="form-section">
+              <div class="form-section__title">⚠️ Notification Admin</div>
+              <div class="form-group">
+                <label for="subjectSkip">Sujet (livraison sautée)</label>
+                <input type="text" id="subjectSkip" placeholder="⚠️ Livraison Sautée - Action Requise" required>
               </div>
             </div>
-          </div>
 
-          <div class="section">
-            <div class="section-title">Notification Admin</div>
+          </form>
+        </div>
 
-            <div class="form-group">
-              <label for="subjectSkip">Sujet (livraison sautée)</label>
-              <input type="text" id="subjectSkip" name="subjectSkip" required>
-              <div class="help-text">
-                Ex: ⚠️ Livraison Sautée - Action Requise
-              </div>
-            </div>
-          </div>
-
-        </form>
+        <div class="form-footer">
+          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
+          <button type="submit" form="emailForm" class="btn btn--primary">💾 Enregistrer</button>
+        </div>
       </div>
 
-      <div class="button-container">
-        <button type="button" class="btn-secondary" onclick="closeDialog()">
-          Annuler
-        </button>
-        <button type="submit" form="emailForm" class="btn-primary">
-          💾 Enregistrer
-        </button>
+      <!-- LOADING STATE -->
+      <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <div class="loading-state__text">Sauvegarde en cours…</div>
       </div>
+
     </div>
   </div>
 
   <script>
     window.addEventListener('load', function () {
-      loadCurrentConfig();
-    });
-
-    function loadCurrentConfig() {
       google.script.run
         .withSuccessHandler(function (config) {
-          if (config) {
-            document.getElementById('fromName').value = config.fromName || '';
-            document.getElementById('adminEmail').value = config.adminEmail || '';
-            document.getElementById('subjectRoute').value = config.subjectRoute || '';
-            document.getElementById('subjectSkip').value = config.subjectSkip || '';
-          }
+          if (!config) return;
+          document.getElementById('fromName').value = config.fromName || '';
+          document.getElementById('adminEmail').value = config.adminEmail || '';
+          document.getElementById('subjectRoute').value = config.subjectRoute || '';
+          document.getElementById('subjectSkip').value = config.subjectSkip || '';
         })
-        .withFailureHandler(function (error) {
-          showAlert('error', 'Erreur de chargement : ' + error.message);
-        })
+        .withFailureHandler(function (e) { showAlert('error', 'Erreur de chargement : ' + e.message); })
         .getCurrentEmailConfig();
-    }
+    });
 
     document.getElementById('emailForm').addEventListener('submit', function (e) {
       e.preventDefault();
-
-      const config = {
+      var adminEmail = document.getElementById('adminEmail').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) { showAlert('error', 'Email administrateur invalide'); return; }
+      var config = {
         fromName: document.getElementById('fromName').value.trim(),
-        adminEmail: document.getElementById('adminEmail').value.trim(),
+        adminEmail: adminEmail,
         subjectRoute: document.getElementById('subjectRoute').value.trim(),
         subjectSkip: document.getElementById('subjectSkip').value.trim()
       };
-
-      // Validation email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(config.adminEmail)) {
-        showAlert('error', 'Email administrateur invalide');
-        return;
-      }
-
-      // Sauvegarder
+      setState('loading');
       google.script.run
-        .withSuccessHandler(function () {
-          showAlert('success', 'Configuration des emails enregistrée !');
-          setTimeout(function () {
-            closeDialog();
-          }, 1500);
-        })
-        .withFailureHandler(function (error) {
-          showAlert('error', 'Erreur : ' + error.message);
-        })
+        .withSuccessHandler(function () { setState('form'); showAlert('success', '✅ Configuration enregistrée !'); setTimeout(function () { google.script.host.close(); }, 1800); })
+        .withFailureHandler(function (e) { setState('form'); showAlert('error', e.message); })
         .saveEmailConfig(config);
     });
 
-    function showAlert(type, message) {
-      const alertId = 'alert-' + type;
-      const alert = document.getElementById(alertId);
-      alert.textContent = message;
-      alert.style.display = 'block';
-
-      setTimeout(function () {
-        alert.style.display = 'none';
-      }, 5000);
+    function setState(s) {
+      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
+      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
     }
 
-    function closeDialog() {
-      google.script.host.close();
+    function showAlert(type, msg) {
+      var el = document.getElementById('alert-' + type);
+      el.textContent = msg;
+      el.classList.add('alert--visible', 'alert--' + type);
+      setTimeout(function () { el.classList.remove('alert--visible'); }, 5000);
     }
   </script>
 </body>

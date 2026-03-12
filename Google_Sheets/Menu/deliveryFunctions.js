@@ -14,9 +14,10 @@ function showGenerateDeliveriesForm() {
     return;
   }
 
-  const html = HtmlService.createHtmlOutputFromFile('ui/deliveryForm')
-    .setWidth(850)
-    .setHeight(700)
+  const html = HtmlService.createTemplateFromFile('ui/deliveryForm')
+    .evaluate()
+    .setWidth(1200)
+    .setHeight(800)
     .setTitle('📦 Générer des Livraisons');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Générer des Livraisons');
@@ -147,9 +148,10 @@ function updateDeliveryStatuses() {
  * Ouvre le formulaire de génération de la feuille de conditionnement.
  */
 function showPackagingForm() {
-  const html = HtmlService.createHtmlOutputFromFile('ui/packagingForm')
-    .setWidth(600)
-    .setHeight(450)
+  const html = HtmlService.createTemplateFromFile('ui/packagingForm')
+    .evaluate()
+    .setWidth(1200)
+    .setHeight(800)
     .setTitle('📦 Feuille de Conditionnement');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Feuille de Conditionnement');
@@ -170,20 +172,43 @@ function generatePackagingSheetFromForm(params) {
   }
 }
 
-function showPlanRoutesForm() {
-  if (!isApiConfigured()) {
-    SpreadsheetApp.getUi().alert(
-      'Configuration Manquante',
-      CONFIG.MESSAGES.ERROR_API_KEY_MISSING,
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    return;
+function getQuartiersForDeliveryForm() {
+  try {
+    const response = getAllQuartiers();
+
+    if (!response || !response.quartiers) {
+      return [];
+    }
+
+    return response.quartiers.map(q => ({
+      id: q.id,
+      nom: q.nom
+    }));
+
+  } catch (error) {
+    Logger.log(`[FORM] ❌ Erreur récupération quartiers: ${error.message}`);
+    return [];
   }
+}
 
-  const html = HtmlService.createHtmlOutputFromFile('ui/routeForm')
-    .setWidth(650)
-    .setHeight(950)
-    .setTitle('🗺️ Planifier les Routes');
+/**
+ * Génère des livraisons depuis le formulaire
+ * @param {Object} filters - Filtres du formulaire
+ * @returns {Object} Résultat de la génération
+ */
+function generateDeliveriesFromForm(filters) {
+  try {
+    Logger.log('[FORM] 📝 Génération depuis formulaire...');
+    Logger.log(`[FORM] Filtres: ${JSON.stringify(filters)}`);
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Planifier les Routes');
+    const result = generateDeliveries(filters);
+
+    Logger.log(`[FORM] ✅ Génération terminée: ${result.created} créées, ${result.skipped} ignorées`);
+
+    return result;
+
+  } catch (error) {
+    Logger.log(`[FORM] ❌ Erreur: ${error.message}`);
+    throw error;
+  }
 }

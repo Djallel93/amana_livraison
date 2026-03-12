@@ -1,281 +1,117 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 
 <head>
   <base target="_top">
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
-
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 30px;
-      text-align: center;
-    }
-
-    .header h1 {
-      font-size: 28px;
-      margin-bottom: 10px;
-      font-weight: 600;
-    }
-
-    .form-content {
-      padding: 30px;
-    }
-
-    .section {
-      margin-bottom: 30px;
-      padding: 20px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border-left: 4px solid #667eea;
-    }
-
-    .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #2d3748;
-      margin-bottom: 15px;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      color: #4a5568;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    input[type="number"] {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e2e8f0;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: border-color 0.2s;
-      font-family: inherit;
-    }
-
-    input:focus {
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-
-    .help-text {
-      font-size: 12px;
-      color: #718096;
-      margin-top: 5px;
-      font-style: italic;
-    }
-
-    .info-box {
-      background: #ebf8ff;
-      border-left: 4px solid #4299e1;
-      padding: 15px;
-      margin-top: 20px;
-      border-radius: 6px;
-      font-size: 13px;
-      color: #2c5282;
-    }
-
-    .button-container {
-      display: flex;
-      gap: 15px;
-      justify-content: flex-end;
-      padding: 20px 30px;
-      background: #f7fafc;
-      border-top: 1px solid #e2e8f0;
-    }
-
-    button {
-      padding: 12px 30px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-family: inherit;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    }
-
-    .btn-secondary {
-      background: white;
-      color: #4a5568;
-      border: 2px solid #e2e8f0;
-    }
-
-    .btn-secondary:hover {
-      background: #f7fafc;
-      border-color: #cbd5e0;
-    }
-
-    .alert {
-      padding: 16px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      display: none;
-    }
-
-    .alert-success {
-      background: #c6f6d5;
-      color: #22543d;
-      border-left: 4px solid #38a169;
-    }
-
-    .alert-error {
-      background: #fed7d7;
-      color: #742a2a;
-      border-left: 4px solid #e53e3e;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <?!= include('styles'); ?>
 </head>
 
 <body>
-  <div class="container">
+  <div class="page-wrap">
     <div class="card">
-      <div class="header">
-        <h1>⚙️ Optimisation des Routes</h1>
-        <p>Configurer les paramètres d'optimisation</p>
+
+      <div class="form-header">
+        <div class="form-header__icon">🎛️</div>
+        <div class="form-header__text">
+          <h1>Optimisation des Routes</h1>
+          <p>Paramètres du clustering adaptatif</p>
+        </div>
       </div>
 
-      <div class="form-content">
-        <div id="alert-success" class="alert alert-success"></div>
-        <div id="alert-error" class="alert alert-error"></div>
+      <!-- FORM STATE -->
+      <div id="formState">
+        <div class="form-body">
+          <div id="alert-success" class="alert alert--success"></div>
+          <div id="alert-error" class="alert alert--error"></div>
 
-        <form id="optimizationForm">
+          <form id="optimizationForm">
 
-          <div class="section">
-            <div class="section-title">🗺️ Clustering Géographique</div>
-
-            <div class="form-group">
-              <label for="distanceProximite">Distance de proximité (km)</label>
-              <input type="number" id="distanceProximite" name="distanceProximite" min="0.5" max="10" step="0.1"
-                required>
-              <div class="help-text">
-                Livraisons à moins de X km = même cluster (recommandé : 3 km)
+            <div class="form-section">
+              <div class="form-section__title">🗺️ Clustering géographique</div>
+              <div class="form-group">
+                <label for="distanceProximite">Distance de proximité (km)</label>
+                <input type="number" id="distanceProximite" min="0.5" max="10" step="0.1" required>
+                <div class="help-text">Livraisons à moins de X km = même cluster (recommandé : 3 km)</div>
+              </div>
+              <div class="form-group">
+                <label for="distanceClusterMax">Distance max entre clusters (km)</label>
+                <input type="number" id="distanceClusterMax" min="5" max="50" step="1" required>
+                <div class="help-text">Clusters à moins de X km peuvent être groupés (recommandé : 15 km)</div>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="distanceClusterMax">Distance max entre clusters (km)</label>
-              <input type="number" id="distanceClusterMax" name="distanceClusterMax" min="5" max="50" step="1" required>
-              <div class="help-text">
-                Clusters à moins de X km peuvent être groupés (recommandé : 15 km)
+            <div class="form-section">
+              <div class="form-section__title">📍 Livraisons éloignées</div>
+              <div class="form-group">
+                <label for="distanceRegroupeEloignes">Distance pour regroupement (km)</label>
+                <input type="number" id="distanceRegroupeEloignes" min="10" max="100" step="5" required>
+                <div class="help-text">Livraisons &gt; X km du QG sont regroupées ensemble (recommandé : 30 km)</div>
               </div>
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">📍 Détection Livraisons Éloignées</div>
-
-            <div class="form-group">
-              <label for="distanceRegroupeEloignes">Distance pour regroupement (km)</label>
-              <input type="number" id="distanceRegroupeEloignes" name="distanceRegroupeEloignes" min="10" max="100"
-                step="5" required>
-              <div class="help-text">
-                Livraisons > X km du QG sont regroupées ensemble (recommandé : 30 km)
+              <div class="form-group">
+                <label for="distanceLivraisonIsolee">Distance livraison isolée (km)</label>
+                <input type="number" id="distanceLivraisonIsolee" min="20" max="150" step="5" required>
+                <div class="help-text">Avertissement si livraison &gt; X km (recommandé : 50 km)</div>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="distanceLivraisonIsolee">Distance livraison isolée (km)</label>
-              <input type="number" id="distanceLivraisonIsolee" name="distanceLivraisonIsolee" min="20" max="150"
-                step="5" required>
-              <div class="help-text">
-                Avertissement si livraison > X km (recommandé : 50 km)
+            <div class="form-section">
+              <div class="form-section__title">🚗 Capacités véhicules (kg)</div>
+              <div class="form-row">
+                <div class="form-group mb-0">
+                  <label for="capaciteBerline">Berline</label>
+                  <input type="number" id="capaciteBerline" min="50" max="500" step="10" required>
+                </div>
+                <div class="form-group mb-0">
+                  <label for="capaciteBreak">Break / Utilitaire</label>
+                  <input type="number" id="capaciteBreak" min="100" max="2000" step="10" required>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="info-box">
-            <strong>ℹ️ Comment ça marche :</strong><br>
-            Le système utilise ces paramètres pour optimiser les routes :
-            <br>• Regroupe les livraisons proches (clustering)
-            <br>• Assigne les clusters aux véhicules selon leur capacité
-            <br>• Détecte et alerte sur les trajets problématiques
-            <br>• Maximise l'utilisation de chaque véhicule
-          </div>
+            <div class="info-box">
+              <strong>ℹ️ Comment ça marche :</strong><br>
+              Le système regroupe les livraisons proches (clustering), assigne les clusters aux véhicules
+              selon leur capacité, détecte les trajets problématiques et maximise le taux de remplissage.
+            </div>
 
-        </form>
+          </form>
+        </div>
+
+        <div class="form-footer">
+          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
+          <button type="submit" form="optimizationForm" class="btn btn--primary">💾 Enregistrer</button>
+        </div>
       </div>
 
-      <div class="button-container">
-        <button type="button" class="btn-secondary" onclick="closeDialog()">
-          Annuler
-        </button>
-        <button type="submit" form="optimizationForm" class="btn-primary">
-          💾 Enregistrer
-        </button>
+      <!-- LOADING STATE -->
+      <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <div class="loading-state__text">Sauvegarde en cours…</div>
       </div>
+
     </div>
   </div>
 
   <script>
     window.addEventListener('load', function () {
-      loadCurrentConfig();
-    });
-
-    function loadCurrentConfig() {
       google.script.run
         .withSuccessHandler(function (config) {
-          if (config) {
-            document.getElementById('distanceProximite').value = config.distanceProximite || 3;
-            document.getElementById('distanceClusterMax').value = config.distanceClusterMax || 15;
-            document.getElementById('distanceRegroupeEloignes').value = config.distanceRegroupeEloignes || 30;
-            document.getElementById('distanceLivraisonIsolee').value = config.distanceLivraisonIsolee || 50;
-            document.getElementById('capaciteBerline').value = config.capaciteBerline || 200;
-            document.getElementById('capaciteBreak').value = config.capaciteBreak || 400;
-          }
+          if (!config) return;
+          document.getElementById('distanceProximite').value = config.distanceProximite || 3;
+          document.getElementById('distanceClusterMax').value = config.distanceClusterMax || 15;
+          document.getElementById('distanceRegroupeEloignes').value = config.distanceRegroupeEloignes || 30;
+          document.getElementById('distanceLivraisonIsolee').value = config.distanceLivraisonIsolee || 50;
+          document.getElementById('capaciteBerline').value = config.capaciteBerline || 200;
+          document.getElementById('capaciteBreak').value = config.capaciteBreak || 400;
         })
-        .withFailureHandler(function (error) {
-          showAlert('error', 'Erreur de chargement : ' + error.message);
-        })
+        .withFailureHandler(function (e) { showAlert('error', 'Erreur de chargement : ' + e.message); })
         .getCurrentOptimizationConfig();
-    }
+    });
 
     document.getElementById('optimizationForm').addEventListener('submit', function (e) {
       e.preventDefault();
-
-      const config = {
+      var config = {
         distanceProximite: parseFloat(document.getElementById('distanceProximite').value),
         distanceClusterMax: parseFloat(document.getElementById('distanceClusterMax').value),
         distanceRegroupeEloignes: parseFloat(document.getElementById('distanceRegroupeEloignes').value),
@@ -283,45 +119,25 @@
         capaciteBerline: parseFloat(document.getElementById('capaciteBerline').value),
         capaciteBreak: parseFloat(document.getElementById('capaciteBreak').value)
       };
-
-      // Validation logique
-      if (config.distanceProximite >= config.distanceClusterMax) {
-        showAlert('error', 'Distance proximité doit être < distance cluster max');
-        return;
-      }
-
-      if (config.capaciteBerline >= config.capaciteBreak) {
-        showAlert('error', 'Capacité berline doit être < capacité break');
-        return;
-      }
-
-      // Sauvegarder
+      if (config.distanceProximite >= config.distanceClusterMax) { showAlert('error', 'Distance proximité doit être < distance cluster max'); return; }
+      if (config.capaciteBerline >= config.capaciteBreak) { showAlert('error', 'Capacité berline doit être < capacité break'); return; }
+      setState('loading');
       google.script.run
-        .withSuccessHandler(function () {
-          showAlert('success', 'Configuration de l\'optimisation enregistrée !');
-          setTimeout(function () {
-            closeDialog();
-          }, 1500);
-        })
-        .withFailureHandler(function (error) {
-          showAlert('error', 'Erreur : ' + error.message);
-        })
+        .withSuccessHandler(function () { setState('form'); showAlert('success', "✅ Configuration enregistrée !"); setTimeout(function () { google.script.host.close(); }, 1800); })
+        .withFailureHandler(function (e) { setState('form'); showAlert('error', e.message); })
         .saveOptimizationConfig(config);
     });
 
-    function showAlert(type, message) {
-      const alertId = 'alert-' + type;
-      const alert = document.getElementById(alertId);
-      alert.textContent = message;
-      alert.style.display = 'block';
-
-      setTimeout(function () {
-        alert.style.display = 'none';
-      }, 5000);
+    function setState(s) {
+      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
+      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
     }
 
-    function closeDialog() {
-      google.script.host.close();
+    function showAlert(type, msg) {
+      var el = document.getElementById('alert-' + type);
+      el.textContent = msg;
+      el.classList.add('alert--visible', 'alert--' + type);
+      setTimeout(function () { el.classList.remove('alert--visible'); }, 5000);
     }
   </script>
 </body>

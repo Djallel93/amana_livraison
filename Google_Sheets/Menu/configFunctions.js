@@ -47,28 +47,14 @@ function getApiKeysConfig() {
   };
 }
 
-function configureApiWebUrl() {
-  const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt(
-    'Configuration API Web',
-    'Entrez l\'URL de déploiement de l\'API Web :\n\nFormat : https://script.google.com/macros/s/VOTRE_DEPLOYMENT_ID/exec',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (response.getSelectedButton() === ui.Button.OK) {
-    const url = response.getResponseText().trim();
-    if (url) {
-      PropertiesService.getScriptProperties().setProperty('API_WEB_URL', url);
-      ui.alert('Succès', 'URL de l\'API Web configurée : ' + url, ui.ButtonSet.OK);
-      Logger.log('[CONFIG] API Web URL: ' + url);
-    }
-  }
-}
-
 function showHqAddressConfig() {
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutputFromFile('ui/configHq').setWidth(650).setHeight(550),
-    'Configuration du QG'
-  );
+  const html = HtmlService.createTemplateFromFile('ui/configHq')
+    .evaluate()
+    .setWidth(600)
+    .setHeight(520)
+    .setTitle('🏢 Configuration du QG');
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Configuration du QG');
 }
 
 function getCurrentHqConfig() {
@@ -89,10 +75,13 @@ function saveHqConfig(config) {
 }
 
 function showEmailConfig() {
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutputFromFile('ui/configEmail').setWidth(750).setHeight(600),
-    'Configuration des Emails'
-  );
+  const html = HtmlService.createTemplateFromFile('ui/configEmail')
+    .evaluate()
+    .setWidth(600)
+    .setHeight(580)
+    .setTitle('📧 Configuration des Emails');
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Configuration des Emails');
 }
 
 function getCurrentEmailConfig() {
@@ -115,10 +104,13 @@ function saveEmailConfig(config) {
 }
 
 function showRouteOptimizationConfig() {
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutputFromFile('ui/configRouteOptimization').setWidth(700).setHeight(700),
-    'Paramètres Optimisation Routes'
-  );
+  const html = HtmlService.createTemplateFromFile('ui/configRouteOptimization')
+    .evaluate()
+    .setWidth(700)
+    .setHeight(680)
+    .setTitle('🎛️ Paramètres Optimisation Routes');
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Paramètres Optimisation Routes');
 }
 
 function getCurrentOptimizationConfig() {
@@ -145,13 +137,29 @@ function saveOptimizationConfig(config) {
 }
 
 /**
- * Ouvre le formulaire des statistiques journalières.
+ * Ouvre le formulaire des statistiques.
  */
 function showStatisticsForm() {
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutputFromFile('ui/statsForm').setWidth(1200).setHeight(800),
-    '📊 Statistiques'
-  );
+  const html = HtmlService.createTemplateFromFile('ui/statsForm')
+    .evaluate()
+    .setWidth(1200)
+    .setHeight(800)
+    .setTitle('📊 Statistiques');
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📊 Statistiques');
+}
+
+/**
+ * Ouvre le formulaire de gestion des véhicules temporaires.
+ */
+function ouvrirGestionVehiculesTmp() {
+  const html = HtmlService.createTemplateFromFile('ui/gererVehiculesTmp')
+    .evaluate()
+    .setWidth(500)
+    .setHeight(580)
+    .setTitle('🚗 Véhicules Temporaires');
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Véhicules Temporaires');
 }
 
 function manageEmailTemplates() {
