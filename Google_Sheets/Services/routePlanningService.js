@@ -2,17 +2,6 @@
  * ====================================================================
  * ROUTE_SERVICE_PLANNING.GS - Planification et Orchestration des Routes
  * ====================================================================
- * VERSION 4.0
- *
- * ⚠️ CHANGEMENT v4 :
- * - Passage de params.poids_moyen_kg vers identifierClusters
- * - Passage de nombrePartMax (depuis getVehicleTypes) vers assignerClustersAuxVehicules
- *
- * ⚠️ CHANGEMENT v3 (hôtel) :
- * - Passage de params.poids_moyen_hotel_kg comme 3e argument à identifierClusters()
- *
- * Contient : planRoutes(), separateOutliers(), getAvailableVolunteers()
- * Responsabilité : Orchestrer le processus complet de planification
  */
 
 /**
@@ -34,7 +23,6 @@ function planRoutes(params) {
     };
 
     try {
-        // 1. Récupérer les livraisons non assignées pour la date
         const livraisons = getUnassignedDeliveriesForDate(params.date_livraison);
         Logger.log(`[ROUTES] 📦 ${livraisons.length} livraisons non assignées trouvées`);
 
@@ -43,7 +31,6 @@ function planRoutes(params) {
             return result;
         }
 
-        // 2. Détecter et séparer les outliers (livraisons très éloignées)
         const { normal, outliers } = separateOutliers(livraisons);
 
         if (outliers.length > 0) {
@@ -59,7 +46,6 @@ function planRoutes(params) {
             result.outliers = outliers;
         }
 
-        // 3. Récupérer les bénévoles disponibles (avec véhicule valide)
         const benevoles = getBenevolesPourPlanification(params);
         Logger.log(`[ROUTES] 👥 ${benevoles.length} bénévoles disponibles`);
 
@@ -68,22 +54,13 @@ function planRoutes(params) {
             return result;
         }
 
-        // 4. Identifier les clusters géographiques
-        // ⚠️ CHANGEMENT v3 : on passe également poids_moyen_hotel_kg pour le calcul
-        //    différencié domicile / hôtel dans chaque cluster
         const poidsParPart = parseFloat(params.poids_moyen_kg) || 0;
-        const clusters = identifierClusters(
-            normal,
-            poidsParPart,
-            params.poids_moyen_hotel_kg
-        );
+        const clusters = identifierClusters(normal, poidsParPart, params.poids_moyen_hotel_kg);
         Logger.log(`[ROUTES] 🗺️ ${clusters.length} clusters identifiés`);
 
-        // 5. Attribuer les clusters aux véhicules (best-fit + split si nécessaire)
         const routes = assignerClustersAuxVehicules(clusters, benevoles, params);
         Logger.log(`[ROUTES] 🚗 ${routes.length} routes créées`);
 
-        // 6. Sauvegarder les routes
         for (const route of routes) {
             const saved = saveRoute(route, params);
             if (saved) {
@@ -92,7 +69,6 @@ function planRoutes(params) {
             }
         }
 
-        // 7. Détecter les routes éloignées
         const remoteWarnings = detectRemoteRoutes(result.routes);
         result.warnings.push(...remoteWarnings);
 
@@ -115,8 +91,8 @@ function planRoutes(params) {
 }
 
 /**
- * Sépare les livraisons normales des outliers (très éloignées du QG)
- * @param {Array} livraisons - Toutes les livraisons
+ * Sépare les livraisons normales des outliers (trop éloignées du QG)
+ * @param {Array} livraisons
  * @returns {Object} {normal: Array, outliers: Array}
  */
 function separateOutliers(livraisons) {
@@ -129,14 +105,8 @@ function separateOutliers(livraisons) {
             CONFIG.HQ.LAT, CONFIG.HQ.LNG,
             livraison.latitude, livraison.longitude
         );
-
         livraison._distance_hq = distHQ;
-
-        if (distHQ > OUTLIER_THRESHOLD) {
-            outliers.push(livraison);
-        } else {
-            normal.push(livraison);
-        }
+        (distHQ > OUTLIER_THRESHOLD ? outliers : normal).push(livraison);
     }
 
     return { normal, outliers };
@@ -144,34 +114,28 @@ function separateOutliers(livraisons) {
 
 /**
  * Récupère les livraisons non assignées pour une date
- * @param {string} date - Date au format YYYY-MM-DD
+ * @param {string} date - Format YYYY-MM-DD
  * @returns {Array<Object>}
  */
 function getUnassignedDeliveriesForDate(date) {
     const deliveries = getDeliveriesForDate(new Date(date));
-    return deliveries.filter(d =>
-        d.statut === CONFIG.ENUMS.STATUT_LIVRAISON.NON_ASSIGNEE
-    );
+    return deliveries.filter(d => d.statut === CONFIG.ENUMS.STATUT_LIVRAISON.NON_ASSIGNEE);
 }
 
 /**
- * Récupère les bénévoles avec un véhicule valide pour la planification
- * Délègue à getVolunteersWithVehicle() défini dans apiService.js
- *
+ * Récupère les bénévoles disponibles pour la planification.
+ * Si params.selected_benevole_ids est fourni, seuls ces bénévoles sont retenus.
  * @param {Object} params - Paramètres de planification
- * @returns {Array<Object>} Bénévoles avec vehicule.capaciteKg > 0
+ * @returns {Array<Object>}
  */
 function getBenevolesPourPlanification(params) {
     let benevoles = getVolunteersWithVehicle();
-
     Logger.log(`[ROUTES] 👥 ${benevoles.length} bénévoles avec véhicule valide (capaciteKg > 0)`);
 
-    // Ajouter les véhicules prêtés configurés
     if (params.vehicules_pretes && params.vehicules_pretes.length > 0) {
         benevoles = assignVehiculesPrets(benevoles, params.vehicules_pretes);
     }
 
-    // ── AJOUT : bénévoles permis appairés avec véhicules temporaires ──
     if (params.date_livraison) {
         try {
             const permisVolunteers = getPairedPermisVolunteers(params.date_livraison);
@@ -182,6 +146,12 @@ function getBenevolesPourPlanification(params) {
         } catch (err) {
             Logger.log(`[ROUTES] ⚠️ Erreur intégration véhicules temporaires: ${err.message}`);
         }
+    }
+
+    if (params.selected_benevole_ids && params.selected_benevole_ids.length > 0) {
+        const ids = new Set(params.selected_benevole_ids.map(String));
+        benevoles = benevoles.filter(b => ids.has(String(b.id)));
+        Logger.log(`[ROUTES] 🎯 Filtre sélection manuelle: ${benevoles.length} bénévole(s) retenus`);
     }
 
     return benevoles;

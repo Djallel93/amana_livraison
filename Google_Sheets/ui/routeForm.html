@@ -5,6 +5,125 @@
   <base target="_top">
   <meta charset="UTF-8">
   <?!= include('styles'); ?>
+  <style>
+    .benevoles-section {
+      margin-top: 16px;
+    }
+
+    .benevoles-counter {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 10px;
+    }
+
+    .benevoles-counter strong {
+      color: #111827;
+    }
+
+    .benevoles-table-wrap {
+      max-height: 260px;
+      overflow-y: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+
+    .benevoles-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .benevoles-table thead th {
+      background: #f9fafb;
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #374151;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+    }
+
+    .benevoles-table tbody tr {
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .benevoles-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .benevoles-table tbody tr:hover {
+      background: #f9fafb;
+    }
+
+    .benevoles-table td {
+      padding: 8px 12px;
+      vertical-align: middle;
+    }
+
+    .benevoles-table td:first-child {
+      width: 36px;
+      text-align: center;
+    }
+
+    .statut-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 99px;
+      font-weight: 500;
+    }
+
+    .statut-none {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
+    .statut-brouillon {
+      background: #eff6ff;
+      color: #3b82f6;
+    }
+
+    .statut-en-cours {
+      background: #fef3c7;
+      color: #d97706;
+    }
+
+    .statut-terminee {
+      background: #d1fae5;
+      color: #059669;
+    }
+
+    .benevoles-loading {
+      padding: 20px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 13px;
+    }
+
+    .select-all-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+    }
+
+    .livraisons-restantes {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #1d4ed8;
+      margin-top: 6px;
+    }
+  </style>
 </head>
 
 <body>
@@ -34,6 +153,11 @@
               <div class="form-group">
                 <label for="date_livraison">Date de livraison</label>
                 <input type="date" id="date_livraison" required>
+                <div id="livraisons-restantes-wrap" style="display:none;">
+                  <div class="livraisons-restantes">
+                    📦 <span id="livraisons-restantes-count">—</span> livraison(s) non assignée(s)
+                  </div>
+                </div>
               </div>
 
               <div class="form-group">
@@ -83,12 +207,21 @@
               </div>
             </div>
 
+            <!-- SECTION BÉNÉVOLES -->
+            <div class="form-section benevoles-section">
+              <div class="form-section__title">👥 Sélection des bénévoles</div>
+              <div id="benevoles-wrap">
+                <div class="benevoles-loading">Sélectionnez une date pour afficher les bénévoles disponibles</div>
+              </div>
+            </div>
+
           </form>
         </div>
 
         <div class="form-footer">
           <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="routeForm" class="btn btn--primary">✨ Planifier les Routes</button>
+          <button type="submit" form="routeForm" id="btn-submit" class="btn btn--primary" disabled>✨ Planifier les
+            Routes</button>
         </div>
       </div>
 
@@ -188,99 +321,7 @@
     </div>
   </div>
 
-  <script>
-    window.addEventListener('load', function () {
-      var d = new Date();
-      d.setDate(d.getDate() + 1);
-      document.getElementById('date_livraison').value = d.toISOString().split('T')[0];
-    });
-
-    function toggleRelivre() {
-      var cb = document.getElementById('relivre');
-      cb.checked = !cb.checked;
-    }
-
-    document.getElementById('routeForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var params = {
-        date_livraison: document.getElementById('date_livraison').value,
-        max_livraisons: parseInt(document.getElementById('max_livraisons').value),
-        occasion: document.querySelector('input[name="occasion"]:checked').value,
-        poids_moyen_kg: parseFloat(document.getElementById('poids_moyen_kg').value),
-        poids_moyen_hotel_kg: parseFloat(document.getElementById('poids_moyen_hotel_kg').value) || 5,
-        relivre: document.getElementById('relivre').checked,
-        vehicules_pretes: [],
-        binomes: []
-      };
-      setState('loading');
-      google.script.run
-        .withSuccessHandler(onPlanSuccess)
-        .withFailureHandler(function (e) { setState('form'); showAlert('error', 'Erreur : ' + e.message); })
-        .planRoutesFromForm(params);
-    });
-
-    function onPlanSuccess(result) {
-      if (!result.success) { setState('form'); showAlert('error', 'Échec : ' + (result.errors.join(', ') || 'Erreur inconnue')); return; }
-      populateResults(result);
-      setState('results');
-    }
-
-    function populateResults(result) {
-      var routes = result.routes || [];
-      var warnings = result.warnings || [];
-      var poidsTotal = routes.reduce(function (s, r) { return s + (r.poids_total_kg || 0); }, 0);
-      var distTotal = routes.reduce(function (s, r) { return s + (r.distance_totale_km || 0); }, 0);
-      var livTotal = routes.reduce(function (s, r) { return s + (r.livraisons ? r.livraisons.length : 0); }, 0);
-      var partsTotal = routes.reduce(function (s, r) { return s + (r.nombre_parts || 0); }, 0);
-      var benevoles = new Set(routes.map(function (r) { return r.id_benevole; })).size;
-      var avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
-
-      document.getElementById('stat-routes').textContent = result.created;
-      document.getElementById('stat-deliveries').textContent = livTotal;
-      document.getElementById('stat-beneficiaires').textContent = partsTotal;
-      document.getElementById('stat-poids').textContent = Math.round(poidsTotal) + ' kg';
-      document.getElementById('stat-benevoles').textContent = benevoles;
-      document.getElementById('stat-distance').textContent = Math.round(distTotal) + ' km';
-      document.getElementById('stat-avg').textContent = avgLiv;
-      document.getElementById('stat-warnings').textContent = warnings.length;
-      document.getElementById('results-subtitle').textContent = result.created + ' routes générées pour le ' + document.getElementById('date_livraison').value;
-
-      var tbody = document.getElementById('breakdown-tbody');
-      tbody.innerHTML = '';
-      routes.forEach(function (r) {
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td><span class="mono badge badge--cyan">' + r.id_route + '</span></td>' +
-          '<td><strong>' + (r.benevole_nom || r.id_benevole || '—') + '</strong></td>' +
-          '<td class="mono">' + (r.livraisons ? r.livraisons.length : '—') + '</td>' +
-          '<td class="mono">' + (r.poids_total_kg ? Math.round(r.poids_total_kg) + ' kg' : '—') + '</td>' +
-          '<td class="mono">' + (r.distance_totale_km ? Math.round(r.distance_totale_km * 10) / 10 + ' km' : '—') + '</td>' +
-          '<td><span class="badge badge--green">✓ Brouillon</span></td>';
-        tbody.appendChild(tr);
-      });
-      if (routes.length === 0) document.getElementById('breakdown-section').style.display = 'none';
-
-      if (warnings.length > 0) {
-        var ul = document.getElementById('warnings-list');
-        ul.innerHTML = '';
-        warnings.forEach(function (w) { var li = document.createElement('li'); li.textContent = w.message || w; ul.appendChild(li); });
-        document.getElementById('warnings-box').classList.remove('hidden');
-      }
-    }
-
-    function setState(s) {
-      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-      document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
-    }
-
-    function showAlert(type, msg) {
-      var el = document.getElementById('alert-' + type);
-      el.textContent = msg;
-      el.classList.add('alert--visible', 'alert--' + type);
-      setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
-    }
-  </script>
+  <?!= include('ui/routeFormScript'); ?>
 </body>
 
 </html>

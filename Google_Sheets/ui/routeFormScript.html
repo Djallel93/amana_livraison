@@ -1,0 +1,197 @@
+<script>
+    var _benevoles = [];
+
+    window.addEventListener('load', function () {
+        var d = new Date();
+        d.setDate(d.getDate() + 1);
+        document.getElementById('date_livraison').value = d.toISOString().split('T')[0];
+    });
+
+    document.getElementById('date_livraison').addEventListener('change', function () {
+        var date = this.value;
+        if (!date) return;
+        chargerBenevoles(date);
+        chargerLivraisonsRestantes(date);
+    });
+
+    function chargerLivraisonsRestantes(date) {
+        google.script.run
+            .withSuccessHandler(function (count) {
+                document.getElementById('livraisons-restantes-count').textContent = count;
+                document.getElementById('livraisons-restantes-wrap').style.display = '';
+            })
+            .withFailureHandler(function () { })
+            .getUnassignedDeliveryCountForDate(date);
+    }
+
+    function chargerBenevoles(date) {
+        var wrap = document.getElementById('benevoles-wrap');
+        wrap.innerHTML = '<div class="benevoles-loading">Chargement des bénévoles…</div>';
+        document.getElementById('btn-submit').disabled = true;
+
+        google.script.run
+            .withSuccessHandler(function (benevoles) {
+                _benevoles = benevoles;
+                renderBenevoles(benevoles);
+                document.getElementById('btn-submit').disabled = false;
+            })
+            .withFailureHandler(function (e) {
+                wrap.innerHTML = '<div class="benevoles-loading">Erreur : ' + e.message + '</div>';
+            })
+            .getVolunteersForPlanningForm(date);
+    }
+
+    function renderBenevoles(benevoles) {
+        var wrap = document.getElementById('benevoles-wrap');
+
+        if (benevoles.length === 0) {
+            wrap.innerHTML = '<div class="benevoles-loading">Aucun bénévole disponible pour cette date</div>';
+            return;
+        }
+
+        var html = '';
+        html += '<div class="select-all-row">';
+        html += '<input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">';
+        html += '<label for="select-all">Tout sélectionner / désélectionner</label>';
+        html += '</div>';
+        html += '<div class="benevoles-table-wrap">';
+        html += '<table class="benevoles-table">';
+        html += '<thead><tr>';
+        html += '<th></th><th>Bénévole</th><th>Véhicule</th><th>Capacité</th><th>Statut du jour</th><th>Livraisons faites</th>';
+        html += '</tr></thead><tbody>';
+
+        benevoles.forEach(function (b) {
+            var statutClass = 'statut-none';
+            var statutLabel = '— Aucune route';
+            if (b.route_statut) {
+                var s = (b.route_statut || '').toLowerCase();
+                if (s.indexOf('cours') !== -1) { statutClass = 'statut-en-cours'; statutLabel = '🚚 En cours'; }
+                else if (s.indexOf('termin') !== -1) { statutClass = 'statut-terminee'; statutLabel = '✅ Terminée'; }
+                else if (s.indexOf('brouillon') !== -1) { statutClass = 'statut-brouillon'; statutLabel = '📝 Brouillon'; }
+                else { statutLabel = b.route_statut; }
+            }
+
+            var vehiculeLabel = (b.vehicule_type || '—') + (b.is_tmp_vehicle ? ' 🔑' : '');
+
+            html += '<tr>';
+            html += '<td><input type="checkbox" class="benevole-cb" value="' + b.id + '"></td>';
+            html += '<td><strong>' + b.prenom + ' ' + b.nom + '</strong></td>';
+            html += '<td>' + vehiculeLabel + '</td>';
+            html += '<td class="mono">' + (b.vehicule_capacite ? b.vehicule_capacite + ' kg' : '—') + '</td>';
+            html += '<td><span class="statut-badge ' + statutClass + '">' + statutLabel + '</span></td>';
+            html += '<td class="mono">' + (b.has_route_today ? b.livraisons_faites : '—') + '</td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        wrap.innerHTML = html;
+    }
+
+    function toggleSelectAll(checked) {
+        document.querySelectorAll('.benevole-cb').forEach(function (cb) { cb.checked = checked; });
+    }
+
+    function getSelectedBenevoleIds() {
+        return Array.from(document.querySelectorAll('.benevole-cb:checked')).map(function (cb) { return cb.value; });
+    }
+
+    function toggleRelivre() {
+        var cb = document.getElementById('relivre');
+        cb.checked = !cb.checked;
+    }
+
+    document.getElementById('routeForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        var selectedIds = getSelectedBenevoleIds();
+        if (selectedIds.length === 0) {
+            showAlert('error', 'Veuillez sélectionner au moins un bénévole.');
+            return;
+        }
+
+        var params = {
+            date_livraison: document.getElementById('date_livraison').value,
+            max_livraisons: parseInt(document.getElementById('max_livraisons').value),
+            occasion: document.querySelector('input[name="occasion"]:checked').value,
+            poids_moyen_kg: parseFloat(document.getElementById('poids_moyen_kg').value),
+            poids_moyen_hotel_kg: parseFloat(document.getElementById('poids_moyen_hotel_kg').value) || 5,
+            relivre: document.getElementById('relivre').checked,
+            vehicules_pretes: [],
+            binomes: [],
+            selected_benevole_ids: selectedIds
+        };
+
+        setState('loading');
+        google.script.run
+            .withSuccessHandler(onPlanSuccess)
+            .withFailureHandler(function (e) { setState('form'); showAlert('error', 'Erreur : ' + e.message); })
+            .planRoutesFromForm(params);
+    });
+
+    function onPlanSuccess(result) {
+        if (!result.success) {
+            setState('form');
+            showAlert('error', 'Échec : ' + (result.errors.join(', ') || 'Erreur inconnue'));
+            return;
+        }
+        populateResults(result);
+        setState('results');
+    }
+
+    function populateResults(result) {
+        var routes = result.routes || [];
+        var warnings = result.warnings || [];
+        var poidsTotal = routes.reduce(function (s, r) { return s + (r.poids_total_kg || 0); }, 0);
+        var distTotal = routes.reduce(function (s, r) { return s + (r.distance_totale_km || 0); }, 0);
+        var livTotal = routes.reduce(function (s, r) { return s + (r.livraisons ? r.livraisons.length : 0); }, 0);
+        var partsTotal = routes.reduce(function (s, r) { return s + (r.nombre_parts || 0); }, 0);
+        var benevoles = new Set(routes.map(function (r) { return r.id_benevole; })).size;
+        var avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
+
+        document.getElementById('stat-routes').textContent = result.created;
+        document.getElementById('stat-deliveries').textContent = livTotal;
+        document.getElementById('stat-beneficiaires').textContent = partsTotal;
+        document.getElementById('stat-poids').textContent = Math.round(poidsTotal) + ' kg';
+        document.getElementById('stat-benevoles').textContent = benevoles;
+        document.getElementById('stat-distance').textContent = Math.round(distTotal) + ' km';
+        document.getElementById('stat-avg').textContent = avgLiv;
+        document.getElementById('stat-warnings').textContent = warnings.length;
+        document.getElementById('results-subtitle').textContent =
+            result.created + ' routes générées pour le ' + document.getElementById('date_livraison').value;
+
+        var tbody = document.getElementById('breakdown-tbody');
+        tbody.innerHTML = '';
+        routes.forEach(function (r) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td><span class="mono badge badge--cyan">' + r.id_route + '</span></td>' +
+                '<td><strong>' + (r.benevole_nom || r.id_benevole || '—') + '</strong></td>' +
+                '<td class="mono">' + (r.livraisons ? r.livraisons.length : '—') + '</td>' +
+                '<td class="mono">' + (r.poids_total_kg ? Math.round(r.poids_total_kg) + ' kg' : '—') + '</td>' +
+                '<td class="mono">' + (r.distance_totale_km ? Math.round(r.distance_totale_km * 10) / 10 + ' km' : '—') + '</td>' +
+                '<td><span class="badge badge--green">✓ Brouillon</span></td>';
+            tbody.appendChild(tr);
+        });
+        if (routes.length === 0) document.getElementById('breakdown-section').style.display = 'none';
+
+        if (warnings.length > 0) {
+            var ul = document.getElementById('warnings-list');
+            ul.innerHTML = '';
+            warnings.forEach(function (w) { var li = document.createElement('li'); li.textContent = w.message || w; ul.appendChild(li); });
+            document.getElementById('warnings-box').classList.remove('hidden');
+        }
+    }
+
+    function setState(s) {
+        document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
+        document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
+        document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
+    }
+
+    function showAlert(type, msg) {
+        var el = document.getElementById('alert-' + type);
+        el.textContent = msg;
+        el.classList.add('alert--visible', 'alert--' + type);
+        setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
+    }
+</script>

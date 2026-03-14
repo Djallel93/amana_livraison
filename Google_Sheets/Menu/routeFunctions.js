@@ -7,11 +7,7 @@
 function showPlanRoutesForm() {
   if (!isApiConfigured()) {
     const ui = SpreadsheetApp.getUi();
-    ui.alert(
-      'Configuration Manquante',
-      CONFIG.MESSAGES.ERROR_API_KEY_MISSING,
-      ui.ButtonSet.OK
-    );
+    ui.alert('Configuration Manquante', CONFIG.MESSAGES.ERROR_API_KEY_MISSING, ui.ButtonSet.OK);
     return;
   }
 
@@ -40,10 +36,7 @@ function viewAllRoutes() {
       byStatus[r.statut] = (byStatus[r.statut] || 0) + 1;
     });
 
-    let message = `📊 STATISTIQUES DES ROUTES\n\n`;
-    message += `Total : ${routes.length} routes\n\n`;
-
-    message += `Par Statut :\n`;
+    let message = `📊 STATISTIQUES DES ROUTES\n\nTotal : ${routes.length} routes\n\nPar Statut :\n`;
     Object.entries(byStatus).forEach(([status, count]) => {
       message += `  • ${status} : ${count}\n`;
     });
@@ -52,9 +45,7 @@ function viewAllRoutes() {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(CONFIG.SHEETS.ROUTES);
-    if (sheet) {
-      ss.setActiveSheet(sheet);
-    }
+    if (sheet) ss.setActiveSheet(sheet);
 
   } catch (error) {
     ui.alert('Erreur', error.message, ui.ButtonSet.OK);
@@ -74,7 +65,6 @@ function planRoutesFromForm(params) {
     const result = planRoutes(params);
 
     Logger.log(`[FORM] ✅ Planification terminée: ${result.created} routes créées`);
-
     return result;
 
   } catch (error) {
@@ -108,9 +98,7 @@ function showReorderStopsInterface() {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(CONFIG.SHEETS.ETAPES_ROUTE);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  }
+  if (sheet) ss.setActiveSheet(sheet);
 }
 
 /**
@@ -163,7 +151,10 @@ function regenerateAllMapsLinks() {
         });
 
         const newLienMaps = generateGoogleMapsLink(deliveriesOrdered, hqCoords);
-        updateRowById(CONFIG.SHEETS.ROUTES, routeId, CONFIG.COLUMNS.ROUTES.ID_ROUTE, { lien_maps: newLienMaps, date_modification: getCurrentDateTime() });
+        updateRowById(CONFIG.SHEETS.ROUTES, routeId, CONFIG.COLUMNS.ROUTES.ID_ROUTE, {
+          lien_maps: newLienMaps,
+          date_modification: getCurrentDateTime()
+        });
         updated++;
       } catch (err) {
         errors.push(`Route ${route.id_route} : ${err.message}`);
@@ -180,9 +171,6 @@ function regenerateAllMapsLinks() {
   }
 }
 
-/**
- * PHASE 5 - Génération des Étiquettes
- */
 function showGenerateLabelsForm() {
   const html = HtmlService.createTemplateFromFile('ui/labelForm')
     .evaluate()
@@ -191,4 +179,107 @@ function showGenerateLabelsForm() {
     .setTitle('🏷️ Générer les Étiquettes');
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Générer les Étiquettes');
+}
+
+/**
+ * Retourne les bénévoles éligibles enrichis avec leur statut du jour.
+ * Appelé depuis routeForm.html via google.script.run
+ * @param {string} date - Format YYYY-MM-DD
+ * @returns {Array<Object>}
+ */
+function getVolunteersForPlanningForm(date) {
+  try {
+    Logger.log(`[FORM] 👥 Chargement bénévoles pour date: ${date}`);
+
+    const withVehicle = getVolunteersWithVehicle();
+    let permis = [];
+
+    if (date) {
+      try {
+        permis = getPairedPermisVolunteers(date);
+      } catch (e) {
+        Logger.log(`[FORM] ⚠️ Véhicules temporaires: ${e.message}`);
+      }
+    }
+
+    const allVolunteers = [...withVehicle];
+    const existingIds = new Set(withVehicle.map(v => v.id));
+    permis.forEach(v => { if (!existingIds.has(v.id)) allVolunteers.push(v); });
+
+    Logger.log(`[FORM] 📋 ${allVolunteers.length} bénévoles éligibles`);
+
+    const routesAujourdhui = date ? _getRoutesForDate(date) : [];
+    const routeParBenevole = {};
+
+    routesAujourdhui.forEach(route => {
+      const bid = String(route.id_benevole);
+      if (!routeParBenevole[bid] || _statutPrecedence(route.statut) > _statutPrecedence(routeParBenevole[bid].statut)) {
+        routeParBenevole[bid] = route;
+      }
+    });
+
+    return allVolunteers.map(benevole => {
+      const routeExistante = routeParBenevole[String(benevole.id)] || null;
+
+      let livraisonsFaites = 0;
+      if (routeExistante) {
+        const stops = getDeliveryStopsForRoute(routeExistante.id_route);
+        livraisonsFaites = stops.filter(s => s.statut === CONFIG.ENUMS.STATUT_ETAPE.LIVREE).length;
+      }
+
+      return {
+        id: benevole.id,
+        nom: benevole.nom || '',
+        prenom: benevole.prenom || '',
+        vehicule_type: benevole.vehicule ? benevole.vehicule.type : '—',
+        vehicule_capacite: benevole.vehicule ? (parseFloat(benevole.vehicule.capaciteKg) || 0) : 0,
+        has_route_today: !!routeExistante,
+        route_statut: routeExistante ? routeExistante.statut : null,
+        livraisons_faites: livraisonsFaites,
+        is_tmp_vehicle: !!benevole._tmp_vehicule_id
+      };
+    });
+
+  } catch (error) {
+    Logger.log(`[FORM] ❌ getVolunteersForPlanningForm: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Retourne le nombre de livraisons non assignées pour une date.
+ * @param {string} date - Format YYYY-MM-DD
+ * @returns {number}
+ */
+function getUnassignedDeliveryCountForDate(date) {
+  try {
+    return getUnassignedDeliveriesForDate(date).length;
+  } catch (e) {
+    Logger.log(`[FORM] ❌ getUnassignedDeliveryCountForDate: ${e.message}`);
+    return 0;
+  }
+}
+
+function _getRoutesForDate(date) {
+  const cible = new Date(date);
+  cible.setHours(0, 0, 0, 0);
+
+  return filterData(CONFIG.SHEETS.ROUTES, function (row) {
+    if (!row.date_debut) return false;
+    const d = new Date(row.date_debut);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() === cible.getTime();
+  });
+}
+
+function _statutPrecedence(statut) {
+  const order = {
+    [CONFIG.ENUMS.STATUT_ROUTE.TERMINEE]: 5,
+    [CONFIG.ENUMS.STATUT_ROUTE.EN_COURS]: 4,
+    [CONFIG.ENUMS.STATUT_ROUTE.PRETE]: 3,
+    [CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE]: 2,
+    [CONFIG.ENUMS.STATUT_ROUTE.BROUILLON]: 1,
+    [CONFIG.ENUMS.STATUT_ROUTE.ANNULEE]: 0
+  };
+  return order[statut] || 0;
 }
