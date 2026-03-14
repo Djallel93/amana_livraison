@@ -152,9 +152,9 @@ function showPackagingForm() {
     .evaluate()
     .setWidth(1200)
     .setHeight(800)
-    .setTitle('📦 Feuille de Conditionnement');
+    .setTitle('📦 Feuille de Préparation');
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Feuille de Conditionnement');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Feuille de Préparation');
 }
 
 /**
@@ -203,9 +203,12 @@ function generateDeliveriesFromForm(filters) {
 
     const result = generateDeliveries(filters);
 
-    Logger.log(`[FORM] ✅ Génération terminée: ${result.created} créées, ${result.skipped} ignorées`);
+    // Strip heavy deliveries array before sending back to UI
+    const { deliveries, ...lightResult } = result;
 
-    return result;
+    Logger.log(`[FORM] ✅ Génération terminée: ${lightResult.created} créées, ${lightResult.skipped} ignorées`);
+
+    return lightResult;
 
   } catch (error) {
     Logger.log(`[FORM] ❌ Erreur: ${error.message}`);

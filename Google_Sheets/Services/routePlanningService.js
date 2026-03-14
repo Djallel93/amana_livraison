@@ -113,16 +113,6 @@ function separateOutliers(livraisons) {
 }
 
 /**
- * Récupère les livraisons non assignées pour une date
- * @param {string} date - Format YYYY-MM-DD
- * @returns {Array<Object>}
- */
-function getUnassignedDeliveriesForDate(date) {
-    const deliveries = getDeliveriesForDate(new Date(date));
-    return deliveries.filter(d => d.statut === CONFIG.ENUMS.STATUT_LIVRAISON.NON_ASSIGNEE);
-}
-
-/**
  * Récupère les bénévoles disponibles pour la planification.
  * Si params.selected_benevole_ids est fourni, seuls ces bénévoles sont retenus.
  * @param {Object} params - Paramètres de planification

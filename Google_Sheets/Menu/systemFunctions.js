@@ -53,52 +53,6 @@ function showApiKeysConfig() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Configuration des API Keys');
 }
 
-/**
- * Affiche le formulaire de configuration des emails
- */
-function showEmailConfig() {
-  const html = HtmlService.createTemplateFromFile('ui/configEmail')
-    .evaluate()
-    .setWidth(600)
-    .setHeight(580)
-    .setTitle('📧 Configuration Email');
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Configuration Email');
-}
-
-/**
- * Affiche le formulaire de configuration du QG
- */
-function showHqAddressConfig() {
-  const html = HtmlService.createTemplateFromFile('ui/configHq')
-    .evaluate()
-    .setWidth(600)
-    .setHeight(520)
-    .setTitle('🏢 Adresse du QG');
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Adresse du QG');
-}
-
-/**
- * Affiche le formulaire de configuration de l'optimisation routes
- */
-function showRouteOptimizationConfig() {
-  const html = HtmlService.createTemplateFromFile('ui/configRouteOptimization')
-    .evaluate()
-    .setWidth(700)
-    .setHeight(680)
-    .setTitle('🎛️ Paramètres Optimisation Routes');
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Paramètres Optimisation Routes');
-}
-
-/**
- * Gestion des templates email
- */
-function manageEmailTemplates() {
-  showPlaceholder('Templates Email', 'Cette fonctionnalité sera disponible ultérieurement');
-}
-
 // ========================================
 // SYNCHRONISATION
 // ========================================
@@ -207,33 +161,4 @@ ${CONFIG.EMAIL.ADMIN_EMAIL}
   `;
 
   ui.alert('Documentation', message, ui.ButtonSet.OK);
-}
-
-/**
- * Affiche les informations À Propos
- */
-function showAbout() {
-  const ui = SpreadsheetApp.getUi();
-
-  const message = `
-${CONFIG.APP_NAME}
-Version ${CONFIG.VERSION}
-
-Développé pour Association AMANA
-© 2026
-
-🎯 Fonctionnalités :
-- Gestion des livraisons
-- Optimisation des routes
-- Communication bénévoles
-- Génération d'étiquettes
-- Suivi en temps réel
-
-🔧 APIs Intégrées :
-- API Familles v2.2
-- API Bénévoles v1.0
-- API GEO v5.0
-  `;
-
-  ui.alert('À Propos', message, ui.ButtonSet.OK);
 }

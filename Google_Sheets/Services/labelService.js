@@ -466,7 +466,7 @@ function formatRouteDisplay(routeId) {
 function buildConfirmUrl(livraisonId, routeId) {
   const tokens = filterData(CONFIG.SHEETS.TOKENS, row => row.id_route === routeId);
   const token  = tokens.length > 0 ? tokens[0].token : '';
-  const apiUrl = PropertiesService.getScriptProperties().getProperty('API_WEB_URL')
+  const apiUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL')
     || ScriptApp.getService().getUrl()
     || 'https://script.google.com';
 

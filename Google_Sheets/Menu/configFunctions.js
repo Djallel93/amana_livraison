@@ -4,17 +4,6 @@
  * ====================================================================
  */
 
-function showAbout() {
-  const ui = SpreadsheetApp.getUi();
-  const message =
-    CONFIG.APP_NAME + '\nVersion ' + CONFIG.VERSION +
-    '\n\nDéveloppé pour Association AMANA\n© 2026\n\n' +
-    '🎯 Fonctionnalités :\n- Gestion des livraisons\n- Optimisation des routes\n' +
-    '- Communication bénévoles\n- Génération d\'étiquettes\n- Suivi en temps réel\n\n' +
-    '🔧 APIs Intégrées :\n- API Familles v2.2\n- API Bénévoles v1.0\n- API GEO v5.0';
-  ui.alert('À Propos', message, ui.ButtonSet.OK);
-}
-
 function showPlaceholder(title, message) {
   SpreadsheetApp.getUi().alert(title, '⏳ ' + message, SpreadsheetApp.getUi().ButtonSet.OK);
 }

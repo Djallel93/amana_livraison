@@ -327,15 +327,3 @@ function getEtapeCoordinatesFromEtape(etape) {
         adresse: delivery.adresse
     };
 }
-
-/**
- * 🔍 Extract HQ address from commentaire field
- * @param {string} commentaire - Commentaire text
- * @returns {string|null} Extracted address or null
- */
-function extractHqAddressFromCommentaire(commentaire) {
-    if (!commentaire) return null;
-
-    const match = commentaire.match(/Retour au QG - (.+)/);
-    return match ? match[1] : null;
-}

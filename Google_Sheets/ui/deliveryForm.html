@@ -60,12 +60,12 @@
               <div class="form-section__title">💝 Types d'aide</div>
               <div class="checkbox-grid">
                 <div class="checkbox-item">
-                  <input type="checkbox" id="zakat" name="type_aide" value="zakat" checked>
+                  <input type="checkbox" id="zakat" name="type_aide" value="zakat_el_fitr">
                   <label for="zakat">🌙 Zakat El Fitr</label>
                 </div>
                 <div class="checkbox-item">
-                  <input type="checkbox" id="sadaqa" name="type_aide" value="sadaqa">
-                  <label for="sadaqa">💝 Sadaqa</label>
+                  <input type="checkbox" id="ponctuelle" name="type_aide" value="ponctuelle">
+                  <label for="ponctuelle">💝 Ponctuelle</label>
                 </div>
                 <div class="checkbox-item">
                   <input type="checkbox" id="recolte" name="type_aide" value="recolte">
@@ -76,6 +76,11 @@
 
             <div class="form-section">
               <div class="form-section__title">📍 Quartiers</div>
+
+              <button type="button" class="text-link" onclick="toggleAllQuartiers()">
+                ✓ Tout sélectionner / désélectionner
+              </button>
+
               <div class="form-group mb-0">
                 <label for="quartiers">Sélectionner les quartiers <span class="text-muted">(Ctrl/Cmd pour
                     multi-sélection)</span></label>
@@ -189,6 +194,20 @@
       var boxes = document.querySelectorAll('#priorites-group input[type="checkbox"]');
       var allChecked = Array.from(boxes).every(function (b) { return b.checked; });
       boxes.forEach(function (b) { b.checked = !allChecked; });
+    }
+
+    function toggleAllQuartiers() {
+      var select = document.getElementById('quartiers');
+      var options = Array.from(select.options);
+
+      // ignore empty placeholder option
+      options = options.filter(function (o) { return o.value !== ""; });
+
+      var allSelected = options.every(function (o) { return o.selected; });
+
+      options.forEach(function (o) {
+        o.selected = !allSelected;
+      });
     }
 
     document.getElementById('deliveryForm').addEventListener('submit', function (e) {

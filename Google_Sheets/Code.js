@@ -18,7 +18,7 @@ function onOpen() {
         .addSeparator()
         .addItem('🔄 Mettre à Jour Statuts', 'updateDeliveryStatuses')
         .addSeparator()
-        .addItem('📦 Feuille de Conditionnement', 'showPackagingForm')
+        .addItem('📦 Feuille de Préparation', 'showPackagingForm')
     )
 
     .addSubMenu(
@@ -59,7 +59,6 @@ function onOpen() {
     .addSubMenu(
       ui.createMenu('❓ Aide')
         .addItem('📖 Documentation', 'showDocumentation')
-        .addItem('ℹ️ À Propos', 'showAbout')
     )
 
     .addToUi();

@@ -210,13 +210,3 @@ function getPairedPermisVolunteers(dateLivraison) {
     Logger.log(`[TMP_VEHICLE] ✅ ${pairs.length} bénévole(s) permis appairés avec véhicule temporaire`);
     return pairs;
 }
-
-/**
- * Ouvre la dialog de gestion des véhicules temporaires
- */
-function ouvrirGestionVehiculesTmp() {
-    SpreadsheetApp.getUi().showModalDialog(
-        HtmlService.createHtmlOutputFromFile('ui/gererVehiculesTmp').setWidth(500).setHeight(400),
-        '🚗 Véhicules Temporaires'
-    );
-}

@@ -1,12 +1,10 @@
 /**
  * ====================================================================
- * PACKAGING_SERVICE.GS - Feuille de Conditionnement
+ * PACKAGING_SERVICE.GS - Feuille de Préparation
  * ====================================================================
  */
 
 const PACKAGING_QR_SIZE_PX = 200;
-const PACKAGING_COL_WIDTH = 120;
-const PACKAGING_ROW_HEIGHT = 110;
 const PACKAGING_HEADER_H = 30;
 
 /**
@@ -20,9 +18,9 @@ function generatePackagingSheet(params) {
     const result = { success: false, url: '', count: 0, errors: [] };
 
     try {
-        const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_WEB_URL') || '';
+        const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
         if (!apiWebUrl) {
-            result.errors.push('API_WEB_URL non configurée (Menu > Configuration > Configurer API Web)');
+            result.errors.push('API_LIVRAISON_URL non configurée (Menu > Configuration > Configurer API Web)');
             return result;
         }
 
@@ -111,7 +109,7 @@ function _writePackagingSheet(sheet, livraisons, apiWebUrl) {
     sheet.setColumnWidth(3, 90);
     sheet.setColumnWidth(4, 90);
     sheet.setColumnWidth(5, 220);
-    sheet.setColumnWidth(6, PACKAGING_COL_WIDTH);
+    sheet.setColumnWidth(6, PACKAGING_QR_SIZE_PX - 20);
 
     // En-tête
     sheet.setRowHeight(1, PACKAGING_HEADER_H);
@@ -128,16 +126,16 @@ function _writePackagingSheet(sheet, livraisons, apiWebUrl) {
         const liv = livraisons[i];
         const rowIndex = i + 2;
 
-        sheet.setRowHeight(rowIndex, PACKAGING_ROW_HEIGHT);
+        sheet.setRowHeight(rowIndex, PACKAGING_QR_SIZE_PX - 20);
 
         const qrUrl = _buildPackagingQrUrl(liv.id_livraison, apiWebUrl);
         const qrFormula = `=IMAGE("${qrUrl}",4,${PACKAGING_QR_SIZE_PX - 20},${PACKAGING_QR_SIZE_PX - 20})`;
 
         const rowData = [
             liv.id_livraison,
-            liv.hotel === true || liv.hotel === 'TRUE' ? '✓' : '',
+            liv.hotel === true || liv.hotel === 'TRUE' ? true : false,
             liv.nombre_personnes || 0,
-            liv.avec_enfant === true || liv.avec_enfant === 'TRUE' ? '✓' : '',
+            liv.avec_enfant === true || liv.avec_enfant === 'TRUE' ? true : false,
             liv.besoins_speciaux || ''
         ];
 
@@ -174,7 +172,7 @@ function _writePackagingSheet(sheet, livraisons, apiWebUrl) {
  * Pas de token requis — endpoint ouvert pour l'équipe interne.
  */
 function _buildPackagingQrUrl(livraisonId, apiWebUrl) {
-    const url = `${apiWebUrl}?action=update_stop_status&id_livraison=${encodeURIComponent(livraisonId)}&statut=${encodeURIComponent(CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE)}`;
+    const url = `${apiWebUrl}?action=update_stop_status&id_livraison=${livraisonId}&statut=${CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE}`;
     return `https://api.qrserver.com/v1/create-qr-code/?size=${PACKAGING_QR_SIZE_PX}x${PACKAGING_QR_SIZE_PX}&data=${encodeURIComponent(url)}`;
 }
 
@@ -209,11 +207,11 @@ function passerRouteEnPrete(routeId) {
     updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.PRETE);
 
     try {
-        const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_WEB_URL') || '';
+        const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
         const adminPhone = PropertiesService.getScriptProperties().getProperty('ADMIN_PHONE') || '';
 
         if (!apiWebUrl) {
-            Logger.log(`[CONDITIONNEMENT] ⚠️ API_WEB_URL non configurée — email non envoyé`);
+            Logger.log(`[CONDITIONNEMENT] ⚠️ API_LIVRAISON_URL non configurée — email non envoyé`);
             return;
         }
 
@@ -222,5 +220,31 @@ function passerRouteEnPrete(routeId) {
 
     } catch (err) {
         Logger.log(`[CONDITIONNEMENT] ❌ Erreur envoi email route ${routeId}: ${err.message}`);
+    }
+}
+
+/**
+ * Processes statut_conditionnement = Prête for a delivery.
+ * Shared logic between QR scan and manual edit.
+ * @param {string} livraisonId
+ */
+function _processConditionnementPrete(livraisonId) {
+    const etapes = filterData(
+        CONFIG.SHEETS.ETAPES_ROUTE,
+        row => row.id_livraison === livraisonId
+    );
+
+    if (etapes.length > 0) {
+        const etape = etapes[0];
+        updateStopStatus(etape.id_etape, CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE);
+        Logger.log(`[CONDITIONNEMENT] ✅ Étape ${etape.id_etape} → Prête`);
+
+        const routeId = etape.id_route;
+        if (toutesLivraisonsPretes(routeId)) {
+            Logger.log(`[CONDITIONNEMENT] 🟢 Toutes livraisons Prêtes pour route ${routeId} → passage Prête`);
+            passerRouteEnPrete(routeId);
+        }
+    } else {
+        Logger.log(`[CONDITIONNEMENT] ℹ️ Aucun stop trouvé pour ${livraisonId} — statut_conditionnement conservé pour vérification ultérieure`);
     }
 }

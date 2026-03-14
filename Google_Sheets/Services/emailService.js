@@ -24,11 +24,11 @@ function sendRouteEmails(routeIds) {
 
   const result = { success: false, sent: 0, errors: [] };
 
-  const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_WEB_URL') || '';
+  const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
   const adminPhone = PropertiesService.getScriptProperties().getProperty('ADMIN_PHONE') || '';
 
   if (!apiWebUrl) {
-    result.errors.push('API_WEB_URL non configurée (Menu > Configuration > Configurer API Web)');
+    result.errors.push('API_LIVRAISON_URL non configurée (Menu > Configuration > Configurer API Web)');
     return result;
   }
 
