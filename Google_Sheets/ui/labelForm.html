@@ -15,17 +15,32 @@
         <div class="form-header__icon">🏷️</div>
         <div class="form-header__text">
           <h1>Générer les Étiquettes</h1>
-          <p>Créer des étiquettes imprimables avec QR codes pour les colis</p>
+          <p>Étiquettes avec QR codes — indépendant des routes</p>
         </div>
       </div>
 
       <!-- FORM STATE -->
       <div id="formState">
         <div class="form-body">
-          <div id="alert-success" class="alert alert--success"></div>
           <div id="alert-error" class="alert alert--error"></div>
 
           <form id="labelsForm">
+
+            <div class="form-section">
+              <div class="form-section__title">📅 Paramètres</div>
+              <div class="form-group">
+                <label for="date">Date de livraison</label>
+                <input type="date" id="date" required>
+              </div>
+              <div class="form-group mb-0">
+                <label for="occasion">Occasion</label>
+                <select id="occasion">
+                  <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
+                  <option value="recolte">🌾 Récolte</option>
+                  <option value="ponctuelle">📦 Ponctuelle</option>
+                </select>
+              </div>
+            </div>
 
             <div class="form-section">
               <div class="form-section__title">📐 Format A4</div>
@@ -42,40 +57,10 @@
               <div
                 style="margin-top: 14px; padding: 14px; background: var(--bg2); border-radius: var(--radius); text-align: center; border: 1px solid var(--border);">
                 <div style="font-weight: 600; font-size: 13px; color: var(--text-2); margin-bottom: 10px;"
-                  id="format-display">7×3 = 21 étiquettes par page</div>
+                  id="format-display">
+                  7×3 = 21 étiquettes par page
+                </div>
                 <div class="label-preview-grid" id="grid-preview"></div>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">📍 Routes à étiqueter</div>
-              <div class="toolbar">
-                <span class="toolbar__title" id="routeCount">Chargement…</span>
-                <button type="button" class="text-link" onclick="toggleSelectAll()">✓ Tout sélectionner /
-                  désélectionner</button>
-              </div>
-              <div class="scroll-list" id="routes-container">
-                <div class="loading-state loading-state--visible" style="padding: 32px 0;">
-                  <div class="spinner"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Preview stats -->
-            <div id="preview-section" class="hidden">
-              <div class="kpi-grid" style="margin-bottom: 0;">
-                <div class="kpi-card">
-                  <div class="kpi-card__value" id="preview-labels">0</div>
-                  <div class="kpi-card__label">Étiquettes</div>
-                </div>
-                <div class="kpi-card">
-                  <div class="kpi-card__value" id="preview-pages">0</div>
-                  <div class="kpi-card__label">Pages A4</div>
-                </div>
-                <div class="kpi-card">
-                  <div class="kpi-card__value" id="preview-routes">0</div>
-                  <div class="kpi-card__label">Routes</div>
-                </div>
               </div>
             </div>
 
@@ -84,8 +69,7 @@
 
         <div class="form-footer">
           <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="labelsForm" class="btn btn--primary" id="submitBtn" disabled>✨ Générer les
-            Étiquettes</button>
+          <button type="submit" form="labelsForm" class="btn btn--primary">✨ Générer les Étiquettes</button>
         </div>
       </div>
 
@@ -93,16 +77,21 @@
       <div id="loadingState" class="loading-state">
         <div class="spinner"></div>
         <div class="loading-state__text">Génération en cours…</div>
-        <div class="loading-state__sub">Création des documents Google avec QR codes</div>
+        <div class="loading-state__sub">Création des QR codes et mise en page</div>
       </div>
 
       <!-- RESULTS STATE -->
       <div id="resultsState" class="results-state">
         <div class="results-header">
           <h2>✅ Étiquettes générées</h2>
+          <p id="results-subtitle"></p>
         </div>
         <div class="results-body">
           <div id="documents-list"></div>
+          <div id="errors-box" class="error-box hidden">
+            <div class="error-box__title">⚠️ Erreurs</div>
+            <ul id="errors-list"></ul>
+          </div>
         </div>
         <div class="form-footer">
           <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
@@ -113,75 +102,21 @@
   </div>
 
   <script>
-    var routes = [];
-
     window.addEventListener('load', function () {
-      loadConfirmedRoutes();
-      updateGridPreview();
+      document.getElementById('date').value = new Date().toISOString().split('T')[0];
+      updateFormatDisplay();
       document.getElementById('rows').addEventListener('input', updateFormatDisplay);
       document.getElementById('cols').addEventListener('input', updateFormatDisplay);
     });
-
-    function loadConfirmedRoutes() {
-      google.script.run
-        .withSuccessHandler(displayRoutes)
-        .withFailureHandler(function (e) {
-          document.getElementById('routes-container').innerHTML =
-            '<div class="empty-state"><div class="empty-state__icon">⚠️</div><h3>Erreur de chargement</h3><p>' + e.message + '</p></div>';
-        })
-        .getConfirmedRoutesForLabels();
-    }
-
-    function displayRoutes(data) {
-      routes = data || [];
-      var container = document.getElementById('routes-container');
-      document.getElementById('routeCount').textContent = routes.length + ' route' + (routes.length > 1 ? 's' : '') + ' disponible' + (routes.length > 1 ? 's' : '');
-
-      if (routes.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state__icon">📭</div><h3>Aucune route confirmée</h3><p>Les routes doivent être confirmées avant de générer les étiquettes.</p></div>';
-        return;
-      }
-
-      container.innerHTML = routes.map(function (r, i) {
-        return '<div class="route-card" id="card-' + i + '" onclick="toggleRoute(' + i + ', event)">' +
-          '<input type="checkbox" id="route-' + i + '" value="' + r.id_route + '" onchange="updatePreview()">' +
-          '<div class="route-card__info">' +
-          '<div class="route-card__id">' + r.id_route + '</div>' +
-          '<div class="route-card__meta">' +
-          '<span class="route-card__badge">📦 ' + (r.nombre_livraisons || 0) + ' livraisons</span>' +
-          '<span class="route-card__badge">🏷️ ' + (r.total_personnes || 0) + ' étiquettes</span>' +
-          '</div>' +
-          '</div>' +
-          '<span class="route-card__status">Confirmée</span>' +
-          '</div>';
-      }).join('');
-    }
-
-    function toggleRoute(i, event) {
-      if (event.target.type === 'checkbox') return;
-      var cb = document.getElementById('route-' + i);
-      cb.checked = !cb.checked;
-      updatePreview();
-    }
-
-    function toggleSelectAll() {
-      var boxes = document.querySelectorAll('#routes-container input[type="checkbox"]');
-      var allChecked = Array.from(boxes).every(function (b) { return b.checked; });
-      boxes.forEach(function (b) { b.checked = !allChecked; });
-      updatePreview();
-    }
 
     function updateFormatDisplay() {
       var rows = parseInt(document.getElementById('rows').value) || 7;
       var cols = parseInt(document.getElementById('cols').value) || 3;
       document.getElementById('format-display').textContent = rows + '×' + cols + ' = ' + (rows * cols) + ' étiquettes par page';
-      updateGridPreview();
-      updatePreview();
+      updateGridPreview(rows, cols);
     }
 
-    function updateGridPreview() {
-      var rows = parseInt(document.getElementById('rows').value) || 7;
-      var cols = parseInt(document.getElementById('cols').value) || 3;
+    function updateGridPreview(rows, cols) {
       var grid = document.getElementById('grid-preview');
       grid.style.gridTemplateColumns = 'repeat(' + cols + ', 56px)';
       grid.style.gridTemplateRows = 'repeat(' + rows + ', 38px)';
@@ -194,54 +129,60 @@
       }
     }
 
-    function updatePreview() {
-      var selected = Array.from(document.querySelectorAll('#routes-container input:checked'));
-      document.getElementById('submitBtn').disabled = selected.length === 0;
-
-      selected.forEach(function (_, i) { });
-      routes.forEach(function (_, i) {
-        var cb = document.getElementById('route-' + i);
-        var card = document.getElementById('card-' + i);
-        if (cb && card) card.classList.toggle('selected', cb.checked);
-      });
-
-      if (selected.length === 0) { document.getElementById('preview-section').classList.add('hidden'); return; }
-
-      var totalLabels = 0;
-      selected.forEach(function (cb) {
-        var r = routes.find(function (x) { return x.id_route === cb.value; });
-        if (r) totalLabels += r.total_personnes || 0;
-      });
-      var rows = parseInt(document.getElementById('rows').value) || 7;
-      var cols = parseInt(document.getElementById('cols').value) || 3;
-      document.getElementById('preview-labels').textContent = totalLabels;
-      document.getElementById('preview-pages').textContent = Math.ceil(totalLabels / (rows * cols));
-      document.getElementById('preview-routes').textContent = selected.length;
-      document.getElementById('preview-section').classList.remove('hidden');
-    }
-
     document.getElementById('labelsForm').addEventListener('submit', function (e) {
       e.preventDefault();
-      var routeIds = Array.from(document.querySelectorAll('#routes-container input:checked')).map(function (b) { return b.value; });
-      if (routeIds.length === 0) { showAlert('error', 'Veuillez sélectionner au moins une route'); return; }
+
+      var date = document.getElementById('date').value;
+      if (!date) { showAlert('Veuillez sélectionner une date.'); return; }
+
       setState('loading');
+
       google.script.run
-        .withSuccessHandler(onGenerateSuccess)
-        .withFailureHandler(function (e) { setState('form'); showAlert('error', 'Erreur : ' + e.message); })
-        .generateLabelsFromForm({ routeIds: routeIds, rows: parseInt(document.getElementById('rows').value), cols: parseInt(document.getElementById('cols').value) });
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(function (err) {
+          setState('form');
+          showAlert('Erreur : ' + err.message);
+        })
+        .generateLabelsFromForm({
+          date: date,
+          occasion: document.getElementById('occasion').value,
+          rows: parseInt(document.getElementById('rows').value),
+          cols: parseInt(document.getElementById('cols').value)
+        });
     });
 
-    function onGenerateSuccess(result) {
-      if (!result.success) { setState('form'); showAlert('error', 'La génération a échoué : ' + (result.errors.join(', ') || 'Erreur inconnue')); return; }
+    function onSuccess(result) {
+      if (!result.success) {
+        setState('form');
+        showAlert((result.errors || []).join(', ') || 'Erreur inconnue');
+        return;
+      }
+
+      var subtitle = result.processed + ' livraison(s)';
+      if (result.documents.length > 0) {
+        subtitle += ' · ' + result.documents[0].labelCount + ' étiquette(s)';
+      }
+      document.getElementById('results-subtitle').textContent = subtitle;
+
       var list = document.getElementById('documents-list');
       list.innerHTML = '';
       result.documents.forEach(function (doc) {
         list.innerHTML +=
           '<div class="doc-item">' +
-          '<div><div class="doc-item__label">' + doc.routeId + '</div><div class="doc-item__sub">' + doc.labelCount + ' étiquettes</div></div>' +
-          '<a href="' + doc.url + '" target="_blank">📄 Ouvrir le document</a>' +
+          '<div>' +
+          '<div class="doc-item__label">Étiquettes générées</div>' +
+          '<div class="doc-item__sub">' + doc.labelCount + ' étiquettes</div>' +
+          '</div>' +
+          '<a href="' + doc.url + '" target="_blank">📄 Ouvrir</a>' +
           '</div>';
       });
+
+      if (result.errors && result.errors.length > 0) {
+        var ul = document.getElementById('errors-list');
+        ul.innerHTML = result.errors.map(function (e) { return '<li>' + e + '</li>'; }).join('');
+        document.getElementById('errors-box').classList.remove('hidden');
+      }
+
       setState('results');
     }
 
@@ -251,10 +192,10 @@
       document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
     }
 
-    function showAlert(type, msg) {
-      var el = document.getElementById('alert-' + type);
+    function showAlert(msg) {
+      var el = document.getElementById('alert-error');
       el.textContent = msg;
-      el.classList.add('alert--visible', 'alert--' + type);
+      el.classList.add('alert--visible', 'alert--error');
       setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
     }
   </script>

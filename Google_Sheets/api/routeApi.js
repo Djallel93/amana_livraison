@@ -3,12 +3,12 @@
  * ROUTE_API.GS - API Web pour les Actions des Bénévoles
  * ====================================================================
  * Actions disponibles :
- *   ping                - Test de connexion (pas de token requis)
- *   start_route         - Démarre la route + tous les stops → En Cours
- *   confirm_delivery    - Stop → Livrée
- *   skip_delivery       - Stop → ignorée
- *   finish_route        - Route → Terminée
- *   update_stop_status  - Met à jour le statut de conditionnement d'une livraison (sans token)
+ *   ping                - Test de connexion (sans token)
+ *   start_route         - Démarre la route (token requis)
+ *   confirm_delivery    - Stop → Livrée (token optionnel — QR étiquette accepté)
+ *   skip_delivery       - Stop → ignorée (token requis)
+ *   finish_route        - Route → Terminée (token requis)
+ *   update_stop_status  - Statut conditionnement (sans token)
  */
 
 // ============================================================
@@ -39,11 +39,16 @@ function routeRequest(e) {
             });
         }
 
-        // Endpoint sans token — équipe de conditionnement
         if (action === 'update_stop_status') {
             return handleUpdateStopStatus(e.parameter);
         }
 
+        // confirm_delivery accepte les requêtes avec ou sans token (QR étiquette)
+        if (action === 'confirm_delivery') {
+            return handleConfirmDelivery(token, e.parameter);
+        }
+
+        // Toutes les autres actions nécessitent un token valide
         if (!token) {
             return htmlError('Token manquant', 'Lien invalide ou incomplet.');
         }
@@ -57,7 +62,6 @@ function routeRequest(e) {
 
         switch (action) {
             case 'start_route': return handleStartRoute(routeId);
-            case 'confirm_delivery': return handleConfirmDelivery(routeId, e.parameter);
             case 'skip_delivery': return handleSkipDelivery(routeId, e.parameter);
             case 'finish_route': return handleFinishRoute(routeId);
             default:
@@ -65,7 +69,7 @@ function routeRequest(e) {
         }
 
     } catch (err) {
-        Logger.log(`[API] ❌ Erreur inattendue: ${err.message}`);
+        Logger.log(`[API] ❌ Erreur inattendue : ${err.message}`);
         return htmlError('Erreur serveur', err.message);
     }
 }
@@ -85,7 +89,6 @@ function handleStartRoute(routeId) {
     }
 
     updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.EN_COURS);
-    Logger.log(`[API] ✅ Route ${routeId} → En Cours`);
 
     const stops = getDeliveryStopsForRoute(routeId);
     let updated = 0;
@@ -97,7 +100,7 @@ function handleStartRoute(routeId) {
         }
     }
 
-    Logger.log(`[API] ✅ ${updated} étapes passées à En Cours`);
+    Logger.log(`[API] ✅ Route ${routeId} → En Cours, ${updated} étapes mises à jour`);
 
     return htmlSuccess(
         'Route démarrée !',
@@ -106,14 +109,48 @@ function handleStartRoute(routeId) {
     );
 }
 
-function handleConfirmDelivery(routeId, params) {
+/**
+ * Confirme une livraison.
+ * Accepte un token (lien email) ou aucun token (scan QR étiquette).
+ * Lorsqu'il n'y a pas de token, la route est résolue dynamiquement
+ * depuis l'id_livraison.
+ *
+ * @param {string|undefined} token
+ * @param {Object} params
+ */
+function handleConfirmDelivery(token, params) {
     const livraisonId = params.id_livraison;
-    Logger.log(`[API] ✅ confirm_delivery — route ${routeId}, livraison ${livraisonId}`);
+    Logger.log(`[API] ✅ confirm_delivery — livraison ${livraisonId}, token: ${token ? 'présent' : 'absent (QR étiquette)'}`);
 
     if (!livraisonId) return htmlError('Paramètre manquant', 'id_livraison requis.');
 
+    let routeId;
+
+    if (token) {
+        const tv = validateToken(token);
+        if (!tv.valid) return htmlError('Lien expiré', tv.error);
+        routeId = tv.routeId;
+    } else {
+        routeId = _resolveRouteFromLivraison(livraisonId);
+        if (!routeId) {
+            return htmlError(
+                'Route introuvable',
+                `Aucune route active trouvée pour la livraison ${livraisonId}.`
+            );
+        }
+    }
+
     const stop = findStopByLivraison(routeId, livraisonId);
-    if (!stop) return htmlError('Étape introuvable', `Aucune étape pour la livraison ${livraisonId} dans la route ${routeId}.`);
+    if (!stop) {
+        return htmlError(
+            'Étape introuvable',
+            `Aucune étape pour la livraison ${livraisonId} dans la route ${routeId}.`
+        );
+    }
+
+    if (stop.statut === CONFIG.ENUMS.STATUT_ETAPE.LIVREE) {
+        return htmlInfo('Déjà livrée', `La livraison ${livraisonId} a déjà été confirmée.`, '✅');
+    }
 
     updateStopStatus(stop.id_etape, CONFIG.ENUMS.STATUT_ETAPE.LIVREE);
     updateRowById(
@@ -124,7 +161,7 @@ function handleConfirmDelivery(routeId, params) {
     );
     updateDeliveryStatus(livraisonId, CONFIG.ENUMS.STATUT_LIVRAISON.LIVREE);
 
-    Logger.log(`[API] ✅ Livraison ${livraisonId} → Livrée`);
+    Logger.log(`[API] ✅ Livraison ${livraisonId} → Livrée (route ${routeId})`);
 
     return htmlSuccess('Livraison confirmée !', `La livraison a été enregistrée.<br>Merci !`, '✅');
 }
@@ -136,7 +173,12 @@ function handleSkipDelivery(routeId, params) {
     if (!livraisonId) return htmlError('Paramètre manquant', 'id_livraison requis.');
 
     const stop = findStopByLivraison(routeId, livraisonId);
-    if (!stop) return htmlError('Étape introuvable', `Aucune étape pour la livraison ${livraisonId} dans la route ${routeId}.`);
+    if (!stop) {
+        return htmlError(
+            'Étape introuvable',
+            `Aucune étape pour la livraison ${livraisonId} dans la route ${routeId}.`
+        );
+    }
 
     updateStopStatus(stop.id_etape, CONFIG.ENUMS.STATUT_ETAPE.IGNOREE);
     updateRowById(
@@ -147,7 +189,6 @@ function handleSkipDelivery(routeId, params) {
     );
 
     Logger.log(`[API] ⏭️ Livraison ${livraisonId} → ignorée`);
-
     sendSkipNotificationToAdmin(routeId, livraisonId);
 
     return htmlSuccess(
@@ -175,7 +216,7 @@ function handleFinishRoute(routeId) {
         return htmlError(
             'Livraisons en attente',
             `${pendingStops.length} livraison(s) non traitée(s) : ${ids}.<br>
-            Veuillez les marquer comme Livrées ou Ignorées avant de terminer.`
+      Veuillez les marquer comme Livrées ou Ignorées avant de terminer.`
         );
     }
 
@@ -191,7 +232,7 @@ function handleFinishRoute(routeId) {
 
 /**
  * Met à jour le statut de conditionnement d'une livraison.
- * Endpoint sans token — réservé à l'équipe de conditionnement interne.
+ * Endpoint sans token — équipe de conditionnement interne.
  */
 function handleUpdateStopStatus(params) {
     const livraisonId = params.id_livraison;
@@ -216,11 +257,9 @@ function handleUpdateStopStatus(params) {
         CONFIG.SHEETS.LIVRAISON,
         livraisonId,
         CONFIG.COLUMNS.LIVRAISON.ID_LIVRAISON,
-        {
-            statut_conditionnement: statut,
-            date_modification: getCurrentDateTime()
-        }
+        { statut_conditionnement: statut, date_modification: getCurrentDateTime() }
     );
+
     Logger.log(`[API] ✅ Livraison ${livraisonId} → statut_conditionnement: ${statut}`);
 
     if (statut === CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE) {
@@ -232,6 +271,56 @@ function handleUpdateStopStatus(params) {
         `La livraison <strong>${livraisonId}</strong> a été marquée comme prête.<br>Merci !`,
         '📦'
     );
+}
+
+// ============================================================
+// RÉSOLUTION DYNAMIQUE DE LA ROUTE
+// ============================================================
+
+/**
+ * Retrouve la route active contenant une livraison donnée.
+ * Utilisé pour les scans QR étiquettes (sans token).
+ * Priorité : En Cours > Prête > Confirmée > Brouillon.
+ *
+ * @param {string} livraisonId
+ * @returns {string|null} ID de la route ou null si introuvable
+ */
+function _resolveRouteFromLivraison(livraisonId) {
+    const etapes = filterData(
+        CONFIG.SHEETS.ETAPES_ROUTE,
+        row => row.id_livraison === livraisonId
+    );
+
+    if (etapes.length === 0) {
+        Logger.log(`[API] ⚠️ Aucune étape trouvée pour livraison ${livraisonId}`);
+        return null;
+    }
+
+    const priorite = {
+        [CONFIG.ENUMS.STATUT_ROUTE.EN_COURS]: 4,
+        [CONFIG.ENUMS.STATUT_ROUTE.PRETE]: 3,
+        [CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE]: 2,
+        [CONFIG.ENUMS.STATUT_ROUTE.BROUILLON]: 1,
+        [CONFIG.ENUMS.STATUT_ROUTE.TERMINEE]: 0,
+        [CONFIG.ENUMS.STATUT_ROUTE.ANNULEE]: 0
+    };
+
+    let meilleure = null;
+    let meilleureScore = -1;
+
+    for (const etape of etapes) {
+        const route = getRouteById(etape.id_route);
+        if (!route) continue;
+
+        const score = priorite[normalizeStatut(route.statut)] || 0;
+        if (score > meilleureScore) {
+            meilleureScore = score;
+            meilleure = route.id_route;
+        }
+    }
+
+    Logger.log(`[API] 🔍 Route résolue pour livraison ${livraisonId} : ${meilleure}`);
+    return meilleure;
 }
 
 // ============================================================
@@ -253,44 +342,84 @@ function htmlError(title, bodyHtml) {
 function buildHtmlPage(title, bodyHtml, emoji, textColor, bgColor, accentColor) {
     const html = `<!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-        font-family: 'Segoe UI', Arial, sans-serif;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
         }
+
         .card {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-        padding: 48px 40px;
-        text-align: center;
-        max-width: 420px;
-        width: 100%;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+            padding: 48px 40px;
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
         }
-        .emoji { font-size: 72px; margin-bottom: 24px; line-height: 1; }
-        h1 { font-size: 22px; font-weight: 700; color: ${textColor}; margin-bottom: 16px; }
+
+        .emoji {
+            font-size: 72px;
+            margin-bottom: 24px;
+            line-height: 1;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+
+            color: $ {
+                textColor
+            }
+
+            ;
+            margin-bottom: 16px;
+        }
+
         .message {
-        font-size: 15px;
-        color: #4a5568;
-        line-height: 1.7;
-        padding: 16px;
-        background: ${bgColor};
-        border-radius: 8px;
-        border-left: 4px solid ${accentColor};
+            font-size: 15px;
+            color: #4a5568;
+            line-height: 1.7;
+            padding: 16px;
+
+            background: $ {
+                bgColor
+            }
+
+            ;
+            border-radius: 8px;
+
+            border-left: 4px solid $ {
+                accentColor
+            }
+
+            ;
         }
-        .timestamp { margin-top: 24px; font-size: 12px; color: #a0aec0; }
+
+        .timestamp {
+            margin-top: 24px;
+            font-size: 12px;
+            color: #a0aec0;
+        }
     </style>
 </head>
+
 <body>
     <div class="card">
         <div class="emoji">${emoji}</div>
@@ -299,6 +428,7 @@ function buildHtmlPage(title, bodyHtml, emoji, textColor, bgColor, accentColor) 
         <div class="timestamp">${new Date().toLocaleString('fr-FR')}</div>
     </div>
 </body>
+
 </html>`;
 
     return HtmlService.createHtmlOutput(html);
