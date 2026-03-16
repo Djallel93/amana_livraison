@@ -96,8 +96,6 @@ function saveRoute(route, params) {
             }
         }
 
-        // Vérifier si toutes les livraisons de la route étaient déjà conditionnées
-        // avant la création des stops (feuille conditionnement générée en avance)
         _verifierConditionnementApresCreation(tempId, livraisonsOptimisees);
 
         return {
@@ -113,13 +111,8 @@ function saveRoute(route, params) {
 }
 
 /**
- * Après la création des stops, vérifie si toutes les livraisons
- * ont déjà statut_conditionnement = Prête (feuille conditionnement
- * générée avant la planification des routes).
- * Si oui → route passe directement à Prête et l'email est envoyé.
- *
- * @param {string} routeId
- * @param {Array}  livraisons
+ * Vérifie si toutes les livraisons sont déjà conditionnées après création des étapes.
+ * Si oui, passe la route directement à Prête et envoie l'email.
  */
 function _verifierConditionnementApresCreation(routeId, livraisons) {
     const toutesPretes = livraisons.every(l => {
@@ -131,7 +124,6 @@ function _verifierConditionnementApresCreation(routeId, livraisons) {
 
     Logger.log(`[ROUTES] 🟢 Toutes livraisons déjà Prêtes pour route ${routeId} → passage Prête`);
 
-    // Mettre à jour les étapes au statut Prête
     const stops = getDeliveryStopsForRoute(routeId);
     for (const stop of stops) {
         updateStopStatus(stop.id_etape, CONFIG.ENUMS.STATUT_ETAPE.PRETE);
@@ -152,6 +144,12 @@ function calculerCentre(livraisons) {
     };
 }
 
+/**
+ * Génère un lien Google Maps pour la route.
+ * - Origine  : QG
+ * - Destination : dernière livraison (pas le QG, évite le doublon)
+ * - Waypoints : toutes les livraisons sauf la dernière, dédupliquées
+ */
 function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
     if (!livraisonsOptimisees || livraisonsOptimisees.length === 0) {
         Logger.log('[ROUTES] ⚠️ Génération lien Maps: aucune livraison');
@@ -165,15 +163,19 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
 
     try {
         const origin = `${hqCoords.lat},${hqCoords.lng}`;
-        const destination = `${hqCoords.lat},${hqCoords.lng}`;
+        const derniere = livraisonsOptimisees[livraisonsOptimisees.length - 1];
+        const destination = `${derniere.latitude},${derniere.longitude}`;
 
         let url = `https://www.google.com/maps/dir/?api=1`;
         url += `&origin=${encodeURIComponent(origin)}`;
         url += `&destination=${encodeURIComponent(destination)}`;
 
-        if (livraisonsOptimisees.length > 0) {
+        // Waypoints = toutes les livraisons sauf la dernière (déjà en destination)
+        const intermediaires = livraisonsOptimisees.slice(0, -1);
+
+        if (intermediaires.length > 0) {
             const seen = new Set();
-            const waypointsUniques = livraisonsOptimisees
+            const waypointsUniques = intermediaires
                 .map(l => `${l.latitude},${l.longitude}`)
                 .filter(coord => {
                     if (seen.has(coord)) return false;
@@ -181,7 +183,7 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
                     return true;
                 });
 
-            const nbIgnores = livraisonsOptimisees.length - waypointsUniques.length;
+            const nbIgnores = intermediaires.length - waypointsUniques.length;
             if (nbIgnores > 0) {
                 Logger.log(`[ROUTES] 🗺️ ${nbIgnores} adresse(s) dupliquée(s) retirée(s) du lien Maps`);
             }

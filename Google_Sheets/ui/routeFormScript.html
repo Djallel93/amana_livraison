@@ -141,16 +141,16 @@
     function populateResults(result) {
         var routes = result.routes || [];
         var warnings = result.warnings || [];
+
         var poidsTotal = routes.reduce(function (s, r) { return s + (r.poids_total_kg || 0); }, 0);
         var distTotal = routes.reduce(function (s, r) { return s + (r.distance_totale_km || 0); }, 0);
-        var livTotal = routes.reduce(function (s, r) { return s + (r.livraisons ? r.livraisons.length : 0); }, 0);
-        var partsTotal = routes.reduce(function (s, r) { return s + (r.nombre_parts || 0); }, 0);
+        var livTotal = routes.reduce(function (s, r) { return s + (r.nb_livraisons || 0); }, 0);
         var benevoles = new Set(routes.map(function (r) { return r.id_benevole; })).size;
         var avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
 
         document.getElementById('stat-routes').textContent = result.created;
         document.getElementById('stat-deliveries').textContent = livTotal;
-        document.getElementById('stat-beneficiaires').textContent = partsTotal;
+        document.getElementById('stat-beneficiaires').textContent = '—';
         document.getElementById('stat-poids').textContent = Math.round(poidsTotal) + ' kg';
         document.getElementById('stat-benevoles').textContent = benevoles;
         document.getElementById('stat-distance').textContent = Math.round(distTotal) + ' km';
@@ -166,18 +166,25 @@
             tr.innerHTML =
                 '<td><span class="mono badge badge--cyan">' + r.id_route + '</span></td>' +
                 '<td><strong>' + (r.benevole_nom || r.id_benevole || '—') + '</strong></td>' +
-                '<td class="mono">' + (r.livraisons ? r.livraisons.length : '—') + '</td>' +
+                '<td class="mono">' + (r.nb_livraisons || '—') + '</td>' +
                 '<td class="mono">' + (r.poids_total_kg ? Math.round(r.poids_total_kg) + ' kg' : '—') + '</td>' +
                 '<td class="mono">' + (r.distance_totale_km ? Math.round(r.distance_totale_km * 10) / 10 + ' km' : '—') + '</td>' +
                 '<td><span class="badge badge--green">✓ Brouillon</span></td>';
             tbody.appendChild(tr);
         });
-        if (routes.length === 0) document.getElementById('breakdown-section').style.display = 'none';
+
+        if (routes.length === 0) {
+            document.getElementById('breakdown-section').style.display = 'none';
+        }
 
         if (warnings.length > 0) {
             var ul = document.getElementById('warnings-list');
             ul.innerHTML = '';
-            warnings.forEach(function (w) { var li = document.createElement('li'); li.textContent = w.message || w; ul.appendChild(li); });
+            warnings.forEach(function (w) {
+                var li = document.createElement('li');
+                li.textContent = w.message || w;
+                ul.appendChild(li);
+            });
             document.getElementById('warnings-box').classList.remove('hidden');
         }
     }

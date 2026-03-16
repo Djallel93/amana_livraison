@@ -5,6 +5,55 @@
   <base target="_top">
   <meta charset="UTF-8">
   <?!= include('styles'); ?>
+  <style>
+    .quartiers-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .quartier-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer;
+      transition: background .1s;
+    }
+
+    .quartier-item:last-child {
+      border-bottom: none;
+    }
+
+    .quartier-item:hover {
+      background: var(--bg2);
+    }
+
+    .quartier-item input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--c2);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .quartier-item label {
+      margin: 0;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text);
+    }
+
+    .quartiers-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+  </style>
 </head>
 
 <body>
@@ -28,6 +77,7 @@
 
           <form id="deliveryForm">
 
+            <!-- PRIORITÉS -->
             <div class="form-section">
               <div class="form-section__title">🎯 Niveaux de priorité</div>
               <div class="checkbox-grid" id="priorites-group">
@@ -52,10 +102,13 @@
                   <label for="prio5">5 — Standard</label>
                 </div>
               </div>
-              <button type="button" class="text-link" onclick="toggleAllPriorities()">✓ Tout sélectionner /
-                désélectionner</button>
+              <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button type="button" class="text-link" onclick="selectAllPriorities()">✓ Tout sélectionner</button>
+                <button type="button" class="text-link" onclick="deselectAllPriorities()">✕ Tout désélectionner</button>
+              </div>
             </div>
 
+            <!-- TYPES D'AIDE -->
             <div class="form-section">
               <div class="form-section__title">💝 Types d'aide</div>
               <div class="checkbox-grid">
@@ -74,22 +127,23 @@
               </div>
             </div>
 
+            <!-- QUARTIERS -->
             <div class="form-section">
               <div class="form-section__title">📍 Quartiers</div>
 
-              <button type="button" class="text-link" onclick="toggleAllQuartiers()">
-                ✓ Tout sélectionner / désélectionner
-              </button>
+              <div id="quartiers-loading" class="help-text">Chargement des quartiers…</div>
 
-              <div class="form-group mb-0">
-                <label for="quartiers">Sélectionner les quartiers <span class="text-muted">(Ctrl/Cmd pour
-                    multi-sélection)</span></label>
-                <select id="quartiers" multiple style="height: 180px;">
-                  <option value="">Chargement…</option>
-                </select>
+              <div id="quartiers-wrap" style="display: none;">
+                <div class="quartiers-list" id="quartiers-list"></div>
+                <div class="quartiers-actions">
+                  <button type="button" class="text-link" onclick="selectAllQuartiers()">✓ Tout sélectionner</button>
+                  <button type="button" class="text-link" onclick="deselectAllQuartiers()">✕ Tout
+                    désélectionner</button>
+                </div>
               </div>
             </div>
 
+            <!-- DATE ET QUANTITÉ -->
             <div class="form-section">
               <div class="form-section__title">📅 Date et quantité</div>
               <div class="form-row">
@@ -111,8 +165,7 @@
 
         <div class="form-footer">
           <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="deliveryForm" class="btn btn--primary" id="submitBtn">✨ Générer les
-            Livraisons</button>
+          <button type="submit" form="deliveryForm" class="btn btn--primary">✨ Générer les Livraisons</button>
         </div>
       </div>
 
@@ -158,86 +211,161 @@
 
   <script>
     window.addEventListener('load', function () {
-      setDefaultDate();
-      loadQuartiers();
-    });
-
-    function setDefaultDate() {
       var d = new Date();
       d.setDate(d.getDate() + 1);
       document.getElementById('date_livraison').value = d.toISOString().split('T')[0];
-    }
+      loadQuartiers();
+    });
+
+    // ── Chargement des quartiers ──────────────────────────────
 
     function loadQuartiers() {
       google.script.run
         .withSuccessHandler(populateQuartiers)
         .withFailureHandler(function (e) {
-          document.getElementById('quartiers').innerHTML = '<option value="">Erreur de chargement</option>';
+          document.getElementById('quartiers-loading').textContent =
+            'Erreur de chargement : ' + e.message;
         })
         .getQuartiersForDeliveryForm();
     }
 
     function populateQuartiers(quartiers) {
-      var sel = document.getElementById('quartiers');
-      sel.innerHTML = '';
-      if (!quartiers || quartiers.length === 0) { sel.innerHTML = '<option value="">Aucun quartier disponible</option>'; return; }
+      var loading = document.getElementById('quartiers-loading');
+      var wrap = document.getElementById('quartiers-wrap');
+      var list = document.getElementById('quartiers-list');
+
+      if (!quartiers || quartiers.length === 0) {
+        loading.textContent = 'Aucun quartier disponible.';
+        return;
+      }
+
+      list.innerHTML = '';
+
       quartiers.forEach(function (q) {
-        var opt = document.createElement('option');
-        opt.value = q.id;
-        opt.textContent = q.nom;
-        opt.selected = true;
-        sel.appendChild(opt);
+        var item = document.createElement('div');
+        item.className = 'quartier-item';
+
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = 'q_' + q.id;
+        cb.value = q.id;
+        cb.checked = true;
+        cb.className = 'quartier-cb';
+
+        var lbl = document.createElement('label');
+        lbl.htmlFor = 'q_' + q.id;
+        lbl.textContent = q.nom;
+
+        item.appendChild(cb);
+        item.appendChild(lbl);
+        list.appendChild(item);
       });
+
+      loading.style.display = 'none';
+      wrap.style.display = '';
     }
 
-    function toggleAllPriorities() {
-      var boxes = document.querySelectorAll('#priorites-group input[type="checkbox"]');
-      var allChecked = Array.from(boxes).every(function (b) { return b.checked; });
-      boxes.forEach(function (b) { b.checked = !allChecked; });
+    // ── Priorités ─────────────────────────────────────────────
+
+    function selectAllPriorities() {
+      document.querySelectorAll('#priorites-group input[type="checkbox"]')
+        .forEach(function (b) { b.checked = true; });
     }
 
-    function toggleAllQuartiers() {
-      var select = document.getElementById('quartiers');
-      var options = Array.from(select.options);
-
-      // ignore empty placeholder option
-      options = options.filter(function (o) { return o.value !== ""; });
-
-      var allSelected = options.every(function (o) { return o.selected; });
-
-      options.forEach(function (o) {
-        o.selected = !allSelected;
-      });
+    function deselectAllPriorities() {
+      document.querySelectorAll('#priorites-group input[type="checkbox"]')
+        .forEach(function (b) { b.checked = false; });
     }
+
+    // ── Quartiers ─────────────────────────────────────────────
+
+    function selectAllQuartiers() {
+      document.querySelectorAll('.quartier-cb')
+        .forEach(function (cb) { cb.checked = true; });
+    }
+
+    function deselectAllQuartiers() {
+      document.querySelectorAll('.quartier-cb')
+        .forEach(function (cb) { cb.checked = false; });
+    }
+
+    function getSelectedQuartierIds() {
+      return Array.from(document.querySelectorAll('.quartier-cb:checked'))
+        .map(function (cb) { return parseInt(cb.value); })
+        .filter(function (v) { return !isNaN(v); });
+    }
+
+    // ── Soumission ────────────────────────────────────────────
 
     document.getElementById('deliveryForm').addEventListener('submit', function (e) {
       e.preventDefault();
-      var priorites = Array.from(document.querySelectorAll('#priorites-group input:checked')).map(function (b) { return parseInt(b.value); });
-      var typesAide = Array.from(document.querySelectorAll('input[name="type_aide"]:checked')).map(function (b) { return b.value; });
-      var quartiers = Array.from(document.getElementById('quartiers').selectedOptions).map(function (o) { return parseInt(o.value); }).filter(function (v) { return !isNaN(v); });
-      if (priorites.length === 0) { showAlert('error', 'Veuillez sélectionner au moins un niveau de priorité'); return; }
-      if (typesAide.length === 0) { showAlert('error', "Veuillez sélectionner au moins un type d'aide"); return; }
-      if (quartiers.length === 0) { showAlert('error', 'Veuillez sélectionner au moins un quartier'); return; }
+
+      var priorites = Array.from(
+        document.querySelectorAll('#priorites-group input:checked')
+      ).map(function (b) { return parseInt(b.value); });
+
+      var typesAide = Array.from(
+        document.querySelectorAll('input[name="type_aide"]:checked')
+      ).map(function (b) { return b.value; });
+
+      var quartiers = getSelectedQuartierIds();
+
+      if (priorites.length === 0) {
+        showAlert('error', 'Veuillez sélectionner au moins un niveau de priorité');
+        return;
+      }
+      if (typesAide.length === 0) {
+        showAlert('error', "Veuillez sélectionner au moins un type d'aide");
+        return;
+      }
+      if (quartiers.length === 0) {
+        showAlert('error', 'Veuillez sélectionner au moins un quartier');
+        return;
+      }
+
       setState('loading');
+
       google.script.run
         .withSuccessHandler(onGenerateSuccess)
-        .withFailureHandler(function (e) { setState('form'); showAlert('error', 'Erreur : ' + e.message); })
-        .generateDeliveriesFromForm({ priorites: priorites, types_aide: typesAide, quartiers: quartiers, date_livraison: document.getElementById('date_livraison').value, nombre: parseInt(document.getElementById('nombre').value) });
+        .withFailureHandler(function (e) {
+          setState('form');
+          showAlert('error', 'Erreur : ' + e.message);
+        })
+        .generateDeliveriesFromForm({
+          priorites: priorites,
+          types_aide: typesAide,
+          quartiers: quartiers,
+          date_livraison: document.getElementById('date_livraison').value,
+          nombre: parseInt(document.getElementById('nombre').value)
+        });
     });
 
     function onGenerateSuccess(result) {
-      if (!result.success) { setState('form'); showAlert('error', 'La génération a échoué : ' + (result.errors.join(', ') || 'Erreur inconnue')); return; }
+      if (!result.success) {
+        setState('form');
+        showAlert('error', 'La génération a échoué : ' + (result.errors.join(', ') || 'Erreur inconnue'));
+        return;
+      }
+
       document.getElementById('stat-created').textContent = result.created;
       document.getElementById('stat-skipped').textContent = result.skipped;
       document.getElementById('stat-errors').textContent = result.errors.length;
+
       if (result.errors.length > 0) {
         var ul = document.getElementById('error-list');
         ul.innerHTML = '';
-        result.errors.forEach(function (err) { var li = document.createElement('li'); li.textContent = err; ul.appendChild(li); });
+        result.errors.forEach(function (err) {
+          var li = document.createElement('li');
+          li.textContent = err;
+          ul.appendChild(li);
+        });
         document.getElementById('error-details').classList.remove('hidden');
       }
+
       setState('results');
     }
+
+    // ── Utilitaires ───────────────────────────────────────────
 
     function setState(s) {
       document.getElementById('formState').style.display = s === 'form' ? '' : 'none';

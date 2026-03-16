@@ -8,10 +8,10 @@ function generateDeliveries(filters) {
     Logger.log('[LIVRAISONS] 🚀 Démarrage génération...');
 
     const result = {
-        success:    false,
-        created:    0,
-        skipped:    0,
-        errors:     [],
+        success: false,
+        created: 0,
+        skipped: 0,
+        errors: [],
         deliveries: []
     };
 
@@ -24,11 +24,12 @@ function generateDeliveries(filters) {
             return result;
         }
 
-        const limit    = filters.nombre || families.length;
+        const limit = filters.nombre || families.length;
         const selected = families.slice(0, limit);
 
         const toProcess = selected.filter(f => {
             if (hasActiveLivraison(f.id)) {
+                Logger.log(`[LIVRAISONS] ⏭️ Famille ${f.id} ignorée — livraison active existante`);
                 result.skipped++;
                 return false;
             }
@@ -46,9 +47,9 @@ function generateDeliveries(filters) {
         let currentId = getNextIdNumber(CONFIG.SHEETS.LIVRAISON, 'L', CONFIG.COLUMNS.LIVRAISON.ID_LIVRAISON);
 
         for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
-            const batch    = toProcess.slice(i, i + BATCH_SIZE);
+            const batch = toProcess.slice(i, i + BATCH_SIZE);
             const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-            const total    = Math.ceil(toProcess.length / BATCH_SIZE);
+            const total = Math.ceil(toProcess.length / BATCH_SIZE);
 
             Logger.log(`[LIVRAISONS] 📦 Batch ${batchNum}/${total} (${batch.length} familles)`);
 
@@ -88,8 +89,8 @@ function generateDeliveries(filters) {
 
 function processBatch(families, filters, startId) {
     const deliveries = [];
-    const addresses  = families.map(f => f.adresse);
-    const geocoded   = batchGeocode(addresses);
+    const addresses = families.map(f => f.adresse);
+    const geocoded = batchGeocode(addresses);
 
     families.forEach((family, index) => {
         try {
@@ -123,25 +124,25 @@ function createDelivery(family, coords, filters, idNumber) {
     );
 
     const delivery = {
-        id_livraison:           `L${String(idNumber).padStart(3, '0')}`,
-        id_famille:             family.id,
-        id_quartier:            family.idQuartier,
-        adresse:                family.adresse,
-        latitude:               coords.latitude,
-        longitude:              coords.longitude,
-        hotel:                  family.hotel === true || family.hotel === 'true' || false,
-        disponibilite_debut:    filters.date_livraison ? new Date(filters.date_livraison + ' 09:00:00') : null,
-        disponibilite_fin:      filters.date_livraison ? new Date(filters.date_livraison + ' 18:00:00') : null,
-        nombre_personnes:       (parseInt(family.nombreAdulte) || 0) + (parseInt(family.nombreEnfant) || 0),
-        avec_enfant:            (parseInt(family.nombreEnfant) || 0) > 0,
-        statut_conditionnement: '',
-        statut:                 CONFIG.ENUMS.STATUT_LIVRAISON.NON_ASSIGNEE,
-        priorite:               parseInt(family.criticite) || 5,
-        type_aide:              filters.types_aide?.[0] || CONFIG.ENUMS.TYPE_AIDE.PONCTUELLE,
-        besoins_speciaux:       family.besoins_speciaux || '',
-        date_creation:          getCurrentDateTime(),
-        date_modification:      getCurrentDateTime(),
-        _distance:              distance.distance || 0
+        id_livraison: `L${String(idNumber).padStart(3, '0')}`,
+        id_famille: family.id,
+        id_quartier: family.idQuartier,
+        adresse: family.adresse,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        hotel: family.hotel === true || family.hotel === 'true' || false,
+        disponibilite_debut: filters.date_livraison ? new Date(filters.date_livraison + ' 09:00:00') : null,
+        disponibilite_fin: filters.date_livraison ? new Date(filters.date_livraison + ' 18:00:00') : null,
+        nombre_personnes: (parseInt(family.nombreAdulte) || 0) + (parseInt(family.nombreEnfant) || 0),
+        avec_enfant: (parseInt(family.nombreEnfant) || 0) > 0,
+        statut_conditionnement: 'En cours',
+        statut: CONFIG.ENUMS.STATUT_LIVRAISON.NON_ASSIGNEE,
+        priorite: parseInt(family.criticite) || 5,
+        type_aide: filters.types_aide?.[0] || CONFIG.ENUMS.TYPE_AIDE.PONCTUELLE,
+        besoins_speciaux: family.specificites || '',
+        date_creation: getCurrentDateTime(),
+        date_modification: getCurrentDateTime(),
+        _distance: distance.distance || 0
     };
 
     const deliveryValidation = validateLivraison(delivery);
@@ -157,8 +158,8 @@ function fetchEligibleFamilies(filters) {
 
     if (filters.types_aide?.length > 0) {
         if (filters.types_aide.includes(CONFIG.ENUMS.TYPE_AIDE.ZAKAT_EL_FITR)) apiFilters.zakatElFitr = true;
-        if (filters.types_aide.includes(CONFIG.ENUMS.TYPE_AIDE.RECOLTE))       apiFilters.sadaqa     = true;
-        if (filters.types_aide.includes(CONFIG.ENUMS.TYPE_AIDE.PONCTUELLE))    apiFilters.sadaqa     = true;
+        if (filters.types_aide.includes(CONFIG.ENUMS.TYPE_AIDE.RECOLTE)) apiFilters.sadaqa = true;
+        if (filters.types_aide.includes(CONFIG.ENUMS.TYPE_AIDE.PONCTUELLE)) apiFilters.sadaqa = true;
     }
 
     const response = getAllValidatedFamilies(apiFilters);
@@ -184,8 +185,8 @@ function fetchEligibleFamilies(filters) {
 }
 
 function hasActiveLivraison(familyId) {
-    const data    = getAllData(CONFIG.SHEETS.LIVRAISON);
-    const idCol   = CONFIG.COLUMNS.LIVRAISON.ID_FAMILLE - 1;
+    const data = getAllData(CONFIG.SHEETS.LIVRAISON);
+    const idCol = CONFIG.COLUMNS.LIVRAISON.ID_FAMILLE - 1;
     const statCol = CONFIG.COLUMNS.LIVRAISON.STATUT - 1;
 
     for (const row of data) {

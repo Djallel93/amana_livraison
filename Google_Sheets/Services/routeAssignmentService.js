@@ -1,13 +1,10 @@
 /**
  * ====================================================================
- * ROUTE_SERVICE_ASSIGNMENT.GS - Service d'Assignation des Routes
+ * ROUTE_SERVICE_ASSIGNMENT.GS - Assignation des Clusters aux Véhicules
  * ====================================================================
  *
- * ⚠️ CHANGEMENT v3 (hôtel) :
- * - splitCluster() calcule maintenant le poids de chaque livraison
- *   individuellement en tenant compte du type hôtel/domicile,
- *   au lieu d'utiliser un poids uniforme poidsParPart.
- *   Les valeurs poids_moyen_kg et poids_moyen_hotel_kg proviennent de params.
+ * Mode incrémental : chaque bénévole sélectionné reçoit au plus une route
+ * par exécution. Les clusters non traités restent disponibles pour la suite.
  */
 
 // ============================================================
@@ -15,12 +12,18 @@
 // ============================================================
 
 /**
- * Assigne les clusters aux bénévoles disponibles
- * Logique : best-fit (plus petit véhicule suffisant) + split si nécessaire
+ * Assigne les clusters aux bénévoles disponibles.
+ *
+ * Règles :
+ * - Un bénévole reçoit au plus UNE route par exécution.
+ * - Best-fit : plus petit véhicule suffisant pour le cluster.
+ * - Si aucun bénévole libre ne peut gérer le cluster, on tente un split
+ *   avec le plus grand véhicule encore disponible.
+ * - Dès que tous les bénévoles ont leur route, on s'arrête.
  *
  * @param {Array<Object>} clusters  - Clusters triés par distance DESC
  * @param {Array<Object>} benevoles - Bénévoles avec vehicule.capaciteKg > 0
- * @param {Object}        params    - Paramètres (max_livraisons, poids_moyen_kg, poids_moyen_hotel_kg...)
+ * @param {Object}        params    - Paramètres (max_livraisons, poids_moyen_kg, ...)
  * @returns {Array<Object>} Routes à sauvegarder
  */
 function assignerClustersAuxVehicules(clusters, benevoles, params) {
@@ -28,7 +31,6 @@ function assignerClustersAuxVehicules(clusters, benevoles, params) {
     const maxLivraisonsParRoute = params.max_livraisons || 15;
     const poidsParPart = parseFloat(params.poids_moyen_kg) || 0;
 
-    // Récupérer les coordonnées du QG
     const hqConfig = getCurrentHqConfig();
     const hqCoords = (hqConfig && hqConfig.lat && hqConfig.lng)
         ? { lat: hqConfig.lat, lng: hqConfig.lng }
@@ -40,89 +42,75 @@ function assignerClustersAuxVehicules(clusters, benevoles, params) {
         Logger.log(`[ROUTES] ⚠️ Coordonnées QG non configurées`);
     }
 
-    // File de clusters à traiter (peut grossir si split)
+    // Ensemble des bénévoles ayant déjà reçu une route cette exécution.
+    // Un bénévole ne peut pas en recevoir une deuxième — on s'arrête dès
+    // que l'ensemble est plein (tous les bénévoles ont leur route).
+    const benevolesAvecRoute = new Set();
+
     const fileClusters = [...clusters];
 
-    // Suivi des bénévoles déjà utilisés dans ce cycle
-    // Un bénévole peut faire plusieurs trajets si tous les clusters
-    // ont été assignés une première fois
-    const benevolesUtilises = new Set();
+    Logger.log(`[ROUTES] 🚗 Début assignation incrémentale: ${benevoles.length} bénévoles, ${fileClusters.length} clusters`);
 
-    Logger.log(`[ROUTES] 🚗 Début assignation: ${benevoles.length} bénévoles, ${fileClusters.length} clusters`);
-
-    let index = 0;
+    let garde_fou = 0;
+    const MAX_ITERATIONS = clusters.length * 10 + benevoles.length * 2;
 
     while (fileClusters.length > 0) {
+
+        // Tous les bénévoles ont leur route — on arrête même s'il reste des clusters.
+        if (benevolesAvecRoute.size >= benevoles.length) {
+            Logger.log(`[ROUTES] 🛑 Tous les bénévoles ont leur route — ${fileClusters.length} cluster(s) restant(s) pour la prochaine exécution`);
+            break;
+        }
+
+        if (++garde_fou > MAX_ITERATIONS) {
+            Logger.log(`[ROUTES] ⚠️ Garde-fou atteint (${garde_fou} itérations) — arrêt`);
+            break;
+        }
+
         const cluster = fileClusters.shift();
 
-        Logger.log(`[ROUTES] 🔄 Traitement cluster ${cluster.id}: ` +
-            `${cluster.nombre_livraisons} livraisons, ` +
-            `${cluster.nombre_parts} parts, ` +
-            `${Math.round(cluster.poids_total)}kg`);
+        Logger.log(`[ROUTES] 🔄 Cluster ${cluster.id}: ${cluster.nombre_livraisons} livraisons, ${cluster.nombre_parts} parts, ${Math.round(cluster.poids_total)}kg`);
 
-        // Trouver le meilleur bénévole pour ce cluster
         const candidat = chercherMeilleurBenevole(
-            cluster, benevoles, benevolesUtilises, maxLivraisonsParRoute
+            cluster, benevoles, benevolesAvecRoute, maxLivraisonsParRoute
         );
 
         if (candidat) {
-            // ── Cas 1 : un seul bénévole peut gérer le cluster ────────────
             const route = creerRouteDepuisCluster(cluster, candidat, hqCoords);
             routes.push(route);
-            benevolesUtilises.add(candidat.id);
+            benevolesAvecRoute.add(candidat.id);
 
-            Logger.log(`[ROUTES] ✅ Cluster ${cluster.id} → ${candidat.nom} ` +
-                `(${candidat.vehicule.type}, ${candidat.vehicule.capaciteKg}kg, ` +
-                `max ${candidat.vehicule.nombrePartMax} parts)`);
+            Logger.log(`[ROUTES] ✅ Cluster ${cluster.id} → ${candidat.nom} (${candidat.vehicule.type}, ${candidat.vehicule.capaciteKg}kg)`);
 
         } else {
-            // ── Cas 2 : aucun bénévole seul ne peut gérer le cluster ──────
-            // Réinitialiser benevolesUtilises si tous ont été utilisés
-            if (benevolesUtilises.size >= benevoles.length) {
-                Logger.log(`[ROUTES] 🔄 Tous les bénévoles utilisés — réinitialisation`);
-                benevolesUtilises.clear();
-            }
-
-            // Chercher le plus grand véhicule disponible pour faire un split
-            const spliteur = chercherPlusGrandBenevole(benevoles, benevolesUtilises);
+            // Aucun bénévole libre ne peut prendre ce cluster → tentative de split.
+            const spliteur = chercherPlusGrandBenevoleLibre(benevoles, benevolesAvecRoute);
 
             if (!spliteur) {
-                Logger.log(`[ROUTES] ⚠️ Aucun bénévole disponible pour cluster ${cluster.id} — ignoré`);
+                Logger.log(`[ROUTES] ⚠️ Aucun bénévole disponible pour cluster ${cluster.id} — cluster ignoré pour cette exécution`);
                 continue;
             }
 
-            Logger.log(`[ROUTES] ✂️ Split du cluster ${cluster.id} avec ${spliteur.nom} ` +
-                `(${spliteur.vehicule.type})`);
+            Logger.log(`[ROUTES] ✂️ Split du cluster ${cluster.id} avec ${spliteur.nom} (${spliteur.vehicule.type})`);
 
             const { sousCluster, reste } = splitCluster(
                 cluster, spliteur, poidsParPart, maxLivraisonsParRoute, params
             );
 
-            // Créer la route pour la première partie
             const route = creerRouteDepuisCluster(sousCluster, spliteur, hqCoords);
             routes.push(route);
-            benevolesUtilises.add(spliteur.id);
+            benevolesAvecRoute.add(spliteur.id);
 
-            Logger.log(`[ROUTES]   → Sous-cluster A: ${sousCluster.nombre_livraisons} livraisons, ` +
-                `${sousCluster.nombre_parts} parts, ${Math.round(sousCluster.poids_total)}kg`);
+            Logger.log(`[ROUTES]   → Sous-cluster A: ${sousCluster.nombre_livraisons} livraisons, ${Math.round(sousCluster.poids_total)}kg`);
 
-            // Remettre le reste en tête de file pour traitement immédiat
             if (reste && reste.nombre_livraisons > 0) {
                 fileClusters.unshift(reste);
-                Logger.log(`[ROUTES]   → Reste: ${reste.nombre_livraisons} livraisons remis en file`);
+                Logger.log(`[ROUTES]   → Reste: ${reste.nombre_livraisons} livraisons remises en file`);
             }
-        }
-
-        index++;
-
-        // Garde-fou : éviter une boucle infinie
-        if (index > clusters.length * 10) {
-            Logger.log(`[ROUTES] ⚠️ Garde-fou atteint (${index} itérations) — arrêt`);
-            break;
         }
     }
 
-    Logger.log(`[ROUTES] ✅ Assignation terminée: ${routes.length} routes créées`);
+    Logger.log(`[ROUTES] ✅ Assignation terminée: ${routes.length} routes, ${benevolesAvecRoute.size}/${benevoles.length} bénévoles utilisés`);
     return routes;
 }
 
@@ -132,60 +120,34 @@ function assignerClustersAuxVehicules(clusters, benevoles, params) {
 
 /**
  * Trouve le plus petit véhicule disponible capable de gérer le cluster.
- * Contraintes : poids_total ≤ capaciteKg ET nombre_parts ≤ nombrePartMax
- *               ET nombre_livraisons ≤ maxLivraisonsParRoute
- *
- * "Plus petit" = capaciteKg minimal parmi les bénévoles éligibles
- * (évite de gaspiller un gros véhicule pour un petit cluster)
- *
- * @param {Object}   cluster              - Cluster à assigner
- * @param {Array}    benevoles            - Tous les bénévoles
- * @param {Set}      benevolesUtilises    - IDs déjà utilisés ce cycle
- * @param {number}   maxLivraisonsParRoute - Limite de livraisons par route
- * @returns {Object|null} Meilleur bénévole ou null
+ * Un bénévole déjà assigné cette exécution est exclu.
  */
-function chercherMeilleurBenevole(cluster, benevoles, benevolesUtilises, maxLivraisonsParRoute) {
+function chercherMeilleurBenevole(cluster, benevoles, benevolesAvecRoute, maxLivraisonsParRoute) {
     const eligibles = benevoles.filter(b => {
-        // Ignorer les bénévoles déjà utilisés ce cycle
-        if (benevolesUtilises.has(b.id)) return false;
-
-        // Vérifier les contraintes du véhicule
+        if (benevolesAvecRoute.has(b.id)) return false;
         return vehiculeCompatible(b.vehicule, cluster, maxLivraisonsParRoute);
     });
 
     if (eligibles.length === 0) return null;
 
-    // Sélectionner le plus petit véhicule suffisant (best-fit)
     eligibles.sort((a, b) => a.vehicule.capaciteKg - b.vehicule.capaciteKg);
-
     return eligibles[0];
 }
 
 /**
- * Trouve le bénévole disponible avec le plus grand véhicule (pour le split)
- *
- * @param {Array} benevoles         - Tous les bénévoles
- * @param {Set}   benevolesUtilises - IDs déjà utilisés ce cycle
- * @returns {Object|null}
+ * Trouve le bénévole disponible avec le plus grand véhicule (pour le split).
+ * Un bénévole déjà assigné cette exécution est exclu.
  */
-function chercherPlusGrandBenevole(benevoles, benevolesUtilises) {
-    const disponibles = benevoles.filter(b => !benevolesUtilises.has(b.id));
-
+function chercherPlusGrandBenevoleLibre(benevoles, benevolesAvecRoute) {
+    const disponibles = benevoles.filter(b => !benevolesAvecRoute.has(b.id));
     if (disponibles.length === 0) return null;
 
-    // Trier par capaciteKg DESC → le plus grand véhicule en premier
     disponibles.sort((a, b) => b.vehicule.capaciteKg - a.vehicule.capaciteKg);
-
     return disponibles[0];
 }
 
 /**
- * Vérifie si un véhicule peut gérer un cluster
- *
- * @param {Object} vehicule             - Véhicule avec capaciteKg et nombrePartMax
- * @param {Object} cluster              - Cluster avec poids_total, nombre_parts, nombre_livraisons
- * @param {number} maxLivraisonsParRoute - Limite de livraisons
- * @returns {boolean}
+ * Vérifie si un véhicule peut gérer un cluster (poids, parts, nb livraisons).
  */
 function vehiculeCompatible(vehicule, cluster, maxLivraisonsParRoute) {
     if (!vehicule) return false;
@@ -205,26 +167,12 @@ function vehiculeCompatible(vehicule, cluster, maxLivraisonsParRoute) {
 // ============================================================
 
 /**
- * Découpe un cluster en deux parties :
- * - sousCluster : livraisons prises séquentiellement jusqu'aux contraintes du véhicule
- * - reste        : livraisons restantes (remises en file)
- *
- * ⚠️ CHANGEMENT v3 : chaque livraison est pesée individuellement selon son type
- *    (hôtel ou domicile) via le calcul inline estHotel, au lieu du poids uniforme
- *    poidsParPart = poids_total / nombre_parts.
- *    Les valeurs poids_moyen_kg et poids_moyen_hotel_kg viennent de params.
- *
- * @param {Object} cluster              - Cluster à découper
- * @param {Object} benevole             - Bénévole assigné à la première partie
- * @param {number} poidsParPart         - Poids moyen domicile par personne (kg) [conservé pour compatibilité]
- * @param {number} maxLivraisonsParRoute - Limite de livraisons par route
- * @param {Object} params               - Paramètres de planification (poids_moyen_kg, poids_moyen_hotel_kg)
- * @returns {{ sousCluster: Object, reste: Object }}
+ * Découpe un cluster en deux parties selon la capacité du bénévole.
+ * Chaque livraison est pesée individuellement (domicile ou hôtel).
  */
 function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute, params) {
     const capaciteKg = parseFloat(benevole.vehicule.capaciteKg) || 0;
     const nombrePartMax = parseFloat(benevole.vehicule.nombrePartMax) || 0;
-
 
     const poids_moyen_kg = parseFloat((params && params.poids_moyen_kg) || poidsParPart) || 0;
     const poids_moyen_hotel_kg = parseFloat((params && params.poids_moyen_hotel_kg) || poids_moyen_kg) || 0;
@@ -234,22 +182,19 @@ function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute, pa
     let poidsA = 0;
     let partsA = 0;
 
-    // Remplir séquentiellement jusqu'aux contraintes
     for (const livraison of cluster.livraisons) {
         const parts = parseInt(livraison.nombre_personnes) || 0;
-
-
         const estHotel = livraison.hotel === true || livraison.hotel === 'TRUE' || livraison.hotel === 'true';
-        const poidsLivraison = parts * (estHotel ? poids_moyen_hotel_kg : poids_moyen_kg);
+        const poidsLiv = parts * (estHotel ? poids_moyen_hotel_kg : poids_moyen_kg);
 
-        const poidsApres = poidsA + poidsLivraison;
+        const poidsApres = poidsA + poidsLiv;
         const partsApres = partsA + parts;
-        const nbLivraisons = livraisonsA.length + 1;
+        const nbLiv = livraisonsA.length + 1;
 
         if (
             poidsApres <= capaciteKg &&
             partsApres <= nombrePartMax &&
-            nbLivraisons <= maxLivraisonsParRoute
+            nbLiv <= maxLivraisonsParRoute
         ) {
             livraisonsA.push(livraison);
             poidsA = poidsApres;
@@ -259,7 +204,6 @@ function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute, pa
         }
     }
 
-    // Construire le sous-cluster A
     const centreA = calculerCentre(livraisonsA);
     const sousCluster = {
         id: `${cluster.id}_A`,
@@ -271,8 +215,6 @@ function splitCluster(cluster, benevole, poidsParPart, maxLivraisonsParRoute, pa
         nombre_parts: partsA,
         poids_total: poidsA
     };
-
-    // Construire le reste (sous-cluster B)
 
     const partsB = livraisonsB.reduce((s, l) => s + (parseInt(l.nombre_personnes) || 0), 0);
     const poidsB = livraisonsB.reduce((sum, l) => {

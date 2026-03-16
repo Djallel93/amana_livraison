@@ -27,7 +27,7 @@ function viewAllRoutes() {
     const routes = getAllDataAsObjects(CONFIG.SHEETS.ROUTES);
 
     if (routes.length === 0) {
-      ui.alert('Aucune Route', 'Aucune route n\'a encore été créée.', ui.ButtonSet.OK);
+      ui.alert('Aucune Route', "Aucune route n'a encore été créée.", ui.ButtonSet.OK);
       return;
     }
 
@@ -53,9 +53,9 @@ function viewAllRoutes() {
 }
 
 /**
- * Planifie les routes depuis le formulaire
- * @param {Object} params - Paramètres du formulaire
- * @returns {Object}
+ * Planifie les routes depuis le formulaire.
+ * Les tableaux lourds (livraisons par route) sont retirés avant envoi au client
+ * pour éviter de dépasser la limite de taille du payload Apps Script.
  */
 function planRoutesFromForm(params) {
   try {
@@ -64,8 +64,31 @@ function planRoutesFromForm(params) {
 
     const result = planRoutes(params);
 
+    // Construire une version légère de chaque route pour l'UI
+    const routesLegeres = (result.routes || []).map(r => ({
+      id_route: r.id_route,
+      id_benevole: r.id_benevole,
+      benevole_nom: r.benevole_nom || '',
+      statut: r.statut,
+      distance_totale_km: r.distance_totale_km || 0,
+      poids_total_kg: r.poids_total_kg || 0,
+      nb_livraisons: r.livraisons ? r.livraisons.length : 0
+    }));
+
+    const resultLeger = {
+      success: result.success,
+      created: result.created,
+      warnings: result.warnings,
+      errors: result.errors,
+      outliers: (result.outliers || []).map(o => ({
+        id_livraison: o.id_livraison,
+        distance: Math.round(o._distance_hq || 0)
+      })),
+      routes: routesLegeres
+    };
+
     Logger.log(`[FORM] ✅ Planification terminée: ${result.created} routes créées`);
-    return result;
+    return resultLeger;
 
   } catch (error) {
     Logger.log(`[FORM] ❌ Erreur: ${error.message}`);
@@ -130,7 +153,11 @@ function regenerateAllMapsLinks() {
 
     const hqConfig = getCurrentHqConfig();
     if (!hqConfig || !hqConfig.lat || !hqConfig.lng) {
-      ui.alert('Configuration manquante', 'Les coordonnées du QG ne sont pas configurées.\nVeuillez les configurer dans Configuration > Adresse QG.', ui.ButtonSet.OK);
+      ui.alert(
+        'Configuration manquante',
+        'Les coordonnées du QG ne sont pas configurées.\nVeuillez les configurer dans Configuration > Adresse QG.',
+        ui.ButtonSet.OK
+      );
       return;
     }
 
@@ -183,9 +210,6 @@ function showGenerateLabelsForm() {
 
 /**
  * Retourne les bénévoles éligibles enrichis avec leur statut du jour.
- * Appelé depuis routeForm.html via google.script.run
- * @param {string} date - Format YYYY-MM-DD
- * @returns {Array<Object>}
  */
 function getVolunteersForPlanningForm(date) {
   try {
@@ -248,8 +272,6 @@ function getVolunteersForPlanningForm(date) {
 
 /**
  * Retourne le nombre de livraisons non assignées pour une date.
- * @param {string} date - Format YYYY-MM-DD
- * @returns {number}
  */
 function getUnassignedDeliveryCountForDate(date) {
   try {

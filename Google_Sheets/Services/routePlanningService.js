@@ -5,12 +5,12 @@
  */
 
 /**
- * Planifie les routes pour une date donnée
- * @param {Object} params - Paramètres de planification
- * @returns {Object} Résultat de la planification
+ * Planifie les routes de façon incrémentale :
+ * chaque bénévole sélectionné reçoit au plus une route par exécution.
+ * Les livraisons non assignées restent disponibles pour la prochaine exécution.
  */
 function planRoutes(params) {
-    Logger.log('[ROUTES] 🚀 Démarrage planification des routes...');
+    Logger.log('[ROUTES] 🚀 Démarrage planification incrémentale...');
     Logger.log(`[ROUTES] Paramètres: ${JSON.stringify(params)}`);
 
     const result = {
@@ -34,11 +34,11 @@ function planRoutes(params) {
         const { normal, outliers } = separateOutliers(livraisons);
 
         if (outliers.length > 0) {
-            Logger.log(`[ROUTES] ⚠️ ${outliers.length} livraisons isolées détectées (> ${CONFIG.ROUTE_OPTIMIZATION.OUTLIER_DISTANCE_KM}km)`);
+            Logger.log(`[ROUTES] ⚠️ ${outliers.length} livraisons isolées (> ${CONFIG.ROUTE_OPTIMIZATION.OUTLIER_DISTANCE_KM}km)`);
             outliers.forEach(o => {
                 result.warnings.push({
                     type: 'outlier',
-                    message: `Livraison ${o.id_livraison} très éloignée (${Math.round(o._distance_hq)}km) - Traitement manuel recommandé`,
+                    message: `Livraison ${o.id_livraison} très éloignée (${Math.round(o._distance_hq)}km) — traitement manuel recommandé`,
                     livraison_id: o.id_livraison,
                     distance: o._distance_hq
                 });
@@ -91,9 +91,7 @@ function planRoutes(params) {
 }
 
 /**
- * Sépare les livraisons normales des outliers (trop éloignées du QG)
- * @param {Array} livraisons
- * @returns {Object} {normal: Array, outliers: Array}
+ * Sépare les livraisons normales des outliers (trop éloignées du QG).
  */
 function separateOutliers(livraisons) {
     const OUTLIER_THRESHOLD = CONFIG.ROUTE_OPTIMIZATION.OUTLIER_DISTANCE_KM;
@@ -113,10 +111,10 @@ function separateOutliers(livraisons) {
 }
 
 /**
- * Récupère les bénévoles disponibles pour la planification.
- * Si params.selected_benevole_ids est fourni, seuls ces bénévoles sont retenus.
- * @param {Object} params - Paramètres de planification
- * @returns {Array<Object>}
+ * Récupère et filtre les bénévoles pour la planification.
+ *
+ * Mode incrémental : si selected_benevole_ids est fourni,
+ * seuls ces bénévoles sont retenus — chacun recevra au plus une route.
  */
 function getBenevolesPourPlanification(params) {
     let benevoles = getVolunteersWithVehicle();
