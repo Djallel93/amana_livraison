@@ -1,13 +1,9 @@
 /**
  * ====================================================================
- * LABEL_SERVICE.GS - Génération des Étiquettes (indépendant des routes)
+ * LABEL_SERVICE.GS - Génération des étiquettes (indépendant des routes)
  * ====================================================================
- *
- * Recto et verso utilisent tous les deux cols*2 colonnes.
- * Recto  : chaque paire de colonnes est fusionnée → cellule QR pleine largeur.
- * Verso  : colonne gauche (2/3) = Famille ID | colonne droite (1/3) = Part X/N.
- * La bordure interne gauche/droite du verso est invisible.
- * Après impression et découpe, recto et verso sont parfaitement alignés.
+ * Recto : QR codes (paires de colonnes fusionnées)
+ * Verso : Famille ID | Part X/N (mirroring horizontal)
  */
 
 const A4_USABLE_WIDTH_PX = 754;
@@ -22,12 +18,9 @@ const SEPARATOR_ROW_HEIGHT_PX = 20;
 
 /**
  * Calcule les dimensions en pixels pour un layout rows×cols sur A4.
- * colWidth = largeur totale d'une étiquette (paire de colonnes).
- * leftWidth / rightWidth = sous-colonnes verso (2/3 - 1/3).
- *
  * @param {number} rows
  * @param {number} cols
- * @returns {{ leftWidth, rightWidth, rowHeight, qrSize, fontSizeId, fontSizePart }}
+ * @returns {Object}
  */
 function calculateCellDimensions(rows, cols) {
   const colWidth = Math.floor(A4_USABLE_WIDTH_PX / cols);
@@ -35,7 +28,6 @@ function calculateCellDimensions(rows, cols) {
   const leftWidth = Math.floor(colWidth * 2 / 3);
   const rightWidth = colWidth - leftWidth;
   const qrSize = Math.floor(Math.min(colWidth, rowHeight) * QR_CELL_FILL_RATIO);
-
   const fontSizeId = Math.min(24, Math.max(12, Math.floor(rowHeight / 6)));
   const fontSizePart = Math.min(14, Math.max(9, Math.floor(rowHeight / 12)));
 
@@ -83,7 +75,9 @@ function generateLabels(params) {
 
     const dims = calculateCellDimensions(rows, cols);
     const sheetName = buildSheetName(new Date(params.date), params.occasion);
-    const ss = createOrReplaceSpreadsheet(sheetName);
+
+    const dossier = getDateOccasionFolder(new Date(params.date), params.occasion);
+    const ss = _createOrReplaceSpreadsheetInFolder(sheetName, dossier);
     const sheet = ss.getActiveSheet();
 
     _setColumnWidths(sheet, cols, dims);
@@ -107,12 +101,6 @@ function generateLabels(params) {
 // RÉCUPÉRATION ET CONSTRUCTION DES SLOTS
 // ============================================================
 
-/**
- * Récupère les livraisons non annulées pour une date et une occasion.
- * @param {string} date
- * @param {string} occasion
- * @returns {Array<Object>}
- */
 function _getLivraisonsForLabels(date, occasion) {
   const cible = new Date(date);
   cible.setHours(0, 0, 0, 0);
@@ -128,11 +116,6 @@ function _getLivraisonsForLabels(date, occasion) {
   });
 }
 
-/**
- * Construit un slot par personne (part) par livraison.
- * @param {Array<Object>} livraisons
- * @returns {Array<Object>}
- */
 function _buildSlots(livraisons) {
   const apiUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
   const slots = [];
@@ -155,10 +138,6 @@ function _buildSlots(livraisons) {
   return slots;
 }
 
-/**
- * Construit l'URL du QR code sans token.
- * confirm_delivery résout la route dynamiquement au scan.
- */
 function _buildLabelQrUrl(livraisonId, apiUrl) {
   const base = apiUrl || ScriptApp.getService().getUrl() || 'https://script.google.com';
   const url = `${base}?action=confirm_delivery&id_livraison=${encodeURIComponent(livraisonId)}`;
@@ -170,11 +149,13 @@ function _buildLabelQrUrl(livraisonId, apiUrl) {
 // ============================================================
 
 /**
- * Crée un nouveau spreadsheet ou remplace l'existant portant le même nom.
+ * Crée ou remplace un spreadsheet dans le dossier fourni.
+ * @param {string} name
+ * @param {GoogleAppsScript.Drive.Folder} dossier
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet}
  */
-function createOrReplaceSpreadsheet(name) {
-  const folder = getRoutesFolder();
-  const existing = folder.getFilesByName(name);
+function _createOrReplaceSpreadsheetInFolder(name, dossier) {
+  const existing = dossier.getFilesByName(name);
   while (existing.hasNext()) {
     existing.next().setTrashed(true);
     Logger.log(`[ÉTIQUETTES] 🗑️ Ancien fichier supprimé : ${name}`);
@@ -182,17 +163,13 @@ function createOrReplaceSpreadsheet(name) {
 
   const ss = SpreadsheetApp.create(name);
   const file = DriveApp.getFileById(ss.getId());
-  folder.addFile(file);
+  dossier.addFile(file);
   DriveApp.getRootFolder().removeFile(file);
 
-  Logger.log(`[ÉTIQUETTES] ✅ Spreadsheet créé : ${name}`);
+  Logger.log(`[ÉTIQUETTES] ✅ Spreadsheet créé dans le sous-dossier : ${name}`);
   return ss;
 }
 
-/**
- * Définit les largeurs de toutes les colonnes (cols*2 au total).
- * Appelé une seule fois avant l'écriture des pages.
- */
 function _setColumnWidths(sheet, cols, dims) {
   for (let c = 0; c < cols; c++) {
     sheet.setColumnWidth(c * 2 + 1, dims.leftWidth);
@@ -204,9 +181,6 @@ function _setColumnWidths(sheet, cols, dims) {
 // ÉCRITURE DES PAGES
 // ============================================================
 
-/**
- * Écrit toutes les paires recto/verso dans la feuille.
- */
 function writeAllPages(sheet, allSlots, rows, cols, slotsPerPage, dims) {
   const totalPages = Math.ceil(allSlots.length / slotsPerPage);
   Logger.log(`[ÉTIQUETTES] 📄 Écriture de ${totalPages} paire(s) de pages...`);
@@ -226,23 +200,12 @@ function writeAllPages(sheet, allSlots, rows, cols, slotsPerPage, dims) {
   Logger.log(`[ÉTIQUETTES] ✅ Terminé. Lignes utilisées : ${currentRow - 1}`);
 }
 
-// ============================================================
-// PAGE RECTO — QR codes (cols*2 colonnes, paires fusionnées)
-// ============================================================
-
-/**
- * Écrit la page recto.
- * Chaque étiquette occupe une paire de colonnes fusionnées → même largeur que le verso.
- * @returns {number} Prochaine ligne disponible
- */
 function writeRectoPage(sheet, startRow, slots, rows, cols, dims) {
   for (let r = 0; r < rows; r++) {
     const sheetRow = startRow + r;
     sheet.setRowHeight(sheetRow, dims.rowHeight);
 
     for (let c = 0; c < cols; c++) {
-      // Même miroir que le verso : col c → slot (cols-1-c)
-      // Garantit que recto et verso pointent vers le même id_livraison après découpe
       const frontCol = (cols - 1) - c;
       const idx = r * cols + frontCol;
       const colLeft = c * 2 + 1;
@@ -264,28 +227,16 @@ function writeRectoPage(sheet, startRow, slots, rows, cols, dims) {
   return startRow + rows;
 }
 
-// ============================================================
-// PAGE VERSO — Famille + Part (cols*2 colonnes, non fusionnées)
-// ============================================================
-
-/**
- * Écrit la page verso avec mirroring horizontal pour impression recto/verso bord long.
- * Slot en position frontCol (recto) → position miroir sur le verso.
- * @returns {number} Prochaine ligne disponible
- */
 function writeVersoPage(sheet, startRow, slots, rows, cols, dims) {
   for (let r = 0; r < rows; r++) {
     const sheetRow = startRow + r;
     sheet.setRowHeight(sheetRow, dims.rowHeight);
 
     for (let c = 0; c < cols; c++) {
-      // Miroir horizontal : étiquette recto col c → verso col (cols-1-c)
       const frontCol = (cols - 1) - c;
       const idx = r * cols + frontCol;
-
       const colLeft = c * 2 + 1;
       const colRight = c * 2 + 2;
-
       const cellLeft = sheet.getRange(sheetRow, colLeft);
       const cellRight = sheet.getRange(sheetRow, colRight);
 
@@ -294,22 +245,13 @@ function writeVersoPage(sheet, startRow, slots, rows, cols, dims) {
 
       if (idx < slots.length) {
         const slot = slots[idx];
-
         cellLeft.setValue(`F_${slot.familleId}`);
-        cellLeft.setFontSize(dims.fontSizeId);
-        cellLeft.setFontWeight('bold');
-        cellLeft.setFontColor('#000000');
-        cellLeft.setHorizontalAlignment('center');
-        cellLeft.setVerticalAlignment('middle');
-        cellLeft.setWrap(false);
+        cellLeft.setFontSize(dims.fontSizeId).setFontWeight('bold').setFontColor('#000000');
+        cellLeft.setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(false);
 
         cellRight.setValue(`${slot.part}/${slot.total}`);
-        cellRight.setFontSize(dims.fontSizePart);
-        cellRight.setFontWeight('normal');
-        cellRight.setFontColor('#333333');
-        cellRight.setHorizontalAlignment('center');
-        cellRight.setVerticalAlignment('bottom');
-        cellRight.setWrap(false);
+        cellRight.setFontSize(dims.fontSizePart).setFontWeight('normal').setFontColor('#333333');
+        cellRight.setHorizontalAlignment('center').setVerticalAlignment('bottom').setWrap(false);
       }
     }
   }
@@ -324,67 +266,33 @@ function writeVersoPage(sheet, startRow, slots, rows, cols, dims) {
 // ============================================================
 
 function _styleRectoCell(cell) {
-  cell.setBackground('#FFFFFF');
-  cell.setHorizontalAlignment('center');
-  cell.setVerticalAlignment('middle');
-  cell.setBorder(
-    true, true, true, true, false, false,
-    '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID
-  );
+  cell.setBackground('#FFFFFF').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  cell.setBorder(true, true, true, true, false, false, '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID);
 }
 
-/**
- * Cellule verso gauche : pas de bordure droite (invisible entre gauche et droite).
- */
 function _styleVersoLeft(cell) {
   cell.setBackground('#FFFFFF');
-  cell.setBorder(
-    true, true, true, false, false, false,
-    '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID
-  );
+  cell.setBorder(true, true, true, false, false, false, '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID);
 }
 
-/**
- * Cellule verso droite : pas de bordure gauche (invisible entre gauche et droite).
- */
 function _styleVersoRight(cell) {
   cell.setBackground('#FFFFFF');
-  cell.setBorder(
-    true, false, true, true, false, false,
-    '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID
-  );
+  cell.setBorder(true, false, true, true, false, false, '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID);
 }
 
-/**
- * Bordure extérieure épaisse autour de la page entière.
- */
 function _drawOuterBorder(sheet, startRow, rows, totalCols) {
   sheet.getRange(startRow, 1, rows, totalCols)
-    .setBorder(
-      true, true, true, true, null, null,
-      '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM
-    );
+    .setBorder(true, true, true, true, null, null, '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 }
 
-/**
- * Bordures verticales épaisses entre chaque étiquette.
- * Tracées sur le bord droit de la colonne droite de chaque paire, sauf la dernière.
- */
 function _drawInnerLabelBorders(sheet, startRow, rows, cols) {
   for (let c = 0; c < cols - 1; c++) {
     const sepCol = c * 2 + 2;
     sheet.getRange(startRow, sepCol, rows, 1)
-      .setBorder(
-        false, false, false, true, false, false,
-        '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM
-      );
+      .setBorder(false, false, false, true, false, false, '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   }
 }
 
-/**
- * Ligne séparatrice entre recto et verso.
- * @returns {number} Prochaine ligne disponible
- */
 function writeSeparatorRow(sheet, rowIndex) {
   sheet.setRowHeight(rowIndex, SEPARATOR_ROW_HEIGHT_PX);
   return rowIndex + 1;
@@ -394,17 +302,12 @@ function writeSeparatorRow(sheet, rowIndex) {
 // UTILITAIRES
 // ============================================================
 
-/**
- * Construit le nom du spreadsheet.
- * Ex : "20260215_zakat_el_fitr"
- */
 function buildSheetName(date, occasion) {
   const dateStr = Utilities.formatDate(date, CONFIG.TIMEZONE || 'Europe/Paris', 'yyyyMMdd');
   return `${dateStr}_${occasion}`;
 }
 
 /**
- * Retourne les routes confirmées/en cours avec leur nombre de livraisons.
  * Conservé pour compatibilité future.
  * @returns {Array<Object>}
  */
@@ -418,7 +321,6 @@ function getConfirmedRoutesForLabels() {
       const totalPersonnes = deliveries.reduce((sum, d) => sum + (parseInt(d.nombre_personnes) || 1), 0);
       return { id_route: route.id_route, nombre_livraisons: deliveries.length, total_personnes: totalPersonnes };
     });
-
   } catch (err) {
     Logger.log(`[ÉTIQUETTES] ❌ Erreur récupération routes : ${err.message}`);
     return [];

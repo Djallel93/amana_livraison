@@ -1,6 +1,6 @@
 /**
  * ====================================================================
- * PACKAGING_SERVICE.GS - Feuille de Préparation
+ * PACKAGING_SERVICE.GS - Feuille de préparation (conditionnement)
  * ====================================================================
  */
 
@@ -32,8 +32,9 @@ function generatePackagingSheet(params) {
             return result;
         }
 
-        const sheetName = `packaging_${params.date.replace(/-/g, '')}_${params.occasion}`;
-        const ss = _createOrReplaceSheet(sheetName);
+        const nomFeuille = `packaging_${params.date.replace(/-/g, '')}_${params.occasion}`;
+        const dossier = getDateOccasionFolder(new Date(params.date), params.occasion);
+        const ss = _createOrReplacePackagingSheet(nomFeuille, dossier);
         const sheet = ss.getActiveSheet();
 
         _writePackagingSheet(sheet, livraisons, apiWebUrl);
@@ -42,19 +43,20 @@ function generatePackagingSheet(params) {
         result.count = livraisons.length;
         result.success = true;
 
-        Logger.log(`[CONDITIONNEMENT] ✅ Feuille créée: ${result.url}`);
+        Logger.log(`[CONDITIONNEMENT] ✅ Feuille créée : ${result.url}`);
         return result;
 
     } catch (err) {
-        Logger.log(`[CONDITIONNEMENT] ❌ Erreur critique: ${err.message}`);
-        result.errors.push(`Erreur critique: ${err.message}`);
+        Logger.log(`[CONDITIONNEMENT] ❌ Erreur critique : ${err.message}`);
+        result.errors.push(`Erreur critique : ${err.message}`);
         return result;
     }
 }
 
-/**
- * Filtre les livraisons par date et type_aide (= occasion).
- */
+// ============================================================
+// REQUÊTE DES DONNÉES
+// ============================================================
+
 function _getLivraisonsForPackaging(date, occasion) {
     const cible = new Date(date);
     cible.setHours(0, 0, 0, 0);
@@ -72,38 +74,36 @@ function _getLivraisonsForPackaging(date, occasion) {
     });
 }
 
-/**
- * Crée ou recrée le Google Sheet de conditionnement dans le dossier Routes.
- */
-function _createOrReplaceSheet(name) {
-    const folder = getRoutesFolder();
-    const existing = folder.getFilesByName(name);
+// ============================================================
+// SPREADSHEET
+// ============================================================
 
+/**
+ * Crée ou remplace la feuille de conditionnement dans le sous-dossier.
+ * @param {string} nom
+ * @param {GoogleAppsScript.Drive.Folder} dossier
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet}
+ */
+function _createOrReplacePackagingSheet(nom, dossier) {
+    const existing = dossier.getFilesByName(nom);
     while (existing.hasNext()) {
         existing.next().setTrashed(true);
-        Logger.log(`[CONDITIONNEMENT] 🗑️ Ancienne feuille supprimée: ${name}`);
+        Logger.log(`[CONDITIONNEMENT] 🗑️ Ancienne feuille supprimée : ${nom}`);
     }
 
-    const ss = SpreadsheetApp.create(name);
+    const ss = SpreadsheetApp.create(nom);
     const file = DriveApp.getFileById(ss.getId());
-    folder.addFile(file);
+    dossier.addFile(file);
     DriveApp.getRootFolder().removeFile(file);
 
-    Logger.log(`[CONDITIONNEMENT] ✅ Feuille créée: ${name}`);
+    Logger.log(`[CONDITIONNEMENT] ✅ Feuille créée dans le sous-dossier : ${nom}`);
     return ss;
 }
 
-/**
- * Écrit les en-têtes et les données dans la feuille.
- */
 function _writePackagingSheet(sheet, livraisons, apiWebUrl) {
-    const headers = [
-        'ID Livraison', 'Hôtel', 'Nb Personnes', 'Avec Enfant', 'Besoins Spéciaux', 'QR Code'
-    ];
-
+    const headers = ['ID Livraison', 'Hôtel', 'Nb Personnes', 'Avec Enfant', 'Besoins Spéciaux', 'QR Code'];
     const COL_COUNT = headers.length;
 
-    // Largeurs de colonnes
     sheet.setColumnWidth(1, 110);
     sheet.setColumnWidth(2, 70);
     sheet.setColumnWidth(3, 90);
@@ -111,7 +111,6 @@ function _writePackagingSheet(sheet, livraisons, apiWebUrl) {
     sheet.setColumnWidth(5, 220);
     sheet.setColumnWidth(6, PACKAGING_QR_SIZE_PX - 20);
 
-    // En-tête
     sheet.setRowHeight(1, PACKAGING_HEADER_H);
     const headerRange = sheet.getRange(1, 1, 1, COL_COUNT);
     headerRange.setValues([headers]);
@@ -121,7 +120,6 @@ function _writePackagingSheet(sheet, livraisons, apiWebUrl) {
     headerRange.setHorizontalAlignment('center');
     headerRange.setVerticalAlignment('middle');
 
-    // Lignes de données
     for (let i = 0; i < livraisons.length; i++) {
         const liv = livraisons[i];
         const rowIndex = i + 2;
@@ -146,41 +144,31 @@ function _writePackagingSheet(sheet, livraisons, apiWebUrl) {
         const bgColor = i % 2 === 0 ? '#ffffff' : '#f7fafc';
         sheet.getRange(rowIndex, 1, 1, COL_COUNT).setBackground(bgColor);
 
-        // QR code dans la dernière colonne
         sheet.getRange(rowIndex, COL_COUNT).setFormula(qrFormula);
-        sheet.getRange(rowIndex, COL_COUNT).setHorizontalAlignment('center');
-        sheet.getRange(rowIndex, COL_COUNT).setVerticalAlignment('middle');
+        sheet.getRange(rowIndex, COL_COUNT).setHorizontalAlignment('center').setVerticalAlignment('middle');
 
-        // Colonne statut_conditionnement : colorer si déjà Prête
         if (liv.statut_conditionnement === CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE) {
             sheet.getRange(rowIndex, 1, 1, COL_COUNT).setBackground('#c6f6d5');
         }
     }
 
-    // Bordures globales
     const fullRange = sheet.getRange(1, 1, livraisons.length + 1, COL_COUNT);
     fullRange.setBorder(true, true, true, true, true, true, '#e2e8f0', SpreadsheetApp.BorderStyle.SOLID);
 
-    // Figer la ligne d'en-tête
     sheet.setFrozenRows(1);
 
     Logger.log(`[CONDITIONNEMENT] ✅ ${livraisons.length} lignes écrites`);
 }
 
-/**
- * Construit l'URL encodée dans le QR code de conditionnement.
- * Pas de token requis — endpoint ouvert pour l'équipe interne.
- */
 function _buildPackagingQrUrl(livraisonId, apiWebUrl) {
     const url = `${apiWebUrl}?action=update_stop_status&id_livraison=${livraisonId}&statut=${CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE}`;
     return `https://api.qrserver.com/v1/create-qr-code/?size=${PACKAGING_QR_SIZE_PX}x${PACKAGING_QR_SIZE_PX}&data=${encodeURIComponent(url)}`;
 }
 
-/**
- * Vérifie si toutes les livraisons d'une route ont statut_conditionnement = Prête.
- * @param {string} routeId
- * @returns {boolean}
- */
+// ============================================================
+// LOGIQUE CONDITIONNEMENT
+// ============================================================
+
 function toutesLivraisonsPretes(routeId) {
     const stops = getDeliveryStopsForRoute(routeId);
 
@@ -197,14 +185,8 @@ function toutesLivraisonsPretes(routeId) {
     return true;
 }
 
-/**
- * Passe une route au statut Prête et envoie l'email au bénévole.
- * @param {string} routeId
- */
 function passerRouteEnPrete(routeId) {
     Logger.log(`[CONDITIONNEMENT] 🟢 Route ${routeId} → Prête`);
-
-    updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.PRETE);
 
     try {
         const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
@@ -212,6 +194,7 @@ function passerRouteEnPrete(routeId) {
 
         if (!apiWebUrl) {
             Logger.log(`[CONDITIONNEMENT] ⚠️ API_LIVRAISON_URL non configurée — email non envoyé`);
+            updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.PRETE);
             return;
         }
 
@@ -219,15 +202,12 @@ function passerRouteEnPrete(routeId) {
         Logger.log(`[CONDITIONNEMENT] 📧 Email envoyé au bénévole pour route ${routeId}`);
 
     } catch (err) {
-        Logger.log(`[CONDITIONNEMENT] ❌ Erreur envoi email route ${routeId}: ${err.message}`);
+        Logger.log(`[CONDITIONNEMENT] ❌ Erreur envoi email route ${routeId} : ${err.message}`);
     }
+
+    updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.PRETE);
 }
 
-/**
- * Processes statut_conditionnement = Prête for a delivery.
- * Shared logic between QR scan and manual edit.
- * @param {string} livraisonId
- */
 function _processConditionnementPrete(livraisonId) {
     const etapes = filterData(
         CONFIG.SHEETS.ETAPES_ROUTE,
@@ -245,6 +225,6 @@ function _processConditionnementPrete(livraisonId) {
             passerRouteEnPrete(routeId);
         }
     } else {
-        Logger.log(`[CONDITIONNEMENT] ℹ️ Aucun stop trouvé pour ${livraisonId} — statut_conditionnement conservé pour vérification ultérieure`);
+        Logger.log(`[CONDITIONNEMENT] ℹ️ Aucun stop trouvé pour ${livraisonId} — statut_conditionnement conservé`);
     }
 }
