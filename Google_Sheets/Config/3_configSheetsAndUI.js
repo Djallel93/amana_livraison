@@ -1,9 +1,3 @@
-/**
- * =======================================================================
- * CONFIG_SHEETS_AND_UI.GS - Configuration Sheets, Drive, Email, UI
- * =======================================================================
- */
-
 const CONFIG_SHEETS = {
     SHEETS: {
         LIVRAISON: 'Livraison',
@@ -46,11 +40,13 @@ const CONFIG_SHEETS = {
             STATUT: 8,
             DISTANCE_TOTALE_KM: 9,
             POIDS_TOTAL_KG: 10,
-            RELIVRE: 11,
-            LIEN_MAPS: 12,
-            DOSSIER_DRIVE: 13,
-            DATE_CREATION: 14,
-            DATE_MODIFICATION: 15
+            POIDS_PAR_PART: 11,
+            POIDS_PAR_PART_HOTEL: 12,
+            RELIVRE: 13,
+            LIEN_MAPS: 14,
+            DOSSIER_DRIVE: 15,
+            DATE_CREATION: 16,
+            DATE_MODIFICATION: 17
         },
         ETAPES_ROUTE: {
             ID_ETAPE: 1,

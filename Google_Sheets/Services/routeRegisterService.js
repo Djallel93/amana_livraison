@@ -1,8 +1,18 @@
 /**
- * ====================================================================
- * ROUTE_REGISTER_SERVICE.GS - Sauvegarde et Enregistrement des Routes
- * ====================================================================
+ * Crée un objet route à partir d'un cluster et d'un bénévole
  */
+function creerRouteDepuisCluster(cluster, benevole, hqCoords) {
+    const distanceTotale = calculerDistanceTotaleRoute(cluster.livraisons, hqCoords);
+
+    return {
+        benevole: benevole,
+        binome: null,
+        vehicule_prete_id: '',
+        livraisons: cluster.livraisons,
+        poids_total: cluster.poids_total,
+        distance_totale: distanceTotale
+    };
+}
 
 function saveRoute(route, params) {
     try {
@@ -13,6 +23,9 @@ function saveRoute(route, params) {
         );
 
         Logger.log(`[ROUTES] 💾 Sauvegarde route ${tempId}...`);
+
+        const poidsParPart = parseFloat(params && params.poids_moyen_kg) || 0;
+        const poidsParPartHotel = parseFloat(params && params.poids_moyen_hotel_kg) || poidsParPart;
 
         const hqConfig = getCurrentHqConfig();
         let livraisonsOptimisees = route.livraisons;
@@ -50,6 +63,8 @@ function saveRoute(route, params) {
             statut: CONFIG.ENUMS.STATUT_ROUTE.BROUILLON,
             distance_totale_km: Math.round(route.distance_totale * 100) / 100,
             poids_total_kg: Math.round(route.poids_total * 100) / 100,
+            poids_par_part: poidsParPart,
+            poids_par_part_hotel: poidsParPartHotel,
             relivre: params.relivre || false,
             lien_maps: lienMaps,
             dossier_drive: '',
@@ -73,6 +88,8 @@ function saveRoute(route, params) {
             routeData.statut,
             routeData.distance_totale_km,
             routeData.poids_total_kg,
+            routeData.poids_par_part,
+            routeData.poids_par_part_hotel,
             routeData.relivre,
             routeData.lien_maps,
             routeData.dossier_drive,
@@ -81,7 +98,7 @@ function saveRoute(route, params) {
         ];
 
         appendRow(CONFIG.SHEETS.ROUTES, rowData);
-        Logger.log(`[ROUTES] ✅ Route ${tempId} sauvegardée`);
+        Logger.log(`[ROUTES] ✅ Route ${tempId} sauvegardée (${poidsParPart}kg/pers dom. | ${poidsParPartHotel}kg/pers hôtel)`);
 
         createOptimizedEtapes(tempId, livraisonsOptimisees);
         Logger.log(`[ROUTES] ✅ Étapes créées pour ${tempId}`);
@@ -147,7 +164,7 @@ function calculerCentre(livraisons) {
 /**
  * Génère un lien Google Maps pour la route.
  * - Origine  : QG
- * - Destination : dernière livraison (pas le QG, évite le doublon)
+ * - Destination : dernière livraison
  * - Waypoints : toutes les livraisons sauf la dernière, dédupliquées
  */
 function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
@@ -170,7 +187,6 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
         url += `&origin=${encodeURIComponent(origin)}`;
         url += `&destination=${encodeURIComponent(destination)}`;
 
-        // Waypoints = toutes les livraisons sauf la dernière (déjà en destination)
         const intermediaires = livraisonsOptimisees.slice(0, -1);
 
         if (intermediaires.length > 0) {
@@ -198,5 +214,72 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
     } catch (error) {
         Logger.log(`[ROUTES] ❌ Erreur génération lien Maps: ${error.message}`);
         return '';
+    }
+}
+
+/**
+ * Crée les étapes OPTIMISÉES pour une route
+ */
+function createOptimizedEtapes(routeId, livraisonsOptimisees) {
+    Logger.log(`[ROUTES] 📝 Création de ${livraisonsOptimisees.length} étapes optimisées + retour QG pour ${routeId}...`);
+
+    const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
+    const rows = [];
+
+    for (let i = 0; i < livraisonsOptimisees.length; i++) {
+        const livraison = livraisonsOptimisees[i];
+
+        const etapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        rows.push([
+            etapeId,
+            routeId,
+            livraison.id_livraison,
+            i + 1,
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
+            null,
+            null,
+            ''
+        ]);
+
+        if (i < 3 || i === livraisonsOptimisees.length - 1) {
+            Logger.log(`[ROUTES]    ✅ Étape ${etapeId} pour ${livraison.id_livraison} (ordre ${i + 1})`);
+        } else if (i === 3) {
+            Logger.log(`[ROUTES]    ... (${livraisonsOptimisees.length - 4} étapes supplémentaires)`);
+        }
+    }
+
+    const hqConfig = getCurrentHqConfig();
+
+    if (hqConfig && hqConfig.lat && hqConfig.lng) {
+        const hqEtapeId = generateNextId(
+            CONFIG.SHEETS.ETAPES_ROUTE,
+            'E',
+            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
+        );
+
+        rows.push([
+            hqEtapeId,
+            routeId,
+            null,
+            livraisonsOptimisees.length + 1,
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
+            null,
+            null,
+            `Retour au QG - ${hqConfig.address}`
+        ]);
+
+        Logger.log(`[ROUTES]    🏢 Étape retour QG: ${hqEtapeId} (ordre ${livraisonsOptimisees.length + 1})`);
+    } else {
+        Logger.log(`[ROUTES]    ⚠️ QG non configuré - retour QG ignoré`);
+    }
+
+    if (rows.length > 0) {
+        sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+        Logger.log(`[ROUTES] ✅ ${rows.length} étapes créées pour ${routeId}`);
     }
 }
