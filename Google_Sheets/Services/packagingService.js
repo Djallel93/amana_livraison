@@ -78,12 +78,6 @@ function _getLivraisonsForPackaging(date, occasion) {
 // SPREADSHEET
 // ============================================================
 
-/**
- * Crée ou remplace la feuille de conditionnement dans le sous-dossier.
- * @param {string} nom
- * @param {GoogleAppsScript.Drive.Folder} dossier
- * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet}
- */
 function _createOrReplacePackagingSheet(nom, dossier) {
     const existing = dossier.getFilesByName(nom);
     while (existing.hasNext()) {
@@ -185,27 +179,38 @@ function toutesLivraisonsPretes(routeId) {
     return true;
 }
 
+/**
+ * Passe une route au statut Prete, envoie l'email au bénévole
+ * puis génère le document imprimable.
+ * Le statut est mis à jour EN PREMIER pour que sendRouteEmail()
+ * trouve bien le statut Prete lors de sa vérification.
+ */
 function passerRouteEnPrete(routeId) {
-    Logger.log(`[CONDITIONNEMENT] 🟢 Route ${routeId} → Prête`);
+    Logger.log(`[CONDITIONNEMENT] 🟢 Route ${routeId} → Prete`);
+
+    updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.PRETE);
+
+    const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
+    const adminPhone = PropertiesService.getScriptProperties().getProperty('ADMIN_PHONE') || '';
+
+    if (!apiWebUrl) {
+        Logger.log(`[CONDITIONNEMENT] ⚠️ API_LIVRAISON_URL non configurée — email et doc non générés`);
+        return;
+    }
 
     try {
-        const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
-        const adminPhone = PropertiesService.getScriptProperties().getProperty('ADMIN_PHONE') || '';
-
-        if (!apiWebUrl) {
-            Logger.log(`[CONDITIONNEMENT] ⚠️ API_LIVRAISON_URL non configurée — email non envoyé`);
-            updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.PRETE);
-            return;
-        }
-
         sendRouteEmail(routeId, apiWebUrl, adminPhone);
         Logger.log(`[CONDITIONNEMENT] 📧 Email envoyé au bénévole pour route ${routeId}`);
-
     } catch (err) {
         Logger.log(`[CONDITIONNEMENT] ❌ Erreur envoi email route ${routeId} : ${err.message}`);
     }
 
-    updateRouteStatus(routeId, CONFIG.ENUMS.STATUT_ROUTE.PRETE);
+    try {
+        generateRouteDoc(routeId, adminPhone);
+        Logger.log(`[CONDITIONNEMENT] 📄 Document imprimable généré pour route ${routeId}`);
+    } catch (err) {
+        Logger.log(`[CONDITIONNEMENT] ❌ Erreur génération document route ${routeId} : ${err.message}`);
+    }
 }
 
 function _processConditionnementPrete(livraisonId) {
@@ -217,11 +222,11 @@ function _processConditionnementPrete(livraisonId) {
     if (etapes.length > 0) {
         const etape = etapes[0];
         updateStopStatus(etape.id_etape, CONFIG.ENUMS.STATUT_CONDITIONNEMENT.PRETE);
-        Logger.log(`[CONDITIONNEMENT] ✅ Étape ${etape.id_etape} → Prête`);
+        Logger.log(`[CONDITIONNEMENT] ✅ Étape ${etape.id_etape} → Prete`);
 
         const routeId = etape.id_route;
         if (toutesLivraisonsPretes(routeId)) {
-            Logger.log(`[CONDITIONNEMENT] 🟢 Toutes livraisons Prêtes pour route ${routeId} → passage Prête`);
+            Logger.log(`[CONDITIONNEMENT] 🟢 Toutes livraisons Prêtes pour route ${routeId} → passage Prete`);
             passerRouteEnPrete(routeId);
         }
     } else {

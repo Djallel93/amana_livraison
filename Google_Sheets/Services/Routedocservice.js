@@ -6,7 +6,6 @@
 
 /**
  * Génère un Google Doc imprimable pour une route donnée.
- * Placé dans Routes/YYYYMMDD_occasion/
  * @param {string} routeId
  * @param {string} adminPhone
  * @returns {string} URL du document généré
@@ -105,6 +104,11 @@ function _construireDocument(doc, routeId, benevoleNom, dateRoute, stops, adminP
     const body = doc.getBody();
     body.clear();
 
+    body.setMarginTop(36);
+    body.setMarginBottom(36);
+    body.setMarginLeft(36);
+    body.setMarginRight(36);
+
     const dateFormatee = dateRoute instanceof Date && !isNaN(dateRoute.getTime())
         ? dateRoute.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
         : String(dateRoute);
@@ -132,28 +136,45 @@ function _construireDocument(doc, routeId, benevoleNom, dateRoute, stops, adminP
 
 /**
  * Construit le tableau des livraisons dans le document.
+ * Colonnes ajustées au contenu sauf Adresse qui prend l'espace restant.
  * @param {GoogleAppsScript.Document.Body} body
  * @param {Array<Object>} stops
  */
 function _construireTableau(body, stops) {
-    const NB_COLS = 6;
+    const PAGE_WIDTH_PT = 595 - 72; // A4 largeur moins marges (36pt x2)
+
+    // Largeurs fixes pour colonnes à contenu court (en pt)
+    const COL_NUM = 20;
+    const COL_FAMILLE = 50;
+    const COL_TEL = 90;
+    const COL_TEL_BIS = 90;
+    const COL_PERSONNES = 45;
+    const COL_ADRESSE = PAGE_WIDTH_PT - COL_NUM - COL_FAMILLE - COL_TEL - COL_TEL_BIS - COL_PERSONNES;
+
+    const largeurs = [COL_NUM, COL_FAMILLE, COL_ADRESSE, COL_TEL, COL_TEL_BIS, COL_PERSONNES];
     const entetes = ['#', 'Famille', 'Adresse', 'Téléphone', 'Tél. bis', 'Personnes'];
 
     const tableau = body.appendTable();
     tableau.setBorderWidth(1);
 
+    // Ligne d'en-tête
     const ligneEntete = tableau.appendTableRow();
-    entetes.forEach(function (entete) {
+    entetes.forEach(function (entete, i) {
         const cellule = ligneEntete.appendTableCell(entete);
-        const texte = cellule.getChild(0).asParagraph().editAsText();
-        texte.setBold(true).setFontSize(10).setForegroundColor('#FFFFFF');
+        cellule.setWidth(largeurs[i]);
+        cellule.setPaddingTop(5);
+        cellule.setPaddingBottom(5);
+        cellule.setPaddingLeft(6);
+        cellule.setPaddingRight(6);
         cellule.setBackgroundColor('#2d3748');
-        cellule.setPaddingTop(6);
-        cellule.setPaddingBottom(6);
-        cellule.setPaddingLeft(8);
-        cellule.setPaddingRight(8);
+
+        const texte = cellule.getChild(0).asParagraph().editAsText();
+        texte.setBold(true).setFontSize(9).setForegroundColor('#FFFFFF');
+
+        cellule.getChild(0).asParagraph().setSpacingBefore(0).setSpacingAfter(0);
     });
 
+    // Lignes de données
     stops.forEach(function (stop, index) {
         const ligneData = tableau.appendTableRow();
         const couleurFond = index % 2 === 0 ? '#FFFFFF' : '#f7fafc';
@@ -167,14 +188,25 @@ function _construireTableau(body, stops) {
             String(stop.nombre_personnes)
         ];
 
-        valeurs.forEach(function (valeur) {
+        valeurs.forEach(function (valeur, i) {
             const cellule = ligneData.appendTableCell(valeur);
-            cellule.getChild(0).asParagraph().editAsText().setFontSize(10);
-            cellule.setBackgroundColor(couleurFond);
+            cellule.setWidth(largeurs[i]);
             cellule.setPaddingTop(5);
             cellule.setPaddingBottom(5);
-            cellule.setPaddingLeft(8);
-            cellule.setPaddingRight(8);
+            cellule.setPaddingLeft(6);
+            cellule.setPaddingRight(6);
+            cellule.setBackgroundColor(couleurFond);
+
+            const para = cellule.getChild(0).asParagraph();
+            para.setSpacingBefore(0).setSpacingAfter(0);
+
+            const texte = para.editAsText();
+            texte.setFontSize(9).setForegroundColor('#000000').setBold(false);
+
+            // Adresse : wrap activé — toutes les autres : pas de wrap
+            if (i === 2) {
+                cellule.getChild(0).asParagraph().setLineSpacing(115);
+            }
         });
     });
 }

@@ -139,7 +139,7 @@ const CONFIG_ENUMS = {
     STATUT_ROUTE: {
         BROUILLON: 'Brouillon',
         CONFIRMEE: 'Confirmée',
-        PRETE: 'Prête',
+        PRETE: 'Prete',
         EN_COURS: 'En Cours',
         TERMINEE: 'Terminée',
         ANNULEE: 'Annulée'
@@ -147,12 +147,12 @@ const CONFIG_ENUMS = {
     STATUT_ETAPE: {
         EN_ATTENTE: 'En Attente',
         EN_COURS: 'En Cours',
-        PRETE: 'Prête',
+        PRETE: 'Prete',
         LIVREE: 'Livrée',
         IGNOREE: 'ignorée'
     },
     STATUT_CONDITIONNEMENT: {
-        PRETE: 'Prête'
+        PRETE: 'Prete'
     },
     OCCASION: {
         ZAKAT_EL_FITR: 'zakat_el_fitr',
