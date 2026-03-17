@@ -32,9 +32,7 @@ function viewAllRoutes() {
     }
 
     const byStatus = {};
-    routes.forEach(r => {
-      byStatus[r.statut] = (byStatus[r.statut] || 0) + 1;
-    });
+    routes.forEach(r => { byStatus[r.statut] = (byStatus[r.statut] || 0) + 1; });
 
     let message = `📊 STATISTIQUES DES ROUTES\n\nTotal : ${routes.length} routes\n\nPar Statut :\n`;
     Object.entries(byStatus).forEach(([status, count]) => {
@@ -54,17 +52,14 @@ function viewAllRoutes() {
 
 /**
  * Planifie les routes depuis le formulaire.
- * Les tableaux lourds (livraisons par route) sont retirés avant envoi au client
- * pour éviter de dépasser la limite de taille du payload Apps Script.
  */
 function planRoutesFromForm(params) {
   try {
-    Logger.log('[FORM] 📝 Planification depuis formulaire...');
+    Logger.log('[FORM] Planification depuis formulaire…');
     Logger.log(`[FORM] Paramètres: ${JSON.stringify(params)}`);
 
     const result = planRoutes(params);
 
-    // Construire une version légère de chaque route pour l'UI
     const routesLegeres = (result.routes || []).map(r => ({
       id_route: r.id_route,
       id_benevole: r.id_benevole,
@@ -87,11 +82,11 @@ function planRoutesFromForm(params) {
       routes: routesLegeres
     };
 
-    Logger.log(`[FORM] ✅ Planification terminée: ${result.created} routes créées`);
+    Logger.log(`[FORM] Planification terminée: ${result.created} routes créées`);
     return resultLeger;
 
   } catch (error) {
-    Logger.log(`[FORM] ❌ Erreur: ${error.message}`);
+    Logger.log(`[FORM] Erreur: ${error.message}`);
     throw error;
   }
 }
@@ -124,9 +119,6 @@ function showReorderStopsInterface() {
   if (sheet) ss.setActiveSheet(sheet);
 }
 
-/**
- * Régénère les liens Google Maps pour toutes les routes en statut Brouillon.
- */
 function regenerateAllMapsLinks() {
   const ui = SpreadsheetApp.getUi();
 
@@ -139,8 +131,6 @@ function regenerateAllMapsLinks() {
   if (confirm !== ui.Button.YES) return;
 
   try {
-    Logger.log('[MAPS] 🗺️ Démarrage de la régénération des liens Maps...');
-
     const brouillonRoutes = filterData(
       CONFIG.SHEETS.ROUTES,
       row => normalizeStatut(row.statut) === CONFIG.ENUMS.STATUT_ROUTE.BROUILLON
@@ -153,11 +143,7 @@ function regenerateAllMapsLinks() {
 
     const hqConfig = getCurrentHqConfig();
     if (!hqConfig || !hqConfig.lat || !hqConfig.lng) {
-      ui.alert(
-        'Configuration manquante',
-        'Les coordonnées du QG ne sont pas configurées.\nVeuillez les configurer dans Configuration > Adresse QG.',
-        ui.ButtonSet.OK
-      );
+      ui.alert('Configuration manquante', 'Les coordonnées du QG ne sont pas configurées.', ui.ButtonSet.OK);
       return;
     }
 
@@ -188,7 +174,7 @@ function regenerateAllMapsLinks() {
       }
     }
 
-    let summary = `✅ ${updated} lien(s) Maps régénéré(s) avec succès.`;
+    let summary = `✅ ${updated} lien(s) Maps régénéré(s).`;
     if (skipped > 0) summary += `\n⏭️ ${skipped} route(s) ignorée(s) (aucun stop).`;
     if (errors.length > 0) summary += `\n\n❌ Erreurs :\n${errors.join('\n')}`;
     ui.alert('Régénération terminée', summary, ui.ButtonSet.OK);
@@ -209,28 +195,33 @@ function showGenerateLabelsForm() {
 }
 
 /**
- * Retourne les bénévoles éligibles enrichis avec leur statut du jour.
+ * Retourne tous les bénévoles éligibles enrichis avec leurs créneaux de disponibilité
+ * et leur statut du jour (si une date est fournie).
+ * Les bénévoles sont chargés dès l'ouverture du formulaire — la date est optionnelle.
+ *
+ * @param {string|null} date - Format YYYY-MM-DD (optionnel)
+ * @returns {Array<Object>}
  */
 function getVolunteersForPlanningForm(date) {
   try {
-    Logger.log(`[FORM] 👥 Chargement bénévoles pour date: ${date}`);
+    Logger.log(`[FORM] Chargement bénévoles${date ? ' pour date: ' + date : ' (sans date)'}`);
 
-    const withVehicle = getVolunteersWithVehicle();
-    let permis = [];
+    let benevoles = getVolunteersWithVehicle();
 
     if (date) {
       try {
-        permis = getPairedPermisVolunteers(date);
+        const permis = getPairedPermisVolunteers(date);
+        if (permis.length > 0) {
+          const existingIds = new Set(benevoles.map(v => v.id));
+          permis.forEach(v => { if (!existingIds.has(v.id)) benevoles.push(v); });
+          Logger.log(`[FORM] ${permis.length} bénévole(s) permis ajouté(s) via véhicules temporaires`);
+        }
       } catch (e) {
-        Logger.log(`[FORM] ⚠️ Véhicules temporaires: ${e.message}`);
+        Logger.log(`[FORM] Véhicules temporaires: ${e.message}`);
       }
     }
 
-    const allVolunteers = [...withVehicle];
-    const existingIds = new Set(withVehicle.map(v => v.id));
-    permis.forEach(v => { if (!existingIds.has(v.id)) allVolunteers.push(v); });
-
-    Logger.log(`[FORM] 📋 ${allVolunteers.length} bénévoles éligibles`);
+    Logger.log(`[FORM] ${benevoles.length} bénévoles éligibles`);
 
     const routesAujourdhui = date ? _getRoutesForDate(date) : [];
     const routeParBenevole = {};
@@ -242,7 +233,7 @@ function getVolunteersForPlanningForm(date) {
       }
     });
 
-    return allVolunteers.map(benevole => {
+    return benevoles.map(benevole => {
       const routeExistante = routeParBenevole[String(benevole.id)] || null;
 
       let livraisonsFaites = 0;
@@ -255,8 +246,10 @@ function getVolunteersForPlanningForm(date) {
         id: benevole.id,
         nom: benevole.nom || '',
         prenom: benevole.prenom || '',
+        admin: benevole.admin === true || benevole.admin === 'true',
         vehicule_type: benevole.vehicule ? benevole.vehicule.type : '—',
         vehicule_capacite: benevole.vehicule ? (parseFloat(benevole.vehicule.capaciteKg) || 0) : 0,
+        disponibilites: benevole.disponibilites || [],
         has_route_today: !!routeExistante,
         route_statut: routeExistante ? routeExistante.statut : null,
         livraisons_faites: livraisonsFaites,
@@ -265,7 +258,7 @@ function getVolunteersForPlanningForm(date) {
     });
 
   } catch (error) {
-    Logger.log(`[FORM] ❌ getVolunteersForPlanningForm: ${error.message}`);
+    Logger.log(`[FORM] Erreur getVolunteersForPlanningForm: ${error.message}`);
     throw error;
   }
 }
@@ -277,7 +270,7 @@ function getUnassignedDeliveryCountForDate(date) {
   try {
     return getUnassignedDeliveriesForDate(date).length;
   } catch (e) {
-    Logger.log(`[FORM] ❌ getUnassignedDeliveryCountForDate: ${e.message}`);
+    Logger.log(`[FORM] Erreur getUnassignedDeliveryCountForDate: ${e.message}`);
     return 0;
   }
 }

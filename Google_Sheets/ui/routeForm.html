@@ -6,25 +6,81 @@
   <meta charset="UTF-8">
   <?!= include('styles'); ?>
   <style>
-    .benevoles-section {
-      margin-top: 16px;
+    .filters-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-group label {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .filter-group select {
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      width: auto;
+    }
+
+    .filter-group select:focus {
+      outline: none;
+      border-color: var(--c1);
+    }
+
+    .admin-toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-2);
+      padding: 6px 12px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      transition: border-color .15s, background .15s;
+    }
+
+    .admin-toggle:hover {
+      border-color: var(--c1);
+      background: var(--bg2);
+    }
+
+    .admin-toggle input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--c2);
+      cursor: pointer;
     }
 
     .benevoles-counter {
-      font-size: 13px;
-      color: #6b7280;
-      margin-bottom: 10px;
-    }
-
-    .benevoles-counter strong {
-      color: #111827;
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
     }
 
     .benevoles-table-wrap {
       max-height: 260px;
       overflow-y: auto;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
     }
 
     .benevoles-table {
@@ -34,18 +90,18 @@
     }
 
     .benevoles-table thead th {
-      background: #f9fafb;
+      background: var(--bg);
       padding: 8px 12px;
       text-align: left;
       font-weight: 600;
-      color: #374151;
-      border-bottom: 1px solid #e5e7eb;
+      color: var(--text-2);
+      border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
     }
 
     .benevoles-table tbody tr {
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid var(--border-light);
     }
 
     .benevoles-table tbody tr:last-child {
@@ -53,7 +109,7 @@
     }
 
     .benevoles-table tbody tr:hover {
-      background: #f9fafb;
+      background: var(--bg);
     }
 
     .benevoles-table td {
@@ -94,11 +150,26 @@
       color: #059669;
     }
 
-    .benevoles-loading {
-      padding: 20px;
-      text-align: center;
-      color: #9ca3af;
-      font-size: 13px;
+    .dispo-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 20px;
+      background: rgba(0, 254, 207, .15);
+      color: var(--c2);
+      margin-right: 3px;
+      font-weight: 600;
+    }
+
+    .admin-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 20px;
+      background: #ede9fe;
+      color: #6d28d9;
+      font-weight: 600;
+      margin-left: 4px;
     }
 
     .select-all-row {
@@ -107,8 +178,15 @@
       gap: 8px;
       margin-bottom: 8px;
       font-size: 13px;
-      color: #374151;
+      color: var(--text-2);
       cursor: pointer;
+    }
+
+    .benevoles-loading {
+      padding: 20px;
+      text-align: center;
+      color: var(--muted-light);
+      font-size: 13px;
     }
 
     .livraisons-restantes {
@@ -117,7 +195,7 @@
       gap: 6px;
       background: #eff6ff;
       border: 1px solid #bfdbfe;
-      border-radius: 8px;
+      border-radius: var(--radius);
       padding: 6px 12px;
       font-size: 13px;
       color: #1d4ed8;
@@ -152,7 +230,7 @@
 
               <div class="form-group">
                 <label for="date_livraison">Date de livraison</label>
-                <input type="date" id="date_livraison" required>
+                <input type="date" id="date_livraison">
                 <div id="livraisons-restantes-wrap" style="display:none;">
                   <div class="livraisons-restantes">
                     📦 <span id="livraisons-restantes-count">—</span> livraison(s) non assignée(s)
@@ -193,7 +271,7 @@
                   </div>
                   <div>
                     <input type="number" id="poids_moyen_hotel_kg" min="0" max="100" value="15" step="0.1">
-                    <div class="help-text">🏨 Hôtel (généralement plus léger)</div>
+                    <div class="help-text">🏨 Hôtel</div>
                   </div>
                 </div>
               </div>
@@ -203,15 +281,37 @@
                   <input type="checkbox" id="relivre" checked>
                   <label for="relivre">Route avec retour au QG (relivre)</label>
                 </div>
-                <div class="help-text mt-4">Si coché, les bénévoles devront revenir au QG après les livraisons</div>
               </div>
             </div>
 
             <!-- SECTION BÉNÉVOLES -->
-            <div class="form-section benevoles-section">
+            <div class="form-section">
               <div class="form-section__title">👥 Sélection des bénévoles</div>
+
+              <div class="filters-bar">
+                <div class="filter-group">
+                  <label for="filtre-dispo">Disponibilité</label>
+                  <select id="filtre-dispo" onchange="appliquerFiltres()">
+                    <option value="">Tous</option>
+                    <option value="Matin">Matin</option>
+                    <option value="Après-midi">Après-midi</option>
+                    <option value="Soir">Soir</option>
+                  </select>
+                </div>
+
+                <label class="admin-toggle" onclick="toggleAdmin()">
+                  <input type="checkbox" id="filtre-admin" checked onchange="appliquerFiltres()">
+                  Afficher les administrateurs
+                </label>
+
+                <span class="benevoles-counter" id="benevoles-counter"></span>
+              </div>
+
               <div id="benevoles-wrap">
-                <div class="benevoles-loading">Sélectionnez une date pour afficher les bénévoles disponibles</div>
+                <div class="benevoles-loading">
+                  <div class="spinner" style="width:28px;height:28px;border-width:3px;margin:0 auto 8px;"></div>
+                  Chargement des bénévoles…
+                </div>
               </div>
             </div>
 
@@ -250,12 +350,12 @@
               <div class="kpi-card__label">Livraisons assignées</div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-beneficiaires">0</div>
-              <div class="kpi-card__label">Bénéficiaires</div>
-            </div>
-            <div class="kpi-card">
               <div class="kpi-card__value" id="stat-poids">0 kg</div>
               <div class="kpi-card__label">Poids total</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="stat-warnings">0</div>
+              <div class="kpi-card__label">Avertissements</div>
             </div>
           </div>
 
@@ -279,13 +379,6 @@
               <div>
                 <div class="stat-pill__value" id="stat-avg">0</div>
                 <div class="stat-pill__label">Moy. livraisons / route</div>
-              </div>
-            </div>
-            <div class="stat-pill">
-              <div class="stat-pill__icon">⚠️</div>
-              <div>
-                <div class="stat-pill__value" id="stat-warnings">0</div>
-                <div class="stat-pill__label">Avertissements</div>
               </div>
             </div>
           </div>
