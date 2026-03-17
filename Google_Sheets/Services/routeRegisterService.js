@@ -164,8 +164,11 @@ function calculerCentre(livraisons) {
 /**
  * Génère un lien Google Maps pour la route.
  * - Origine  : QG
- * - Destination : dernière livraison
- * - Waypoints : toutes les livraisons sauf la dernière, dédupliquées
+ * - Destination : dernière livraison (coordonnée unique)
+ * - Waypoints : toutes les livraisons sauf la dernière, dédupliquées par coordonnées GPS
+ *
+ * FIX: Déduplication sur l'ensemble de la liste AVANT de séparer waypoints/destination,
+ * ce qui évite qu'un cluster en fin de route génère une destination dupliquée.
  */
 function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
     if (!livraisonsOptimisees || livraisonsOptimisees.length === 0) {
@@ -180,35 +183,46 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
 
     try {
         const origin = `${hqCoords.lat},${hqCoords.lng}`;
-        const derniere = livraisonsOptimisees[livraisonsOptimisees.length - 1];
+
+        // ── Dédupliquer l'ensemble de la liste par coordonnée GPS ──────────────
+        // On garde la PREMIÈRE occurrence de chaque coordonnée unique.
+        // Cela couvre le cas où la dernière livraison partage ses coordonnées
+        // avec une livraison précédente (cluster en fin de route).
+        const seen = new Set();
+        const livraisonsUniques = livraisonsOptimisees.filter(l => {
+            const coord = `${l.latitude},${l.longitude}`;
+            if (seen.has(coord)) return false;
+            seen.add(coord);
+            return true;
+        });
+
+        const nbIgnores = livraisonsOptimisees.length - livraisonsUniques.length;
+        if (nbIgnores > 0) {
+            Logger.log(`[ROUTES] 🗺️ ${nbIgnores} adresse(s) dupliquée(s) retirée(s) du lien Maps`);
+        }
+
+        if (livraisonsUniques.length === 0) {
+            Logger.log('[ROUTES] ⚠️ Génération lien Maps: aucune livraison unique après déduplication');
+            return '';
+        }
+
+        const derniere = livraisonsUniques[livraisonsUniques.length - 1];
         const destination = `${derniere.latitude},${derniere.longitude}`;
 
         let url = `https://www.google.com/maps/dir/?api=1`;
         url += `&origin=${encodeURIComponent(origin)}`;
         url += `&destination=${encodeURIComponent(destination)}`;
 
-        const intermediaires = livraisonsOptimisees.slice(0, -1);
-
+        const intermediaires = livraisonsUniques.slice(0, -1);
         if (intermediaires.length > 0) {
-            const seen = new Set();
-            const waypointsUniques = intermediaires
+            const waypoints = intermediaires
                 .map(l => `${l.latitude},${l.longitude}`)
-                .filter(coord => {
-                    if (seen.has(coord)) return false;
-                    seen.add(coord);
-                    return true;
-                });
-
-            const nbIgnores = intermediaires.length - waypointsUniques.length;
-            if (nbIgnores > 0) {
-                Logger.log(`[ROUTES] 🗺️ ${nbIgnores} adresse(s) dupliquée(s) retirée(s) du lien Maps`);
-            }
-
-            url += `&waypoints=${encodeURIComponent(waypointsUniques.join('|'))}`;
+                .join('|');
+            url += `&waypoints=${encodeURIComponent(waypoints)}`;
         }
 
         url += `&travelmode=driving`;
-        Logger.log(`[ROUTES] 🗺️ Lien Maps généré (${livraisonsOptimisees.length} arrêts)`);
+        Logger.log(`[ROUTES] 🗺️ Lien Maps généré (${livraisonsUniques.length} arrêt(s) uniques sur ${livraisonsOptimisees.length} total)`);
         return url;
 
     } catch (error) {

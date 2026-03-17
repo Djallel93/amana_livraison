@@ -57,7 +57,7 @@
         html += '<div class="benevoles-table-wrap">';
         html += '<table class="benevoles-table">';
         html += '<thead><tr>';
-        html += '<th></th><th>Bénévole</th><th>Véhicule</th><th>Capacité</th><th>Statut du jour</th><th>Livraisons faites</th>';
+        html += '<th></th><th>ID</th><th>Bénévole</th><th>Véhicule</th><th>Capacité</th><th>Statut du jour</th><th>Livraisons faites</th>';
         html += '</tr></thead><tbody>';
 
         benevoles.forEach(function (b) {
@@ -75,6 +75,7 @@
 
             html += '<tr>';
             html += '<td><input type="checkbox" class="benevole-cb" value="' + b.id + '"></td>';
+            html += '<td><span class="mono" style="font-size:11px;color:#6b7280;">' + b.id + '</span></td>';
             html += '<td><strong>' + b.prenom + ' ' + b.nom + '</strong></td>';
             html += '<td>' + vehiculeLabel + '</td>';
             html += '<td class="mono">' + (b.vehicule_capacite ? b.vehicule_capacite + ' kg' : '—') + '</td>';
