@@ -26,12 +26,11 @@ function creerRouteDepuisCluster(cluster, benevole, hqCoords) {
  * @param {Array<Object>} livraisonsOptimisees - Livraisons dans l'ordre optimisé
  */
 function createOptimizedEtapes(routeId, livraisonsOptimisees) {
-    Logger.log(`[ROUTES] 📝 Création de ${livraisonsOptimisees.length} étapes optimisées + retour QG pour ${routeId}...`);
+    Logger.log(`[ROUTES] 📝 Création de ${livraisonsOptimisees.length} étapes + retour QG pour ${routeId}...`);
 
     const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
     const rows = [];
 
-    // 1. Créer les étapes de livraison dans l'ordre optimisé
     for (let i = 0; i < livraisonsOptimisees.length; i++) {
         const livraison = livraisonsOptimisees[i];
 
@@ -41,18 +40,16 @@ function createOptimizedEtapes(routeId, livraisonsOptimisees) {
             CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
         );
 
-        const rowData = [
-            etapeId,                                    // 1. ID_ETAPE
-            routeId,                                    // 2. ID_ROUTE
-            livraison.id_livraison,                     // 3. ID_LIVRAISON
-            i + 1,                                      // 4. ORDRE_PASSAGE (optimisé)
-            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,      // 5. STATUT
-            null,                                       // 6. HEURE_DEBUT
-            null,                                       // 7. HEURE_FIN
-            ''                                          // 8. COMMENTAIRE
-        ];
-
-        rows.push(rowData);
+        rows.push([
+            etapeId,
+            routeId,
+            livraison.id_livraison,
+            i + 1,
+            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
+            null,
+            null,
+            ''
+        ]);
 
         if (i < 3 || i === livraisonsOptimisees.length - 1) {
             Logger.log(`[ROUTES]    ✅ Étape ${etapeId} pour ${livraison.id_livraison} (ordre ${i + 1})`);
@@ -61,7 +58,6 @@ function createOptimizedEtapes(routeId, livraisonsOptimisees) {
         }
     }
 
-    // 2. Ajouter le retour au QG comme dernière étape
     const hqConfig = getCurrentHqConfig();
 
     if (hqConfig && hqConfig.lat && hqConfig.lng) {
@@ -71,28 +67,24 @@ function createOptimizedEtapes(routeId, livraisonsOptimisees) {
             CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
         );
 
-        const hqCommentaire = `Retour au QG - ${hqConfig.address}`;
-
-        const hqRowData = [
+        rows.push([
             hqEtapeId,
             routeId,
-            null,  // NULL pour retour QG
+            null,
             livraisonsOptimisees.length + 1,
             CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
             null,
             null,
-            hqCommentaire
-        ];
+            `Retour au QG - ${hqConfig.address}`
+        ]);
 
-        rows.push(hqRowData);
         Logger.log(`[ROUTES]    🏢 Étape retour QG: ${hqEtapeId} (ordre ${livraisonsOptimisees.length + 1})`);
     } else {
         Logger.log(`[ROUTES]    ⚠️ QG non configuré - retour QG ignoré`);
     }
 
-    // 3. Insérer toutes les étapes en batch
     if (rows.length > 0) {
         sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-        Logger.log(`[ROUTES] ✅ ${rows.length} étapes créées pour ${routeId} (${livraisonsOptimisees.length} livraisons + ${rows.length - livraisonsOptimisees.length} retour QG)`);
+        Logger.log(`[ROUTES] ✅ ${rows.length} étapes créées pour ${routeId}`);
     }
 }

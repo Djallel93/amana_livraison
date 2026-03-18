@@ -1,19 +1,5 @@
 /**
- * ====================================================================
- * EMAIL_SERVICE.GS - Envoi des emails itinéraires aux bénévoles
- * ====================================================================
- * Logique de validité des tokens :
- *   force_active = true  → toujours valide
- *   force_active = false AND now < expiration → valide
- *   force_active = false AND now >= expiration → expiré
- */
-
-// ============================================================
-// POINT D'ENTRÉE PRINCIPAL
-// ============================================================
-
-/**
- * Envoie les emails pour une liste de routes et génère les docs imprimables.
+ * Envoie les emails pour une liste de routes.
  * @param {string[]} routeIds
  * @returns {Object} { success, sent, errors[] }
  */
@@ -36,13 +22,6 @@ function sendRouteEmails(routeIds) {
       sendRouteEmail(routeId, apiWebUrl, adminPhone);
       result.sent++;
       Logger.log(`[EMAIL] ✅ Email envoyé pour route ${routeId}`);
-
-      try {
-        generateRouteDoc(routeId, adminPhone);
-      } catch (docErr) {
-        Logger.log(`[EMAIL] ⚠️ Doc imprimable non généré pour ${routeId} : ${docErr.message}`);
-      }
-
     } catch (err) {
       Logger.log(`[EMAIL] ❌ Route ${routeId} : ${err.message}`);
       result.errors.push(`Route ${routeId} : ${err.message}`);
@@ -54,16 +33,9 @@ function sendRouteEmails(routeIds) {
   return result;
 }
 
-// ============================================================
-// ENVOI D'UN EMAIL UNIQUE
-// ============================================================
-
 /**
  * Envoie l'email itinéraire au bénévole d'une route.
  * Accepte les statuts Confirmée ET Prête.
- * @param {string} routeId
- * @param {string} apiWebUrl
- * @param {string} adminPhone
  */
 function sendRouteEmail(routeId, apiWebUrl, adminPhone) {
   const route = getRouteById(routeId);
@@ -106,14 +78,8 @@ function sendRouteEmail(routeId, apiWebUrl, adminPhone) {
   Logger.log(`[EMAIL] 📬 Envoyé à ${benevole.email} pour route ${routeId}`);
 }
 
-// ============================================================
-// TOKEN
-// ============================================================
-
 /**
  * Génère ou réutilise un token valide pour la route.
- * @param {string} routeId
- * @returns {string}
  */
 function generateOrGetToken(routeId) {
   const existing = filterData(CONFIG.SHEETS.TOKENS, row => String(row.id_route) === String(routeId));
@@ -131,15 +97,12 @@ function generateOrGetToken(routeId) {
   const now = getCurrentDateTime();
 
   appendRow(CONFIG.SHEETS.TOKENS, [routeId, token, expiration, now, false]);
-  Logger.log(`[EMAIL] 🔑 Nouveau token généré pour ${routeId} (force_active: false)`);
+  Logger.log(`[EMAIL] 🔑 Nouveau token généré pour ${routeId}`);
   return token;
 }
 
 /**
  * Détermine si un token est valide selon la logique force_active.
- * @param {boolean|string} forceActive
- * @param {Date|null} expiration
- * @returns {boolean}
  */
 function isTokenValid(forceActive, expiration) {
   const active = forceActive === true || forceActive === 'true' || forceActive === 'TRUE';
@@ -156,10 +119,6 @@ function generateSecureToken() {
   }
   return t;
 }
-
-// ============================================================
-// DONNÉES DES STOPS
-// ============================================================
 
 function buildStopsData(stops) {
   return stops.map(stop => {
@@ -198,10 +157,6 @@ function buildStopsData(stops) {
     };
   });
 }
-
-// ============================================================
-// CONSTRUCTION HTML EMAIL
-// ============================================================
 
 function buildEmailHtml(ctx) {
   const { route, benevole, stops, token, apiWebUrl, adminPhone } = ctx;
@@ -314,13 +269,8 @@ function buildStopsTable(stops, baseUrl) {
   return `<div>${cards}</div>`;
 }
 
-// ============================================================
-// ROUTES CONFIRMÉES POUR LE FORMULAIRE D'ENVOI
-// ============================================================
-
 /**
  * Retourne les routes Confirmées pour le formulaire d'envoi.
- * @returns {Object[]}
  */
 function getConfirmedRoutesForSending() {
   Logger.log('[EMAIL] 🔍 getConfirmedRoutesForSending…');
@@ -360,35 +310,6 @@ function getConfirmedRoutesForSending() {
   }
 }
 
-// ============================================================
-// UTILITAIRES
-// ============================================================
-
-/**
- * Normalise un statut (trim, gère les objets Date de Sheets).
- * @param {*} val
- * @returns {string}
- */
-function normalizeStatut(val) {
-  if (!val) return '';
-  if (val instanceof Date) return '';
-  return String(val).trim();
-}
-
-/**
- * Extrait la donnée utile d'une réponse API selon les clés candidates.
- * @param {Object} response
- * @param {string[]} keys
- * @returns {Object|null}
- */
-function extractData(response, keys) {
-  if (!response) return null;
-  for (const key of keys) {
-    if (response[key]) return response[key];
-  }
-  return response;
-}
-
 function formatDateFr(val) {
   if (!val) return '';
   try {
@@ -406,10 +327,6 @@ function formatDateForUi(val) {
     return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
   } catch (_) { return String(val); }
 }
-
-// ============================================================
-// DEBUG
-// ============================================================
 
 function debugRoutesSheet() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.ROUTES);

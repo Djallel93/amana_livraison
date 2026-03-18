@@ -1,13 +1,6 @@
 /**
- * ====================================================================
- * ROUTE_SERVICE_PLANNING.GS - Planification et Orchestration des Routes
- * ====================================================================
- */
-
-/**
- * Planifie les routes de façon incrémentale :
- * chaque bénévole sélectionné reçoit au plus une route par exécution.
- * Les livraisons non assignées restent disponibles pour la prochaine exécution.
+ * Planifie les routes de façon incrémentale.
+ * Chaque bénévole sélectionné reçoit au plus une route par exécution.
  */
 function planRoutes(params) {
     Logger.log('[ROUTES] 🚀 Démarrage planification incrémentale...');
@@ -66,6 +59,13 @@ function planRoutes(params) {
             if (saved) {
                 result.routes.push(saved);
                 result.created++;
+
+                if (saved.doc_warning) {
+                    result.warnings.push({
+                        type: 'doc_generation',
+                        message: saved.doc_warning
+                    });
+                }
             }
         }
 
@@ -112,13 +112,10 @@ function separateOutliers(livraisons) {
 
 /**
  * Récupère et filtre les bénévoles pour la planification.
- *
- * Mode incrémental : si selected_benevole_ids est fourni,
- * seuls ces bénévoles sont retenus — chacun recevra au plus une route.
  */
 function getBenevolesPourPlanification(params) {
     let benevoles = getVolunteersWithVehicle();
-    Logger.log(`[ROUTES] 👥 ${benevoles.length} bénévoles avec véhicule valide (capaciteKg > 0)`);
+    Logger.log(`[ROUTES] 👥 ${benevoles.length} bénévoles avec véhicule valide`);
 
     if (params.vehicules_pretes && params.vehicules_pretes.length > 0) {
         benevoles = assignVehiculesPrets(benevoles, params.vehicules_pretes);

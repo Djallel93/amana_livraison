@@ -1,9 +1,3 @@
-/**
- * ====================================================================
- * PACKAGING_SERVICE.GS - Feuille de préparation (conditionnement)
- * ====================================================================
- */
-
 const PACKAGING_QR_SIZE_PX = 200;
 const PACKAGING_HEADER_H = 30;
 
@@ -53,10 +47,6 @@ function generatePackagingSheet(params) {
     }
 }
 
-// ============================================================
-// REQUÊTE DES DONNÉES
-// ============================================================
-
 function _getLivraisonsForPackaging(date, occasion) {
     const cible = new Date(date);
     cible.setHours(0, 0, 0, 0);
@@ -73,10 +63,6 @@ function _getLivraisonsForPackaging(date, occasion) {
         return row.statut !== CONFIG.ENUMS.STATUT_LIVRAISON.ANNULEE;
     });
 }
-
-// ============================================================
-// SPREADSHEET
-// ============================================================
 
 function _createOrReplacePackagingSheet(nom, dossier) {
     const existing = dossier.getFilesByName(nom);
@@ -159,10 +145,6 @@ function _buildPackagingQrUrl(livraisonId, apiWebUrl) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${PACKAGING_QR_SIZE_PX}x${PACKAGING_QR_SIZE_PX}&data=${encodeURIComponent(url)}`;
 }
 
-// ============================================================
-// LOGIQUE CONDITIONNEMENT
-// ============================================================
-
 function toutesLivraisonsPretes(routeId) {
     const stops = getDeliveryStopsForRoute(routeId);
 
@@ -180,10 +162,9 @@ function toutesLivraisonsPretes(routeId) {
 }
 
 /**
- * Passe une route au statut Prete, envoie l'email au bénévole
- * puis génère le document imprimable.
+ * Passe une route au statut Prête et envoie l'email au bénévole.
  * Le statut est mis à jour EN PREMIER pour que sendRouteEmail()
- * trouve bien le statut Prete lors de sa vérification.
+ * trouve bien le statut Prête lors de sa vérification.
  */
 function passerRouteEnPrete(routeId) {
     Logger.log(`[CONDITIONNEMENT] 🟢 Route ${routeId} → Prete`);
@@ -194,7 +175,7 @@ function passerRouteEnPrete(routeId) {
     const adminPhone = PropertiesService.getScriptProperties().getProperty('ADMIN_PHONE') || '';
 
     if (!apiWebUrl) {
-        Logger.log(`[CONDITIONNEMENT] ⚠️ API_LIVRAISON_URL non configurée — email et doc non générés`);
+        Logger.log(`[CONDITIONNEMENT] ⚠️ API_LIVRAISON_URL non configurée — email non envoyé`);
         return;
     }
 
@@ -203,13 +184,6 @@ function passerRouteEnPrete(routeId) {
         Logger.log(`[CONDITIONNEMENT] 📧 Email envoyé au bénévole pour route ${routeId}`);
     } catch (err) {
         Logger.log(`[CONDITIONNEMENT] ❌ Erreur envoi email route ${routeId} : ${err.message}`);
-    }
-
-    try {
-        generateRouteDoc(routeId, adminPhone);
-        Logger.log(`[CONDITIONNEMENT] 📄 Document imprimable généré pour route ${routeId}`);
-    } catch (err) {
-        Logger.log(`[CONDITIONNEMENT] ❌ Erreur génération document route ${routeId} : ${err.message}`);
     }
 }
 

@@ -1,19 +1,3 @@
-/**
- * Crée un objet route à partir d'un cluster et d'un bénévole
- */
-function creerRouteDepuisCluster(cluster, benevole, hqCoords) {
-    const distanceTotale = calculerDistanceTotaleRoute(cluster.livraisons, hqCoords);
-
-    return {
-        benevole: benevole,
-        binome: null,
-        vehicule_prete_id: '',
-        livraisons: cluster.livraisons,
-        poids_total: cluster.poids_total,
-        distance_totale: distanceTotale
-    };
-}
-
 function saveRoute(route, params) {
     try {
         const tempId = generateNextId(
@@ -98,7 +82,7 @@ function saveRoute(route, params) {
         ];
 
         appendRow(CONFIG.SHEETS.ROUTES, rowData);
-        Logger.log(`[ROUTES] ✅ Route ${tempId} sauvegardée (${poidsParPart}kg/pers dom. | ${poidsParPartHotel}kg/pers hôtel)`);
+        Logger.log(`[ROUTES] ✅ Route ${tempId} sauvegardée`);
 
         createOptimizedEtapes(tempId, livraisonsOptimisees);
         Logger.log(`[ROUTES] ✅ Étapes créées pour ${tempId}`);
@@ -115,10 +99,22 @@ function saveRoute(route, params) {
 
         _verifierConditionnementApresCreation(tempId, livraisonsOptimisees);
 
+        // Génération du document imprimable
+        let docWarning = null;
+        try {
+            const adminPhone = PropertiesService.getScriptProperties().getProperty('ADMIN_PHONE') || '';
+            generateRouteDoc(tempId, adminPhone);
+            Logger.log(`[ROUTES] 📄 Document imprimable généré pour ${tempId}`);
+        } catch (docErr) {
+            docWarning = `Route ${tempId} : document imprimable non généré (${docErr.message})`;
+            Logger.log(`[ROUTES] ⚠️ ${docWarning}`);
+        }
+
         return {
             ...routeData,
             livraisons: livraisonsOptimisees,
-            benevole_nom: route.benevole.nom
+            benevole_nom: route.benevole.nom,
+            doc_warning: docWarning
         };
 
     } catch (error) {
@@ -129,7 +125,6 @@ function saveRoute(route, params) {
 
 /**
  * Vérifie si toutes les livraisons sont déjà conditionnées après création des étapes.
- * Si oui, passe la route directement à Prête et envoie l'email.
  */
 function _verifierConditionnementApresCreation(routeId, livraisons) {
     const toutesPretes = livraisons.every(l => {
@@ -163,12 +158,7 @@ function calculerCentre(livraisons) {
 
 /**
  * Génère un lien Google Maps pour la route.
- * - Origine  : QG
- * - Destination : dernière livraison (coordonnée unique)
- * - Waypoints : toutes les livraisons sauf la dernière, dédupliquées par coordonnées GPS
- *
- * FIX: Déduplication sur l'ensemble de la liste AVANT de séparer waypoints/destination,
- * ce qui évite qu'un cluster en fin de route génère une destination dupliquée.
+ * Déduplique les coordonnées avant de construire l'URL.
  */
 function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
     if (!livraisonsOptimisees || livraisonsOptimisees.length === 0) {
@@ -184,10 +174,6 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
     try {
         const origin = `${hqCoords.lat},${hqCoords.lng}`;
 
-        // ── Dédupliquer l'ensemble de la liste par coordonnée GPS ──────────────
-        // On garde la PREMIÈRE occurrence de chaque coordonnée unique.
-        // Cela couvre le cas où la dernière livraison partage ses coordonnées
-        // avec une livraison précédente (cluster en fin de route).
         const seen = new Set();
         const livraisonsUniques = livraisonsOptimisees.filter(l => {
             const coord = `${l.latitude},${l.longitude}`;
@@ -222,78 +208,11 @@ function generateGoogleMapsLink(livraisonsOptimisees, hqCoords) {
         }
 
         url += `&travelmode=driving`;
-        Logger.log(`[ROUTES] 🗺️ Lien Maps généré (${livraisonsUniques.length} arrêt(s) uniques sur ${livraisonsOptimisees.length} total)`);
+        Logger.log(`[ROUTES] 🗺️ Lien Maps généré (${livraisonsUniques.length} arrêt(s))`);
         return url;
 
     } catch (error) {
         Logger.log(`[ROUTES] ❌ Erreur génération lien Maps: ${error.message}`);
         return '';
-    }
-}
-
-/**
- * Crée les étapes OPTIMISÉES pour une route
- */
-function createOptimizedEtapes(routeId, livraisonsOptimisees) {
-    Logger.log(`[ROUTES] 📝 Création de ${livraisonsOptimisees.length} étapes optimisées + retour QG pour ${routeId}...`);
-
-    const sheet = getSheet(CONFIG.SHEETS.ETAPES_ROUTE);
-    const rows = [];
-
-    for (let i = 0; i < livraisonsOptimisees.length; i++) {
-        const livraison = livraisonsOptimisees[i];
-
-        const etapeId = generateNextId(
-            CONFIG.SHEETS.ETAPES_ROUTE,
-            'E',
-            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
-        );
-
-        rows.push([
-            etapeId,
-            routeId,
-            livraison.id_livraison,
-            i + 1,
-            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
-            null,
-            null,
-            ''
-        ]);
-
-        if (i < 3 || i === livraisonsOptimisees.length - 1) {
-            Logger.log(`[ROUTES]    ✅ Étape ${etapeId} pour ${livraison.id_livraison} (ordre ${i + 1})`);
-        } else if (i === 3) {
-            Logger.log(`[ROUTES]    ... (${livraisonsOptimisees.length - 4} étapes supplémentaires)`);
-        }
-    }
-
-    const hqConfig = getCurrentHqConfig();
-
-    if (hqConfig && hqConfig.lat && hqConfig.lng) {
-        const hqEtapeId = generateNextId(
-            CONFIG.SHEETS.ETAPES_ROUTE,
-            'E',
-            CONFIG.COLUMNS.ETAPES_ROUTE.ID_ETAPE
-        );
-
-        rows.push([
-            hqEtapeId,
-            routeId,
-            null,
-            livraisonsOptimisees.length + 1,
-            CONFIG.ENUMS.STATUT_ETAPE.EN_ATTENTE,
-            null,
-            null,
-            `Retour au QG - ${hqConfig.address}`
-        ]);
-
-        Logger.log(`[ROUTES]    🏢 Étape retour QG: ${hqEtapeId} (ordre ${livraisonsOptimisees.length + 1})`);
-    } else {
-        Logger.log(`[ROUTES]    ⚠️ QG non configuré - retour QG ignoré`);
-    }
-
-    if (rows.length > 0) {
-        sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-        Logger.log(`[ROUTES] ✅ ${rows.length} étapes créées pour ${routeId}`);
     }
 }

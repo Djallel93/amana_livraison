@@ -149,38 +149,11 @@ function _buildPage(titre, corpsHtml, emoji, couleurs) {
     <div class="message">${corpsHtml}</div>
     <button class="btn-close" onclick="window.close()">Fermer</button>
     <div class="timestamp">${new Date().toLocaleString('fr-FR')}</div>
-  </div>
+    </div>
 </body>
 </html>`;
 
     return HtmlService.createHtmlOutput(html);
-}
-
-// ============================================================
-// GESTION DES TOKENS
-// ============================================================
-
-function validateToken(token) {
-    try {
-        const rows = filterData(CONFIG.SHEETS.TOKENS, row => row.token === token);
-
-        if (rows.length === 0) {
-            return { valid: false, routeId: null, error: 'Token invalide ou introuvable.' };
-        }
-
-        const tokenData = rows[0];
-        const expiration = parseDate(tokenData.date_expiration);
-
-        if (!isTokenValid(tokenData.force_active, expiration)) {
-            return { valid: false, routeId: null, error: 'Ce lien a expiré. Contactez l\'administrateur.' };
-        }
-
-        return { valid: true, routeId: tokenData.id_route, error: null };
-
-    } catch (err) {
-        Logger.log(`[API] ❌ validateToken : ${err.message}`);
-        return { valid: false, routeId: null, error: 'Erreur de validation du token.' };
-    }
 }
 
 // ============================================================
