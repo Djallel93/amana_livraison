@@ -12,16 +12,6 @@ const QR_CELL_FILL_RATIO = 0.75;
 const QR_SOURCE_SIZE_PX = 200;
 const SEPARATOR_ROW_HEIGHT_PX = 20;
 
-// ============================================================
-// DIMENSIONS
-// ============================================================
-
-/**
- * Calcule les dimensions en pixels pour un layout rows×cols sur A4.
- * @param {number} rows
- * @param {number} cols
- * @returns {Object}
- */
 function calculateCellDimensions(rows, cols) {
   const colWidth = Math.floor(A4_USABLE_WIDTH_PX / cols);
   const rowHeight = Math.floor(A4_USABLE_HEIGHT_PX / rows);
@@ -31,24 +21,11 @@ function calculateCellDimensions(rows, cols) {
   const fontSizeId = Math.min(24, Math.max(12, Math.floor(rowHeight / 6)));
   const fontSizePart = Math.min(14, Math.max(9, Math.floor(rowHeight / 12)));
 
-  Logger.log(
-    `[ÉTIQUETTES] 📐 Layout ${rows}×${cols} : étiquette ${colWidth}×${rowHeight}px` +
-    ` (gauche=${leftWidth} droite=${rightWidth}), QR=${qrSize}px,` +
-    ` polices id=${fontSizeId}pt part=${fontSizePart}pt`
-  );
+  Logger.log(`[ÉTIQUETTES] 📐 Layout ${rows}×${cols} : étiquette ${colWidth}×${rowHeight}px, QR=${qrSize}px, polices id=${fontSizeId}pt part=${fontSizePart}pt`);
 
   return { leftWidth, rightWidth, rowHeight, qrSize, fontSizeId, fontSizePart };
 }
 
-// ============================================================
-// POINT D'ENTRÉE PRINCIPAL
-// ============================================================
-
-/**
- * Génère les étiquettes pour une date et une occasion données.
- * @param {Object} params - { date, occasion, rows, cols }
- * @returns {Object} { success, processed, errors, documents }
- */
 function generateLabels(params) {
   Logger.log('[ÉTIQUETTES] 🚀 Démarrage génération...');
   Logger.log(`[ÉTIQUETTES] Date=${params.date} Occasion=${params.occasion} Format=${params.rows}×${params.cols}`);
@@ -75,7 +52,6 @@ function generateLabels(params) {
 
     const dims = calculateCellDimensions(rows, cols);
     const sheetName = buildSheetName(new Date(params.date), params.occasion);
-
     const dossier = getDateOccasionFolder(new Date(params.date), params.occasion);
     const ss = _createOrReplaceSpreadsheetInFolder(sheetName, dossier);
     const sheet = ss.getActiveSheet();
@@ -96,10 +72,6 @@ function generateLabels(params) {
     return result;
   }
 }
-
-// ============================================================
-// RÉCUPÉRATION ET CONSTRUCTION DES SLOTS
-// ============================================================
 
 function _getLivraisonsForLabels(date, occasion) {
   const cible = new Date(date);
@@ -144,16 +116,6 @@ function _buildLabelQrUrl(livraisonId, apiUrl) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${QR_SOURCE_SIZE_PX}x${QR_SOURCE_SIZE_PX}&data=${encodeURIComponent(url)}`;
 }
 
-// ============================================================
-// SPREADSHEET
-// ============================================================
-
-/**
- * Crée ou remplace un spreadsheet dans le dossier fourni.
- * @param {string} name
- * @param {GoogleAppsScript.Drive.Folder} dossier
- * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet}
- */
 function _createOrReplaceSpreadsheetInFolder(name, dossier) {
   const existing = dossier.getFilesByName(name);
   while (existing.hasNext()) {
@@ -176,10 +138,6 @@ function _setColumnWidths(sheet, cols, dims) {
     sheet.setColumnWidth(c * 2 + 2, dims.rightWidth);
   }
 }
-
-// ============================================================
-// ÉCRITURE DES PAGES
-// ============================================================
 
 function writeAllPages(sheet, allSlots, rows, cols, slotsPerPage, dims) {
   const totalPages = Math.ceil(allSlots.length / slotsPerPage);
@@ -206,8 +164,7 @@ function writeRectoPage(sheet, startRow, slots, rows, cols, dims) {
     sheet.setRowHeight(sheetRow, dims.rowHeight);
 
     for (let c = 0; c < cols; c++) {
-      const frontCol = (cols - 1) - c;
-      const idx = r * cols + frontCol;
+      const idx = r * cols + c;
       const colLeft = c * 2 + 1;
       const mergedCell = sheet.getRange(sheetRow, colLeft, 1, 2);
 
@@ -261,10 +218,6 @@ function writeVersoPage(sheet, startRow, slots, rows, cols, dims) {
   return startRow + rows;
 }
 
-// ============================================================
-// STYLES ET BORDURES
-// ============================================================
-
 function _styleRectoCell(cell) {
   cell.setBackground('#FFFFFF').setHorizontalAlignment('center').setVerticalAlignment('middle');
   cell.setBorder(true, true, true, true, false, false, '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID);
@@ -298,19 +251,11 @@ function writeSeparatorRow(sheet, rowIndex) {
   return rowIndex + 1;
 }
 
-// ============================================================
-// UTILITAIRES
-// ============================================================
-
 function buildSheetName(date, occasion) {
   const dateStr = Utilities.formatDate(date, CONFIG.TIMEZONE || 'Europe/Paris', 'yyyyMMdd');
   return `${dateStr}_${occasion}`;
 }
 
-/**
- * Conservé pour compatibilité future.
- * @returns {Array<Object>}
- */
 function getConfirmedRoutesForLabels() {
   try {
     const validStatuts = [CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE, CONFIG.ENUMS.STATUT_ROUTE.EN_COURS];
