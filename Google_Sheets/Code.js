@@ -21,6 +21,7 @@ function onOpen() {
         .addItem('✏️ Créer une Route Manuellement', 'showCreateManualRouteForm')
         .addSeparator()
         .addItem('🔄 Réassigner / Diviser une Route', 'showReassignRouteForm')
+        .addItem('➕/➖ Modifier les Stops d\'une Route', 'showEditStopsForm')
         .addSeparator()
         .addItem('✉️ Envoyer Routes aux Bénévoles', 'sendRoutesToVolunteers')
         .addItem('🏷️ Générer Étiquettes', 'showGenerateLabelsForm')

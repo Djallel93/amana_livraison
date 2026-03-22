@@ -5,10 +5,7 @@ function showPlanRoutesForm() {
     return;
   }
   const html = HtmlService.createTemplateFromFile('ui/routeForm')
-    .evaluate()
-    .setWidth(1200)
-    .setHeight(800)
-    .setTitle('🗺️ Planifier les Routes');
+    .evaluate().setWidth(1200).setHeight(800).setTitle('🗺️ Planifier les Routes');
   SpreadsheetApp.getUi().showModalDialog(html, 'Planifier les Routes');
 }
 
@@ -19,10 +16,7 @@ function showCreateManualRouteForm() {
     return;
   }
   const html = HtmlService.createTemplateFromFile('ui/manualRouteForm')
-    .evaluate()
-    .setWidth(1200)
-    .setHeight(800)
-    .setTitle('✏️ Créer une Route Manuellement');
+    .evaluate().setWidth(1200).setHeight(800).setTitle('✏️ Créer une Route Manuellement');
   SpreadsheetApp.getUi().showModalDialog(html, 'Créer une Route Manuellement');
 }
 
@@ -33,19 +27,32 @@ function showReassignRouteForm() {
     return;
   }
   const html = HtmlService.createTemplateFromFile('ui/reassignRouteForm')
-    .evaluate()
-    .setWidth(1200)
-    .setHeight(800)
-    .setTitle('🔄 Réassigner / Diviser une Route');
+    .evaluate().setWidth(1200).setHeight(800).setTitle('🔄 Réassigner / Diviser une Route');
   SpreadsheetApp.getUi().showModalDialog(html, 'Réassigner / Diviser une Route');
 }
 
-function getEligibleRoutesForReassign() {
+function showEditStopsForm() {
+  if (!isApiConfigured()) {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('Configuration Manquante', CONFIG.MESSAGES.ERROR_API_KEY_MISSING, ui.ButtonSet.OK);
+    return;
+  }
+  const html = HtmlService.createTemplateFromFile('ui/editStopsForm')
+    .evaluate().setWidth(1200).setHeight(800).setTitle('➕/➖ Modifier les Stops d\'une Route');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Modifier les Stops d\'une Route');
+}
+
+// ============================================================
+// RELAIS — MODIFICATION DES STOPS
+// ============================================================
+
+function getEligibleRoutesForEditStops() {
   try {
     const statutsEligibles = [
       CONFIG.ENUMS.STATUT_ROUTE.BROUILLON,
       CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE,
-      CONFIG.ENUMS.STATUT_ROUTE.PRETE
+      CONFIG.ENUMS.STATUT_ROUTE.PRETE,
+      CONFIG.ENUMS.STATUT_ROUTE.EN_COURS
     ];
 
     const routes = filterData(CONFIG.SHEETS.ROUTES, row =>
@@ -61,6 +68,101 @@ function getEligibleRoutesForReassign() {
         if (vol) benevoleNom = `${vol.prenom || ''} ${vol.nom || ''}`.trim();
       } catch (_) { }
 
+      return {
+        id_route: route.id_route,
+        id_benevole: String(route.id_benevole),
+        benevole_nom: benevoleNom,
+        statut: route.statut,
+        date_debut: formatDateForUi(route.date_debut),
+        date_debut_raw: route.date_debut,
+        occasion: route.occasion,
+        nb_livraisons: stops.length,
+        poids_total_kg: route.poids_total_kg || 0,
+        poids_par_part: route.poids_par_part || 0,
+        poids_par_part_hotel: route.poids_par_part_hotel || 0
+      };
+    });
+  } catch (error) {
+    Logger.log(`[FORM] Erreur getEligibleRoutesForEditStops: ${error.message}`);
+    throw error;
+  }
+}
+
+function getStopsForEditForm(routeId) {
+  try {
+    const stops = getDeliveryStopsForRoute(routeId);
+    return stops.map(stop => {
+      const liv = getDeliveryById(stop.id_livraison);
+      return {
+        id_etape: stop.id_etape,
+        id_livraison: stop.id_livraison,
+        ordre_passage: stop.ordre_passage,
+        statut_etape: stop.statut,
+        id_famille: liv ? liv.id_famille : '—',
+        adresse: liv ? liv.adresse : '—',
+        nombre_personnes: liv ? liv.nombre_personnes : 0,
+        id_quartier: liv ? liv.id_quartier : '—',
+        statut_conditionnement: liv ? (liv.statut_conditionnement || '') : '',
+        hotel: liv ? (liv.hotel === true || liv.hotel === 'TRUE' || liv.hotel === 'true') : false
+      };
+    });
+  } catch (error) {
+    Logger.log(`[FORM] Erreur getStopsForEditForm: ${error.message}`);
+    throw error;
+  }
+}
+
+function getNearbyDeliveriesForRoute(routeId) {
+  try {
+    return getNearbyAvailableDeliveries(routeId);
+  } catch (error) {
+    Logger.log(`[FORM] Erreur getNearbyDeliveriesForRoute: ${error.message}`);
+    throw error;
+  }
+}
+
+function removeStopFromForm(params) {
+  try {
+    Logger.log(`[FORM] Suppression stop ${params.id_etape} (livraison ${params.id_livraison}) de route ${params.id_route}`);
+    return removeStop(params);
+  } catch (error) {
+    Logger.log(`[FORM] Erreur removeStopFromForm: ${error.message}`);
+    throw error;
+  }
+}
+
+function addStopFromForm(params) {
+  try {
+    Logger.log(`[FORM] Ajout livraison ${params.id_livraison} à route ${params.id_route}`);
+    return addStop(params);
+  } catch (error) {
+    Logger.log(`[FORM] Erreur addStopFromForm: ${error.message}`);
+    throw error;
+  }
+}
+
+// ============================================================
+// RELAIS — RÉASSIGNATION
+// ============================================================
+
+function getEligibleRoutesForReassign() {
+  try {
+    const statutsEligibles = [
+      CONFIG.ENUMS.STATUT_ROUTE.BROUILLON,
+      CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE,
+      CONFIG.ENUMS.STATUT_ROUTE.PRETE
+    ];
+    const routes = filterData(CONFIG.SHEETS.ROUTES, row =>
+      statutsEligibles.includes(normalizeStatut(row.statut))
+    );
+    return routes.map(route => {
+      const stops = getDeliveryStopsForRoute(route.id_route);
+      let benevoleNom = String(route.id_benevole);
+      try {
+        const resp = getVolunteerById(route.id_benevole);
+        const vol = extractData(resp, ['volunteer', 'benevole']);
+        if (vol) benevoleNom = `${vol.prenom || ''} ${vol.nom || ''}`.trim();
+      } catch (_) { }
       return {
         id_route: route.id_route,
         id_benevole: String(route.id_benevole),
@@ -101,6 +203,10 @@ function splitRouteFromForm(params) {
     throw error;
   }
 }
+
+// ============================================================
+// RELAIS — PLANIFICATION / MANUEL
+// ============================================================
 
 function viewAllRoutes() {
   const ui = SpreadsheetApp.getUi();
@@ -150,7 +256,7 @@ function planRoutesFromForm(params) {
       routes: routesLegeres
     };
   } catch (error) {
-    Logger.log(`[FORM] Erreur: ${error.message}`);
+    Logger.log(`[FORM] Erreur planRoutesFromForm: ${error.message}`);
     throw error;
   }
 }
@@ -160,7 +266,7 @@ function createManualRouteFromForm(params) {
     Logger.log(`[FORM] Création route manuelle — bénévole: ${params.id_benevole}`);
     return createManualRoute(params);
   } catch (error) {
-    Logger.log(`[FORM] Erreur route manuelle: ${error.message}`);
+    Logger.log(`[FORM] Erreur createManualRouteFromForm: ${error.message}`);
     throw error;
   }
 }
@@ -190,10 +296,7 @@ function getDeliveriesForManualRoute(date) {
 
 function sendRoutesToVolunteers() {
   const html = HtmlService.createTemplateFromFile('ui/sendRoutesForm')
-    .evaluate()
-    .setWidth(1200)
-    .setHeight(800)
-    .setTitle('✉️ Envoyer les Itinéraires aux Bénévoles');
+    .evaluate().setWidth(1200).setHeight(800).setTitle('✉️ Envoyer les Itinéraires aux Bénévoles');
   SpreadsheetApp.getUi().showModalDialog(html, 'Envoyer les Itinéraires');
 }
 
@@ -221,7 +324,6 @@ function regenerateAllMapsLinks() {
     ui.ButtonSet.YES_NO
   );
   if (confirm !== ui.Button.YES) return;
-
   try {
     const brouillonRoutes = filterData(
       CONFIG.SHEETS.ROUTES,
@@ -239,7 +341,6 @@ function regenerateAllMapsLinks() {
     const hqCoords = { lat: hqConfig.lat, lng: hqConfig.lng };
     let updated = 0, skipped = 0;
     const errors = [];
-
     for (const route of brouillonRoutes) {
       try {
         const stops = getDeliveryStopsForRoute(route.id_route);
@@ -259,7 +360,6 @@ function regenerateAllMapsLinks() {
         errors.push(`Route ${route.id_route} : ${err.message}`);
       }
     }
-
     let summary = `✅ ${updated} lien(s) Maps régénéré(s).`;
     if (skipped > 0) summary += `\n⏭️ ${skipped} route(s) ignorée(s) (aucun stop).`;
     if (errors.length > 0) summary += `\n\n❌ Erreurs :\n${errors.join('\n')}`;
@@ -271,10 +371,7 @@ function regenerateAllMapsLinks() {
 
 function showGenerateLabelsForm() {
   const html = HtmlService.createTemplateFromFile('ui/labelForm')
-    .evaluate()
-    .setWidth(1200)
-    .setHeight(800)
-    .setTitle('🏷️ Générer les Étiquettes');
+    .evaluate().setWidth(1200).setHeight(800).setTitle('🏷️ Générer les Étiquettes');
   SpreadsheetApp.getUi().showModalDialog(html, 'Générer les Étiquettes');
 }
 
@@ -292,7 +389,6 @@ function getVolunteersForPlanningForm(date) {
         Logger.log(`[FORM] Véhicules temporaires: ${e.message}`);
       }
     }
-
     const routesAujourdhui = date ? _getRoutesForDate(date) : [];
     const routeParBenevole = {};
     routesAujourdhui.forEach(route => {
@@ -301,7 +397,6 @@ function getVolunteersForPlanningForm(date) {
         routeParBenevole[bid] = route;
       }
     });
-
     return benevoles.map(benevole => {
       const routeExistante = routeParBenevole[String(benevole.id)] || null;
       let livraisonsFaites = 0;

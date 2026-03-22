@@ -1,0 +1,415 @@
+<script>
+    var _etapeCourante = 1;
+    var _toutesRoutes = [];
+    var _routeSelectionnee = null;
+    var _stopsActuels = [];
+    var _nearbyLivraisons = [];
+    var _fallbackLivraisons = [];
+    var _tabActif = 'nearby';
+    var _operationEnCours = false;
+
+    window.addEventListener('load', function () {
+        chargerRoutes();
+    });
+
+    // ============================================================
+    // NAVIGATION
+    // ============================================================
+
+    function goToStep(n) {
+        document.getElementById('step' + _etapeCourante).style.display = 'none';
+        document.getElementById('step' + _etapeCourante).classList.remove('active');
+        _etapeCourante = n;
+        var panel = document.getElementById('step' + n);
+        panel.style.display = 'flex';
+        panel.classList.add('active');
+        [1, 2].forEach(function (i) {
+            var btn = document.getElementById('stepBtn' + i);
+            btn.classList.remove('active', 'done');
+            if (i < n) btn.classList.add('done');
+            if (i === n) btn.classList.add('active');
+        });
+    }
+
+    function afficherChargement(texte) {
+        document.getElementById('step' + _etapeCourante).style.display = 'none';
+        document.getElementById('stepNav').style.display = 'none';
+        document.getElementById('loading-text').textContent = texte || 'Traitement en cours…';
+        document.getElementById('loadingState').style.display = 'flex';
+    }
+
+    function cacherChargement() {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('stepNav').style.display = '';
+        document.getElementById('step' + _etapeCourante).style.display = 'flex';
+    }
+
+    // ============================================================
+    // ÉTAPE 1 — ROUTES
+    // ============================================================
+
+    function chargerRoutes() {
+        google.script.run
+            .withSuccessHandler(function (routes) {
+                _toutesRoutes = routes;
+                filtrerRoutes();
+            })
+            .withFailureHandler(function (e) {
+                document.getElementById('routes-wrap').innerHTML =
+                    '<div style="padding:20px;text-align:center;color:var(--error-text);">Erreur : ' + e.message + '</div>';
+            })
+            .getEligibleRoutesForEditStops();
+    }
+
+    function filtrerRoutes() {
+        var filtreStatut = document.getElementById('filtre-statut').value;
+        var filtrees = _toutesRoutes.filter(function (r) {
+            if (!filtreStatut) return true;
+            var s = (r.statut || '').trim();
+            if (filtreStatut === 'Prete') return s === 'Prete' || s === 'Prête';
+            return s === filtreStatut;
+        });
+        renderRoutes(filtrees);
+    }
+
+    function renderRoutes(routes) {
+        var wrap = document.getElementById('routes-wrap');
+        document.getElementById('routes-counter').textContent =
+            routes.length + ' route' + (routes.length > 1 ? 's' : '');
+
+        if (routes.length === 0) {
+            wrap.innerHTML = '<div class="empty-state" style="padding:40px;"><div class="empty-state__icon">📭</div><h3>Aucune route éligible</h3><p>Seules les routes en statut Brouillon, Confirmée, Prête ou En Cours peuvent être modifiées.</p></div>';
+            return;
+        }
+
+        var STATUT_STYLE = {
+            'Brouillon': 'background:#eff6ff;color:#3b82f6;',
+            'Confirmée': 'background:#fef3c7;color:#d97706;',
+            'Prete': 'background:#d1fae5;color:#059669;',
+            'Prête': 'background:#d1fae5;color:#059669;',
+            'En Cours': 'background:#fef3c7;color:#d97706;'
+        };
+
+        var html = '<table class="sel-table"><thead><tr>';
+        html += '<th></th><th>Route</th><th>Bénévole</th><th>Date</th><th>Stops</th><th>Poids</th><th>Statut</th>';
+        html += '</tr></thead><tbody>';
+
+        routes.forEach(function (r) {
+            var isSelected = _routeSelectionnee && _routeSelectionnee.id_route === r.id_route;
+            var statutStyle = STATUT_STYLE[r.statut] || 'background:#f3f4f6;color:#6b7280;';
+
+            html += '<tr class="' + (isSelected ? 'selected' : '') + '" onclick="selectionnerRoute(' + JSON.stringify(r).replace(/"/g, '&quot;') + ', this)" style="cursor:pointer;">';
+            html += '<td><input type="radio" name="route_radio" value="' + r.id_route + '" ' + (isSelected ? 'checked' : '') + ' style="accent-color:var(--c2);"></td>';
+            html += '<td><strong class="mono">' + r.id_route + '</strong></td>';
+            html += '<td>' + (r.benevole_nom || r.id_benevole) + '</td>';
+            html += '<td class="text-muted">' + (r.date_debut || '—') + '</td>';
+            html += '<td class="mono">' + r.nb_livraisons + '</td>';
+            html += '<td class="mono">' + Math.round(r.poids_total_kg) + ' kg</td>';
+            html += '<td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;' + statutStyle + '">' + r.statut + '</span></td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+    }
+
+    function selectionnerRoute(route, tr) {
+        _routeSelectionnee = route;
+        document.querySelectorAll('#routes-wrap tbody tr').forEach(function (row) { row.classList.remove('selected'); });
+        tr.classList.add('selected');
+        var radio = tr.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+
+        var summary = document.getElementById('route-summary');
+        summary.style.display = 'flex';
+        document.getElementById('route-selected-id').textContent = route.id_route;
+        document.getElementById('route-selected-info').textContent =
+            (route.benevole_nom || route.id_benevole) + ' · ' + route.nb_livraisons + ' stops · ' + Math.round(route.poids_total_kg) + ' kg';
+        document.getElementById('btnStep1Next').disabled = false;
+    }
+
+    function validerEtape1() {
+        if (!_routeSelectionnee) { showAlert(1, 'Veuillez sélectionner une route.'); return; }
+        document.getElementById('stepBtn2').disabled = false;
+        goToStep(2);
+        chargerStep2();
+    }
+
+    // ============================================================
+    // ÉTAPE 2 — CHARGEMENT
+    // ============================================================
+
+    function chargerStep2() {
+        afficherInfoRoute();
+        afficherStatsRoute(_routeSelectionnee.poids_total_kg, 0);
+
+        google.script.run
+            .withSuccessHandler(function (stops) {
+                _stopsActuels = stops;
+                renderStops();
+                document.getElementById('stops-count').textContent = stops.length + ' stop' + (stops.length > 1 ? 's' : '');
+            })
+            .withFailureHandler(function (e) {
+                document.getElementById('stops-list').innerHTML =
+                    '<div style="padding:16px;color:var(--error-text);">Erreur : ' + e.message + '</div>';
+            })
+            .getStopsForEditForm(_routeSelectionnee.id_route);
+
+        google.script.run
+            .withSuccessHandler(function (data) {
+                _nearbyLivraisons = data.nearby || [];
+                _fallbackLivraisons = data.fallback || [];
+
+                if (!data.has_nearby) {
+                    document.getElementById('tab-nearby').textContent = '📍 Proches (0)';
+                    switchTab('all');
+                } else {
+                    document.getElementById('tab-nearby').textContent = '📍 Proches (' + _nearbyLivraisons.length + ')';
+                }
+                document.getElementById('tab-all').textContent = '📋 Toutes (' + _fallbackLivraisons.length + (_nearbyLivraisons.length > 0 ? '+' + _nearbyLivraisons.length : '') + ')';
+
+                renderNearby();
+                renderAll();
+            })
+            .withFailureHandler(function (e) {
+                document.getElementById('nearby-list').innerHTML =
+                    '<div style="padding:16px;color:var(--error-text);">Erreur : ' + e.message + '</div>';
+            })
+            .getNearbyDeliveriesForRoute(_routeSelectionnee.id_route);
+    }
+
+    function afficherInfoRoute() {
+        var r = _routeSelectionnee;
+        document.getElementById('route-info-bar').innerHTML =
+            '<div class="ri-item">Route : <strong>' + r.id_route + '</strong></div>' +
+            '<div class="ri-item">Bénévole : <strong>' + (r.benevole_nom || r.id_benevole) + '</strong></div>' +
+            '<div class="ri-item">Date : <strong>' + (r.date_debut || '—') + '</strong></div>' +
+            '<div class="ri-item">Statut : <strong>' + r.statut + '</strong></div>';
+    }
+
+    function afficherStatsRoute(poidsKg, distanceKm) {
+        document.getElementById('route-stats').innerHTML =
+            '<div class="route-stat">Poids total : <strong>' + Math.round(poidsKg) + ' kg</strong></div>' +
+            (distanceKm > 0 ? '<div class="route-stat">Distance : <strong>' + Math.round(distanceKm * 10) / 10 + ' km</strong></div>' : '');
+    }
+
+    // ============================================================
+    // RENDU STOPS ACTUELS
+    // ============================================================
+
+    function renderStops() {
+        var list = document.getElementById('stops-list');
+        if (_stopsActuels.length === 0) {
+            list.innerHTML = '<div class="empty-state" style="padding:30px 20px;"><div class="empty-state__icon" style="font-size:32px;">📭</div><p>Aucun stop sur cette route.</p></div>';
+            return;
+        }
+
+        var html = '';
+        _stopsActuels.forEach(function (stop) {
+            var condBadge = stop.statut_conditionnement === 'Prete'
+                ? '<span class="mini-badge mini-badge--pret">✅ Prêt</span>'
+                : '<span class="mini-badge mini-badge--attente">⏳ En attente</span>';
+            var hotelBadge = stop.hotel ? '<span class="mini-badge mini-badge--hotel">🏨</span>' : '';
+
+            html += '<div class="stop-row" id="stop-row-' + stop.id_etape + '">';
+            html += '<div class="stop-row__num">' + stop.ordre_passage + '</div>';
+            html += '<div class="stop-row__info">';
+            html += '<div class="stop-row__famille">' + stop.id_famille + ' <span class="text-muted" style="font-size:11px;">(' + stop.nombre_personnes + ' pers.)</span></div>';
+            html += '<div class="stop-row__adresse">' + stop.adresse + '</div>';
+            html += '<div class="stop-row__meta">' + condBadge + hotelBadge + '</div>';
+            html += '</div>';
+            html += '<button class="btn-remove" onclick="supprimerStop(\'' + stop.id_etape + '\', \'' + stop.id_livraison + '\')" title="Retirer ce stop">✕ Retirer</button>';
+            html += '</div>';
+        });
+
+        list.innerHTML = html;
+    }
+
+    // ============================================================
+    // RENDU LIVRAISONS DISPONIBLES
+    // ============================================================
+
+    function switchTab(tab) {
+        _tabActif = tab;
+        document.getElementById('tab-nearby').classList.toggle('active', tab === 'nearby');
+        document.getElementById('tab-all').classList.toggle('active', tab === 'all');
+        document.getElementById('panel-nearby').classList.toggle('active', tab === 'nearby');
+        document.getElementById('panel-all').classList.toggle('active', tab === 'all');
+    }
+
+    function renderNearby() {
+        var list = document.getElementById('nearby-list');
+        if (_nearbyLivraisons.length === 0) {
+            list.innerHTML = '<div class="empty-state" style="padding:30px 20px;"><div class="empty-state__icon" style="font-size:32px;">📍</div><p>Aucune livraison proche.<br>Consultez l\'onglet "Toutes".</p></div>';
+            return;
+        }
+        list.innerHTML = _nearbyLivraisons.map(function (l) { return renderLivraisonRow(l, true); }).join('');
+    }
+
+    function renderAll() {
+        var list = document.getElementById('all-list');
+        var toutes = _nearbyLivraisons.concat(_fallbackLivraisons);
+        if (toutes.length === 0) {
+            list.innerHTML = '<div class="empty-state" style="padding:30px 20px;"><div class="empty-state__icon" style="font-size:32px;">📭</div><p>Aucune livraison disponible pour cette date.</p></div>';
+            return;
+        }
+        list.innerHTML = toutes.map(function (l) {
+            var isNearby = _nearbyLivraisons.some(function (n) { return n.id_livraison === l.id_livraison; });
+            return renderLivraisonRow(l, isNearby);
+        }).join('');
+    }
+
+    function renderLivraisonRow(l, isNearby) {
+        var condBadge = l.statut_conditionnement === 'Prete'
+            ? '<span class="mini-badge mini-badge--pret">✅ Prêt</span>'
+            : '<span class="mini-badge mini-badge--attente">⏳ En attente</span>';
+        var hotelBadge = l.hotel ? '<span class="mini-badge mini-badge--hotel">🏨</span>' : '';
+        var procheBadge = isNearby ? '<span class="mini-badge mini-badge--proche">📍 Proche</span>' : '';
+        var distBadge = l.distance_km !== null
+            ? '<span class="text-muted" style="font-size:10px;">' + l.distance_km + ' km</span>'
+            : '';
+
+        return '<div class="stop-row">' +
+            '<div class="stop-row__info">' +
+            '<div class="stop-row__famille">' + l.id_famille + ' <span class="text-muted" style="font-size:11px;">(' + l.nombre_personnes + ' pers.)</span> ' + distBadge + '</div>' +
+            '<div class="stop-row__adresse">' + l.adresse + '</div>' +
+            '<div class="stop-row__meta">' + condBadge + hotelBadge + procheBadge + '</div>' +
+            '</div>' +
+            '<button class="btn-add" onclick="ajouterStop(\'' + l.id_livraison + '\')" title="Ajouter ce stop">+ Ajouter</button>' +
+            '</div>';
+    }
+
+    // ============================================================
+    // ACTIONS
+    // ============================================================
+
+    function supprimerStop(idEtape, idLivraison) {
+        if (_operationEnCours) return;
+        _operationEnCours = true;
+        masquerFeedback();
+        desactiverBoutons(true);
+        afficherChargement('Suppression du stop…');
+
+        google.script.run
+            .withSuccessHandler(function (result) {
+                cacherChargement();
+                _operationEnCours = false;
+                desactiverBoutons(false);
+
+                _stopsActuels = _stopsActuels.filter(function (s) { return s.id_etape !== idEtape; });
+                _stopsActuels.forEach(function (s, i) { s.ordre_passage = i + 1; });
+                renderStops();
+                document.getElementById('stops-count').textContent = _stopsActuels.length + ' stop' + (_stopsActuels.length > 1 ? 's' : '');
+
+                var livRetiree = null;
+                _nearbyLivraisons.forEach(function (l) { if (l.id_livraison === idLivraison) livRetiree = l; });
+                _fallbackLivraisons.forEach(function (l) { if (l.id_livraison === idLivraison) livRetiree = l; });
+
+                if (!livRetiree) {
+                    var livNearby = { id_livraison: idLivraison, id_famille: '—', adresse: '—', nombre_personnes: 0, statut_conditionnement: '', hotel: false, distance_km: null };
+                    _nearbyLivraisons.unshift(livNearby);
+                }
+
+                renderNearby();
+                renderAll();
+                afficherStatsRoute(result.poids_total_kg, result.distance_totale_km);
+
+                var msg = '✅ Stop retiré — ' + result.nb_stops_restants + ' stop(s) restant(s).';
+                if (result.email_envoye) msg += ' 📧 Email renvoyé au bénévole.';
+                afficherFeedback('success', msg);
+            })
+            .withFailureHandler(function (e) {
+                cacherChargement();
+                _operationEnCours = false;
+                desactiverBoutons(false);
+                afficherFeedback('error', '❌ Erreur : ' + e.message);
+            })
+            .removeStopFromForm({
+                id_route: _routeSelectionnee.id_route,
+                id_etape: idEtape,
+                id_livraison: idLivraison
+            });
+    }
+
+    function ajouterStop(idLivraison) {
+        if (_operationEnCours) return;
+        _operationEnCours = true;
+        masquerFeedback();
+        desactiverBoutons(true);
+        afficherChargement('Ajout du stop…');
+
+        google.script.run
+            .withSuccessHandler(function (result) {
+                cacherChargement();
+                _operationEnCours = false;
+                desactiverBoutons(false);
+
+                _nearbyLivraisons = _nearbyLivraisons.filter(function (l) { return l.id_livraison !== idLivraison; });
+                _fallbackLivraisons = _fallbackLivraisons.filter(function (l) { return l.id_livraison !== idLivraison; });
+                renderNearby();
+                renderAll();
+
+                google.script.run
+                    .withSuccessHandler(function (stops) {
+                        _stopsActuels = stops;
+                        renderStops();
+                        document.getElementById('stops-count').textContent = stops.length + ' stop' + (stops.length > 1 ? 's' : '');
+                    })
+                    .getStopsForEditForm(_routeSelectionnee.id_route);
+
+                afficherStatsRoute(result.poids_total_kg, result.distance_totale_km);
+
+                var msg = '✅ Stop ajouté — ' + result.nb_stops_total + ' stop(s) au total.';
+                if (!result.conditionnement_pret) {
+                    msg += ' ⚠️ Colis non prêt — route rétrogradée à Brouillon.';
+                    afficherFeedback('warning', msg);
+                } else {
+                    if (result.email_envoye) msg += ' 📧 Email renvoyé au bénévole.';
+                    afficherFeedback('success', msg);
+                }
+
+                _routeSelectionnee.statut = result.nouveau_statut;
+                _routeSelectionnee.poids_total_kg = result.poids_total_kg;
+                afficherInfoRoute();
+            })
+            .withFailureHandler(function (e) {
+                cacherChargement();
+                _operationEnCours = false;
+                desactiverBoutons(false);
+                afficherFeedback('error', '❌ Erreur : ' + e.message);
+            })
+            .addStopFromForm({
+                id_route: _routeSelectionnee.id_route,
+                id_livraison: idLivraison
+            });
+    }
+
+    // ============================================================
+    // UTILITAIRES UI
+    // ============================================================
+
+    function desactiverBoutons(disabled) {
+        document.querySelectorAll('.btn-remove, .btn-add').forEach(function (btn) {
+            btn.disabled = disabled;
+        });
+    }
+
+    function afficherFeedback(type, msg) {
+        var el = document.getElementById('op-feedback');
+        el.className = 'op-feedback ' + type;
+        el.textContent = msg;
+        setTimeout(function () { el.className = 'op-feedback'; }, 6000);
+    }
+
+    function masquerFeedback() {
+        document.getElementById('op-feedback').className = 'op-feedback';
+    }
+
+    function showAlert(step, msg) {
+        var el = document.getElementById('alert-error-' + step);
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add('alert--visible', 'alert--error');
+        setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
+    }
+</script>
