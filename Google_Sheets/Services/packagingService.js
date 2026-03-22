@@ -1,11 +1,6 @@
 const PACKAGING_QR_SIZE_PX = 200;
 const PACKAGING_HEADER_H = 30;
 
-/**
- * Point d'entrée appelé depuis le formulaire HTML.
- * @param {Object} params - { date, occasion }
- * @returns {Object} { success, url, count, errors }
- */
 function generatePackagingSheet(params) {
     Logger.log(`[CONDITIONNEMENT] 🚀 Génération pour ${params.date} / ${params.occasion}`);
 
@@ -161,11 +156,6 @@ function toutesLivraisonsPretes(routeId) {
     return true;
 }
 
-/**
- * Passe une route au statut Prête et envoie l'email au bénévole.
- * Le statut est mis à jour EN PREMIER pour que sendRouteEmail()
- * trouve bien le statut Prête lors de sa vérification.
- */
 function passerRouteEnPrete(routeId) {
     Logger.log(`[CONDITIONNEMENT] 🟢 Route ${routeId} → Prete`);
 

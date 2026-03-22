@@ -1,9 +1,3 @@
-/**
- * =====================================================================
- * CODE.GS - Point d'Entrée Principal
- * =====================================================================
- */
-
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
@@ -24,6 +18,9 @@ function onOpen() {
     .addSubMenu(
       ui.createMenu('🗺️ Routes')
         .addItem('📍 Planifier Routes', 'showPlanRoutesForm')
+        .addItem('✏️ Créer une Route Manuellement', 'showCreateManualRouteForm')
+        .addSeparator()
+        .addItem('🔄 Réassigner / Diviser une Route', 'showReassignRouteForm')
         .addSeparator()
         .addItem('✉️ Envoyer Routes aux Bénévoles', 'sendRoutesToVolunteers')
         .addItem('🏷️ Générer Étiquettes', 'showGenerateLabelsForm')

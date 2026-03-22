@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <?!= include('styles'); ?>
+    <style>
+        .step-nav {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            background: var(--bg);
+            flex-shrink: 0;
+        }
+
+        .step-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: none;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: color .15s, border-color .15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .step-btn.active {
+            color: var(--c2);
+            border-bottom-color: var(--c2);
+        }
+
+        .step-btn.done {
+            color: #10b981;
+        }
+
+        .step-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .step-panel {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .step-panel.active {
+            display: flex;
+        }
+
+        .form-body-flex {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+            padding: 20px 32px;
+        }
+
+        .table-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .table-toolbar select {
+            padding: 6px 10px;
+            font-size: 13px;
+            border-radius: var(--radius);
+            border: 2px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            width: auto;
+        }
+
+        .table-toolbar select:focus {
+            outline: none;
+            border-color: var(--c1);
+        }
+
+        .table-wrap {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .sel-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .sel-table thead th {
+            background: var(--bg);
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-2);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .sel-table tbody tr {
+            border-bottom: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: background .1s;
+        }
+
+        .sel-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .sel-table tbody tr:hover {
+            background: var(--bg);
+        }
+
+        .sel-table tbody tr.selected {
+            background: rgba(0, 254, 207, .07);
+        }
+
+        .sel-table td {
+            padding: 8px 12px;
+            vertical-align: middle;
+        }
+
+        .sel-table td:first-child {
+            width: 36px;
+            text-align: center;
+        }
+
+        .action-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .action-card {
+            padding: 20px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+            background: var(--surface);
+        }
+
+        .action-card:hover {
+            border-color: var(--c1);
+            background: var(--bg2);
+        }
+
+        .action-card.selected {
+            border-color: var(--c1);
+            background: rgba(0, 254, 207, .06);
+            box-shadow: 0 0 0 3px rgba(0, 254, 207, .15);
+        }
+
+        .action-card__icon {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .action-card__title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .action-card__desc {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .route-info-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .route-info-bar .ri-item {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .route-info-bar .ri-item strong {
+            color: var(--text);
+            font-size: 13px;
+        }
+
+        .dispo-tag {
+            display: inline-block;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 20px;
+            background: rgba(0, 254, 207, .15);
+            color: var(--c2);
+            margin-right: 3px;
+            font-weight: 600;
+        }
+
+        .admin-badge {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 20px;
+            background: #ede9fe;
+            color: #6d28d9;
+            font-weight: 600;
+        }
+
+        .selection-bar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 14px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--text-2);
+            flex-shrink: 0;
+        }
+
+        .selection-bar .count {
+            color: var(--c2);
+            font-family: 'DM Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .panel-section {
+            display: none;
+        }
+
+        .panel-section.active {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-wrap">
+        <div class="card" style="height:100vh; max-height:800px;">
+
+            <div class="form-header">
+                <div class="form-header__icon">🔄</div>
+                <div class="form-header__text">
+                    <h1>Réassigner / Diviser une Route</h1>
+                    <p>Gérer l'absence d'un bénévole ou redistribuer les livraisons</p>
+                </div>
+            </div>
+
+            <div class="step-nav" id="stepNav">
+                <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)">📋 Choisir la Route</button>
+                <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled>⚙️ Action</button>
+            </div>
+
+            <!-- ÉTAPE 1 — SÉLECTION ROUTE -->
+            <div class="step-panel active" id="step1">
+                <div class="form-body-flex">
+                    <div id="alert-error-1" class="alert alert--error"></div>
+
+                    <div class="table-toolbar">
+                        <span class="text-muted" style="font-size:12px; font-weight:600;">Statut</span>
+                        <select id="filtre-statut" onchange="filtrerRoutes()">
+                            <option value="">Tous</option>
+                            <option value="Brouillon">Brouillon</option>
+                            <option value="Confirmée">Confirmée</option>
+                            <option value="Prete">Prête</option>
+                        </select>
+                        <span class="text-muted" id="routes-counter" style="margin-left:auto; font-size:12px;"></span>
+                    </div>
+
+                    <div class="table-wrap" id="routes-wrap">
+                        <div class="loading-state loading-state--visible" style="padding:32px 0;">
+                            <div class="spinner"></div>
+                            <div class="loading-state__text">Chargement des routes…</div>
+                        </div>
+                    </div>
+
+                    <div class="selection-bar" id="route-summary" style="display:none;">
+                        <span>Route sélectionnée :</span>
+                        <span class="count" id="route-selected-id">—</span>
+                        <span class="text-muted" id="route-selected-info" style="font-size:12px;"></span>
+                    </div>
+                </div>
+
+                <div class="form-footer">
+                    <button type="button" class="btn btn--secondary"
+                        onclick="google.script.host.close()">Annuler</button>
+                    <button type="button" class="btn btn--primary" id="btnStep1Next" onclick="validerEtape1()"
+                        disabled>Suivant →</button>
+                </div>
+            </div>
+
+            <!-- ÉTAPE 2 — ACTION -->
+            <div class="step-panel" id="step2">
+                <div class="form-body-flex">
+                    <div id="alert-error-2" class="alert alert--error"></div>
+
+                    <div class="route-info-bar" id="route-info-bar"></div>
+
+                    <!-- CHOIX ACTION -->
+                    <div id="choix-action">
+                        <div class="action-cards">
+                            <div class="action-card" id="card-reassign" onclick="choisirAction('reassign')">
+                                <div class="action-card__icon">👤</div>
+                                <div class="action-card__title">Réassigner à un autre bénévole</div>
+                                <div class="action-card__desc">Transférer toutes les livraisons à un autre conducteur.
+                                    Si son véhicule est plus grand, des stops proches peuvent être ajoutés
+                                    automatiquement.</div>
+                            </div>
+                            <div class="action-card" id="card-split" onclick="choisirAction('split')">
+                                <div class="action-card__icon">✂️</div>
+                                <div class="action-card__title">Diviser en plusieurs routes</div>
+                                <div class="action-card__desc">Répartir les livraisons entre plusieurs bénévoles. La
+                                    route originale sera annulée et de nouvelles routes créées.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PANEL RÉASSIGNATION -->
+                    <div class="panel-section" id="panel-reassign">
+                        <div class="table-toolbar">
+                            <span class="text-muted" style="font-size:12px; font-weight:600;">Disponibilité</span>
+                            <select id="filtre-dispo-reassign" onchange="filtrerBenevolesReassign()">
+                                <option value="">Tous</option>
+                                <option value="Matin">Matin</option>
+                                <option value="Après-midi">Après-midi</option>
+                                <option value="Soir">Soir</option>
+                            </select>
+                            <span class="text-muted" id="benevoles-reassign-counter"
+                                style="margin-left:auto; font-size:12px;"></span>
+                        </div>
+                        <div class="table-wrap" id="benevoles-reassign-wrap">
+                            <div class="loading-state loading-state--visible" style="padding:32px 0;">
+                                <div class="spinner"></div>
+                                <div class="loading-state__text">Chargement des bénévoles…</div>
+                            </div>
+                        </div>
+                        <div class="selection-bar" id="reassign-summary" style="display:none;">
+                            <span>Nouveau bénévole :</span>
+                            <span class="count" id="reassign-selected-nom">—</span>
+                            <span class="text-muted" id="reassign-selected-vehicule" style="font-size:12px;"></span>
+                        </div>
+                    </div>
+
+                    <!-- PANEL DIVISION -->
+                    <div class="panel-section" id="panel-split">
+                        <div class="table-toolbar">
+                            <span class="text-muted" style="font-size:12px; font-weight:600;">Disponibilité</span>
+                            <select id="filtre-dispo-split" onchange="filtrerBenevolesplit()">
+                                <option value="">Tous</option>
+                                <option value="Matin">Matin</option>
+                                <option value="Après-midi">Après-midi</option>
+                                <option value="Soir">Soir</option>
+                            </select>
+                            <span class="text-muted" id="benevoles-split-counter"
+                                style="margin-left:auto; font-size:12px;"></span>
+                        </div>
+                        <div class="table-wrap" id="benevoles-split-wrap">
+                            <div class="loading-state loading-state--visible" style="padding:32px 0;">
+                                <div class="spinner"></div>
+                                <div class="loading-state__text">Chargement des bénévoles…</div>
+                            </div>
+                        </div>
+                        <div class="selection-bar" id="split-summary">
+                            <span>Sélectionnés :</span>
+                            <span class="count" id="split-selected-count">0</span>
+                            <span class="text-muted">bénévole(s)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-footer">
+                    <button type="button" class="btn btn--secondary" onclick="goToStep(1)">← Retour</button>
+                    <button type="button" class="btn btn--primary" id="btnExecuter" onclick="executer()" disabled>✨
+                        Confirmer</button>
+                </div>
+            </div>
+
+            <!-- LOADING -->
+            <div id="loadingState" class="loading-state" style="display:none;">
+                <div class="spinner"></div>
+                <div class="loading-state__text" id="loading-text">Traitement en cours…</div>
+                <div class="loading-state__sub">Optimisation TSP · Sauvegarde · Génération feuilles</div>
+            </div>
+
+            <!-- RÉSULTATS -->
+            <div id="resultsState" class="results-state">
+                <div class="results-header">
+                    <h2 id="res-titre">✅ Opération réussie</h2>
+                    <p id="res-sous-titre"></p>
+                </div>
+                <div class="results-body" id="res-body"></div>
+                <div class="form-footer">
+                    <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <?!= include('ui/scripts/reassignRouteFormScript'); ?>
+</body>
+
+</html>

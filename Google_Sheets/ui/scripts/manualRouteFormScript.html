@@ -1,0 +1,391 @@
+<script>
+    var _etapeCourante = 1;
+    var _tousBenevoles = [];
+    var _toutesLivraisons = [];
+    var _benevoleSelectionne = null;
+    var _livraisonsSelectionnees = new Set();
+
+    var PRIO_COULEURS = { 1: '#ef4444', 2: '#f97316', 3: '#eab308', 4: '#3b82f6', 5: '#94a3b8' };
+
+    window.addEventListener('load', function () {
+        var demain = new Date();
+        demain.setDate(demain.getDate() + 1);
+        document.getElementById('date_livraison').value = demain.toISOString().split('T')[0];
+
+        chargerBenevoles();
+    });
+
+    // ============================================================
+    // NAVIGATION
+    // ============================================================
+
+    function goToStep(n) {
+        document.getElementById('step' + _etapeCourante).style.display = 'none';
+        document.getElementById('step' + _etapeCourante).classList.remove('active');
+
+        _etapeCourante = n;
+
+        var panel = document.getElementById('step' + n);
+        panel.style.display = 'flex';
+        panel.classList.add('active');
+
+        [1, 2, 3].forEach(function (i) {
+            var btn = document.getElementById('stepBtn' + i);
+            btn.classList.remove('active', 'done');
+            if (i < n) btn.classList.add('done');
+            if (i === n) btn.classList.add('active');
+        });
+    }
+
+    function afficherEtatChargement(visible) {
+        var loading = document.getElementById('loadingState');
+        var stepNav = document.getElementById('stepNav');
+        var panel = document.getElementById('step' + _etapeCourante);
+
+        if (visible) {
+            panel.style.display = 'none';
+            stepNav.style.display = 'none';
+            loading.style.display = 'flex';
+        } else {
+            loading.style.display = 'none';
+            stepNav.style.display = '';
+            panel.style.display = 'flex';
+        }
+    }
+
+    function afficherResultats(result) {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('stepNav').style.display = 'none';
+        document.getElementById('step' + _etapeCourante).style.display = 'none';
+
+        document.getElementById('res-route').textContent = result.id_route;
+        document.getElementById('res-livraisons').textContent = result.nb_livraisons;
+        document.getElementById('res-poids').textContent = Math.round(result.poids_total_kg) + ' kg';
+        document.getElementById('res-distance').textContent = Math.round(result.distance_totale_km * 10) / 10 + ' km';
+        document.getElementById('results-subtitle').textContent =
+            'Route ' + result.id_route + ' assignée à ' + result.benevole_nom;
+
+        if (result.lien_maps) {
+            document.getElementById('res-maps-link').href = result.lien_maps;
+            document.getElementById('res-maps-wrap').style.display = '';
+        }
+
+        if (result.doc_warning) {
+            var warn = document.getElementById('res-warning');
+            warn.textContent = '⚠️ ' + result.doc_warning;
+            warn.style.display = 'flex';
+            warn.classList.add('alert--visible');
+        }
+
+        document.getElementById('resultsState').style.display = 'flex';
+        document.getElementById('resultsState').classList.add('results-state--visible');
+    }
+
+    // ============================================================
+    // ÉTAPE 1 — VALIDATION CONFIG
+    // ============================================================
+
+    function validerEtape1() {
+        var date = document.getElementById('date_livraison').value;
+        if (!date) {
+            showAlert(1, 'Veuillez sélectionner une date de livraison.');
+            return;
+        }
+        document.getElementById('stepBtn2').disabled = false;
+        chargerLivraisons(date);
+        goToStep(2);
+    }
+
+    // ============================================================
+    // ÉTAPE 2 — BÉNÉVOLES
+    // ============================================================
+
+    function chargerBenevoles() {
+        google.script.run
+            .withSuccessHandler(function (benevoles) {
+                _tousBenevoles = benevoles;
+                filtrerBenevoles();
+            })
+            .withFailureHandler(function (e) {
+                document.getElementById('benevoles-wrap-manual').innerHTML =
+                    '<div style="padding:20px;text-align:center;color:var(--error-text);">Erreur : ' + e.message + '</div>';
+            })
+            .getVolunteersForPlanningForm(null);
+    }
+
+    function filtrerBenevoles() {
+        var filtreDispo = document.getElementById('filtre-dispo-benv').value;
+        var afficherAdmins = document.getElementById('filtre-admin-benv').checked;
+
+        var filtres = _tousBenevoles.filter(function (b) {
+            if (!afficherAdmins && b.admin) return false;
+            if (filtreDispo && !b.disponibilites.includes(filtreDispo)) return false;
+            return true;
+        });
+
+        renderBenevoles(filtres);
+    }
+
+    function renderBenevoles(benevoles) {
+        var wrap = document.getElementById('benevoles-wrap-manual');
+        document.getElementById('benevoles-counter-manual').textContent =
+            benevoles.length + ' bénévole' + (benevoles.length > 1 ? 's' : '');
+
+        if (benevoles.length === 0) {
+            wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);">Aucun bénévole correspond aux filtres</div>';
+            return;
+        }
+
+        var html = '<table class="deliveries-table"><thead><tr>';
+        html += '<th></th><th>Bénévole</th><th>Disponibilités</th><th>Véhicule</th><th>Capacité</th><th>Route aujourd\'hui</th>';
+        html += '</tr></thead><tbody>';
+
+        benevoles.forEach(function (b) {
+            var isSelected = _benevoleSelectionne && String(_benevoleSelectionne.id) === String(b.id);
+            var dispoTags = (b.disponibilites || []).map(function (d) {
+                return '<span class="dispo-tag">' + d + '</span>';
+            }).join('') || '<span style="color:var(--muted-light);font-size:11px;">—</span>';
+
+            var routeLabel = b.has_route_today
+                ? '<span class="statut-badge" style="background:#fef3c7;color:#d97706;">' + (b.route_statut || '?') + '</span>'
+                : '<span style="color:var(--muted-light);font-size:12px;">—</span>';
+
+            var nomLabel = b.prenom + ' ' + b.nom;
+            if (b.admin) nomLabel += ' <span style="font-size:10px;padding:1px 6px;border-radius:20px;background:#ede9fe;color:#6d28d9;font-weight:600;">admin</span>';
+            if (b.is_tmp_vehicle) nomLabel += ' 🔑';
+
+            html += '<tr class="' + (isSelected ? 'selected' : '') + '" onclick="selectionnerBenevole(' + JSON.stringify(b).replace(/"/g, '&quot;') + ', this)">';
+            html += '<td><input type="radio" name="benevole_radio" value="' + b.id + '" ' + (isSelected ? 'checked' : '') + ' style="accent-color:var(--c2);"></td>';
+            html += '<td><strong>' + nomLabel + '</strong></td>';
+            html += '<td>' + dispoTags + '</td>';
+            html += '<td>' + (b.vehicule_type || '—') + '</td>';
+            html += '<td class="mono">' + (b.vehicule_capacite ? b.vehicule_capacite + ' kg' : '—') + '</td>';
+            html += '<td>' + routeLabel + '</td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+    }
+
+    function selectionnerBenevole(benevole, tr) {
+        _benevoleSelectionne = benevole;
+
+        document.querySelectorAll('#benevoles-wrap-manual tbody tr').forEach(function (row) {
+            row.classList.remove('selected');
+        });
+        tr.classList.add('selected');
+
+        var radio = tr.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+
+        var summary = document.getElementById('benevole-summary');
+        summary.style.display = 'flex';
+        document.getElementById('benevole-selected-nom').textContent = benevole.prenom + ' ' + benevole.nom;
+        document.getElementById('benevole-selected-vehicule').textContent =
+            benevole.vehicule_type + ' · ' + benevole.vehicule_capacite + ' kg';
+
+        document.getElementById('btnStep2Next').disabled = false;
+    }
+
+    function validerEtape2() {
+        if (!_benevoleSelectionne) {
+            showAlert(2, 'Veuillez sélectionner un bénévole.');
+            return;
+        }
+        document.getElementById('stepBtn3').disabled = false;
+        goToStep(3);
+    }
+
+    // ============================================================
+    // ÉTAPE 3 — LIVRAISONS
+    // ============================================================
+
+    function chargerLivraisons(date) {
+        google.script.run
+            .withSuccessHandler(function (livraisons) {
+                _toutesLivraisons = livraisons;
+                _livraisonsSelectionnees.clear();
+                peuplerFiltreQuartier(livraisons);
+                filtrerLivraisons();
+            })
+            .withFailureHandler(function (e) {
+                document.getElementById('livraisons-wrap').innerHTML =
+                    '<div style="padding:20px;text-align:center;color:var(--error-text);">Erreur : ' + e.message + '</div>';
+            })
+            .getDeliveriesForManualRoute(date);
+    }
+
+    function peuplerFiltreQuartier(livraisons) {
+        var quartiers = {};
+        livraisons.forEach(function (l) {
+            if (l.id_quartier) quartiers[l.id_quartier] = true;
+        });
+
+        var select = document.getElementById('filtre-quartier');
+        select.innerHTML = '<option value="">Tous les quartiers</option>';
+        Object.keys(quartiers).sort().forEach(function (q) {
+            var opt = document.createElement('option');
+            opt.value = q;
+            opt.textContent = q;
+            select.appendChild(opt);
+        });
+    }
+
+    function filtrerLivraisons() {
+        var filtreQuartier = document.getElementById('filtre-quartier').value;
+
+        var filtrees = _toutesLivraisons.filter(function (l) {
+            if (filtreQuartier && l.id_quartier !== filtreQuartier) return false;
+            return true;
+        });
+
+        renderLivraisons(filtrees);
+    }
+
+    function renderLivraisons(livraisons) {
+        var wrap = document.getElementById('livraisons-wrap');
+        document.getElementById('livraisons-counter').textContent =
+            livraisons.length + ' livraison' + (livraisons.length > 1 ? 's' : '');
+
+        if (livraisons.length === 0) {
+            wrap.innerHTML = '<div class="empty-state" style="padding:40px 20px;"><div class="empty-state__icon">📭</div><h3>Aucune livraison disponible</h3><p>Aucune livraison Non Assignée sans besoins spéciaux pour cette date.</p></div>';
+            mettreAJourSommaire();
+            return;
+        }
+
+        var html = '<table class="deliveries-table"><thead><tr>';
+        html += '<th></th><th>ID Famille</th><th>Adresse</th><th>Quartier</th><th>Personnes</th><th>Prio</th>';
+        html += '</tr></thead><tbody>';
+
+        livraisons.forEach(function (l) {
+            var isChecked = _livraisonsSelectionnees.has(l.id_livraison);
+            var prioCouleur = PRIO_COULEURS[l.priorite] || '#94a3b8';
+            var hotelBadge = l.hotel ? ' <span class="hotel-badge">🏨 Hôtel</span>' : '';
+
+            html += '<tr class="' + (isChecked ? 'selected' : '') + '" onclick="toggleLivraison(\'' + l.id_livraison + '\', this)">';
+            html += '<td><input type="checkbox" class="livraison-cb" value="' + l.id_livraison + '" ' + (isChecked ? 'checked' : '') + ' style="accent-color:var(--c2);" onclick="event.stopPropagation(); toggleLivraison(\'' + l.id_livraison + '\', this.closest(\'tr\'))"></td>';
+            html += '<td><strong>' + l.id_famille + '</strong></td>';
+            html += '<td>' + l.adresse + hotelBadge + '</td>';
+            html += '<td>' + (l.id_quartier || '—') + '</td>';
+            html += '<td class="mono">' + l.nombre_personnes + '</td>';
+            html += '<td><span class="prio-dot" style="background:' + prioCouleur + '"></span>' + l.priorite + '</td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+        mettreAJourSommaire();
+    }
+
+    function toggleLivraison(id, tr) {
+        if (_livraisonsSelectionnees.has(id)) {
+            _livraisonsSelectionnees.delete(id);
+            tr.classList.remove('selected');
+            var cb = tr.querySelector('.livraison-cb');
+            if (cb) cb.checked = false;
+        } else {
+            _livraisonsSelectionnees.add(id);
+            tr.classList.add('selected');
+            var cb = tr.querySelector('.livraison-cb');
+            if (cb) cb.checked = true;
+        }
+        mettreAJourSommaire();
+    }
+
+    function toggleToutesLivraisons(checked) {
+        var filtreQuartier = document.getElementById('filtre-quartier').value;
+        var filtrees = _toutesLivraisons.filter(function (l) {
+            return !filtreQuartier || l.id_quartier === filtreQuartier;
+        });
+
+        filtrees.forEach(function (l) {
+            if (checked) {
+                _livraisonsSelectionnees.add(l.id_livraison);
+            } else {
+                _livraisonsSelectionnees.delete(l.id_livraison);
+            }
+        });
+
+        document.querySelectorAll('.livraison-cb').forEach(function (cb) {
+            cb.checked = checked;
+            cb.closest('tr').classList.toggle('selected', checked);
+        });
+
+        mettreAJourSommaire();
+    }
+
+    function mettreAJourSommaire() {
+        var count = _livraisonsSelectionnees.size;
+        document.getElementById('livraisons-selected-count').textContent = count;
+        document.getElementById('btnCreer').disabled = count === 0;
+
+        var poidsTotal = 0;
+        var poidsDom = parseFloat(document.getElementById('poids_moyen_kg').value) || 0;
+        var poidsHot = parseFloat(document.getElementById('poids_moyen_hotel_kg').value) || poidsDom;
+
+        _livraisonsSelectionnees.forEach(function (id) {
+            var liv = _toutesLivraisons.find(function (l) { return l.id_livraison === id; });
+            if (liv) {
+                var parts = parseInt(liv.nombre_personnes) || 0;
+                poidsTotal += parts * (liv.hotel ? poidsHot : poidsDom);
+            }
+        });
+
+        if (count > 0 && poidsTotal > 0) {
+            document.getElementById('livraisons-selected-poids').textContent =
+                '≈ ' + Math.round(poidsTotal) + ' kg estimés';
+        } else {
+            document.getElementById('livraisons-selected-poids').textContent = '';
+        }
+    }
+
+    // ============================================================
+    // CRÉATION DE LA ROUTE
+    // ============================================================
+
+    function creerRoute() {
+        if (!_benevoleSelectionne) {
+            showAlert(3, 'Aucun bénévole sélectionné.');
+            return;
+        }
+
+        if (_livraisonsSelectionnees.size === 0) {
+            showAlert(3, 'Aucune livraison sélectionnée.');
+            return;
+        }
+
+        var params = {
+            id_benevole: _benevoleSelectionne.id,
+            livraison_ids: Array.from(_livraisonsSelectionnees),
+            date_livraison: document.getElementById('date_livraison').value,
+            occasion: document.getElementById('occasion').value,
+            poids_moyen_kg: parseFloat(document.getElementById('poids_moyen_kg').value) || 15,
+            poids_moyen_hotel_kg: parseFloat(document.getElementById('poids_moyen_hotel_kg').value) || 10
+        };
+
+        afficherEtatChargement(true);
+
+        google.script.run
+            .withSuccessHandler(function (result) {
+                afficherResultats(result);
+            })
+            .withFailureHandler(function (e) {
+                afficherEtatChargement(false);
+                showAlert(3, 'Erreur lors de la création : ' + e.message);
+            })
+            .createManualRouteFromForm(params);
+    }
+
+    // ============================================================
+    // UTILITAIRES
+    // ============================================================
+
+    function showAlert(step, msg) {
+        var el = document.getElementById('alert-error-' + step);
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add('alert--visible', 'alert--error');
+        setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
+    }
+</script>
