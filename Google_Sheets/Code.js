@@ -1,65 +1,71 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
-  ui.createMenu('📦 ' + CONFIG.APP_NAME)
+  ui.createMenu("📦 " + CONFIG.APP_NAME)
 
     .addSubMenu(
-      ui.createMenu('📋 Livraisons')
-        .addItem('➕ Générer Livraisons', 'showGenerateDeliveriesForm')
+      ui
+        .createMenu("📋 Livraisons")
+        .addItem("➕ Générer Livraisons", "showGenerateDeliveriesForm")
         .addSeparator()
-        .addItem('📊 Voir Toutes les Livraisons', 'viewAllDeliveries')
-        .addItem('🔍 Rechercher Livraison', 'searchDelivery')
+        .addItem("📊 Voir Toutes les Livraisons", "viewAllDeliveries")
+        .addItem("🔍 Rechercher Livraison", "searchDelivery")
         .addSeparator()
-        .addItem('🔄 Mettre à Jour Statuts', 'updateDeliveryStatuses')
+        .addItem("🔄 Mettre à Jour Statuts", "updateDeliveryStatuses")
         .addSeparator()
-        .addItem('📦 Feuille de Préparation', 'showPackagingForm')
+        .addItem("📦 Feuille de Préparation", "showPackagingForm"),
     )
 
     .addSubMenu(
-      ui.createMenu('🗺️ Routes')
-        .addItem('📍 Planifier Routes', 'showPlanRoutesForm')
-        .addItem('✏️ Créer une Route Manuellement', 'showCreateManualRouteForm')
+      ui
+        .createMenu("🗺️ Routes")
+        .addItem("📍 Planifier Routes", "showPlanRoutesForm")
+        .addItem("✏️ Créer une Route Manuellement", "showCreateManualRouteForm")
         .addSeparator()
-        .addItem('🔄 Réassigner / Diviser une Route', 'showReassignRouteForm')
-        .addItem('➕/➖ Modifier les Stops d\'une Route', 'showEditStopsForm')
+        .addItem("🔄 Réassigner / Diviser une Route", "showReassignRouteForm")
+        .addItem("➕/➖ Modifier les Stops d'une Route", "showEditStopsForm")
         .addSeparator()
-        .addItem('✉️ Envoyer Routes aux Bénévoles', 'sendRoutesToVolunteers')
-        .addItem('🏷️ Générer Étiquettes', 'showGenerateLabelsForm')
+        .addItem("✉️ Envoyer Routes aux Bénévoles", "sendRoutesToVolunteers")
+        .addItem("🏷️ Générer Étiquettes", "showGenerateLabelsForm")
         .addSeparator()
-        .addItem('🔧 Réorganiser Étapes', 'showReorderStopsInterface')
-        .addItem('🗺️ Régénérer Liens Maps', 'regenerateAllMapsLinks')
+        .addItem("🔧 Réorganiser Étapes", "showReorderStopsInterface")
+        .addItem("🗺️ Régénérer Liens Maps", "regenerateAllMapsLinks")
         .addSeparator()
-        .addItem('📊 Voir Toutes les Routes', 'viewAllRoutes')
+        .addItem("📊 Voir Toutes les Routes", "viewAllRoutes"),
     )
 
     .addSubMenu(
-      ui.createMenu('⚙️ Configuration')
-        .addItem('🔑 Configurer API Keys', 'showApiKeysConfig')
-        .addItem('📧 Configurer Emails', 'showEmailConfig')
+      ui
+        .createMenu("⚙️ Configuration")
+        .addItem("🔑 Configurer API Keys", "showApiKeysConfig")
+        .addItem("📧 Configurer Emails", "showEmailConfig")
         .addSeparator()
-        .addItem('🏢 Adresse QG (Headquarters)', 'showHqAddressConfig')
-        .addItem('🎛️ Paramètres Optimisation Routes', 'showRouteOptimizationConfig')
+        .addItem("🏢 Adresse QG (Headquarters)", "showHqAddressConfig")
+        .addItem(
+          "🎛️ Paramètres Optimisation Routes",
+          "showRouteOptimizationConfig",
+        )
         .addSeparator()
-        .addItem('🚗 Gérer Véhicules Temporaires', 'ouvrirGestionVehiculesTmp')
+        .addItem("🚗 Gérer Véhicules Temporaires", "ouvrirGestionVehiculesTmp")
         .addSeparator()
-        .addItem('📊 Statistiques', 'showStatisticsForm')
+        .addItem("📊 Statistiques", "showStatisticsForm"),
     )
 
     .addSubMenu(
-      ui.createMenu('🔄 Synchronisation')
-        .addItem('🔃 Actualiser Données APIs', 'refreshApiData')
-        .addItem('🗑️ Vider le Cache', 'clearAllCache')
+      ui
+        .createMenu("🔄 Synchronisation")
+        .addItem("🔃 Actualiser Données APIs", "refreshApiData")
+        .addItem("🗑️ Vider le Cache", "clearAllCache")
         .addSeparator()
-        .addItem('🏓 Tester Connexion APIs', 'testApiConnections')
+        .addItem("🏓 Tester Connexion APIs", "testApiConnections"),
     )
 
     .addSeparator()
     .addSubMenu(
-      ui.createMenu('❓ Aide')
-        .addItem('📖 Documentation', 'showDocumentation')
+      ui.createMenu("❓ Aide").addItem("📖 Documentation", "showDocumentation"),
     )
 
     .addToUi();
 
-  Logger.log('[MENU] ✅ Menu créé avec succès');
+  Logger.log("[MENU] ✅ Menu créé avec succès");
 }

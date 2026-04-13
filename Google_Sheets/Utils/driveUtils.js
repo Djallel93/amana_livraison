@@ -15,18 +15,25 @@
  * @returns {GoogleAppsScript.Drive.Folder}
  */
 function getRoutesFolder() {
-    const NOM_RACINE = (CONFIG.DRIVE && CONFIG.DRIVE.FOLDER_ROOT) ? CONFIG.DRIVE.FOLDER_ROOT : 'Routes';
-    const dossiers = DriveApp.getFoldersByName(NOM_RACINE);
+  const NOM_RACINE =
+    CONFIG.DRIVE && CONFIG.DRIVE.FOLDER_ROOT
+      ? CONFIG.DRIVE.FOLDER_ROOT
+      : "Routes";
+  const dossiers = DriveApp.getFoldersByName(NOM_RACINE);
 
-    if (dossiers.hasNext()) {
-        const dossier = dossiers.next();
-        Logger.log(`[DRIVE] 📁 Dossier racine trouvé : "${NOM_RACINE}" (${dossier.getId()})`);
-        return dossier;
-    }
+  if (dossiers.hasNext()) {
+    const dossier = dossiers.next();
+    Logger.log(
+      `[DRIVE] 📁 Dossier racine trouvé : "${NOM_RACINE}" (${dossier.getId()})`,
+    );
+    return dossier;
+  }
 
-    const nouveau = DriveApp.createFolder(NOM_RACINE);
-    Logger.log(`[DRIVE] ✅ Dossier racine créé : "${NOM_RACINE}" (${nouveau.getId()})`);
-    return nouveau;
+  const nouveau = DriveApp.createFolder(NOM_RACINE);
+  Logger.log(
+    `[DRIVE] ✅ Dossier racine créé : "${NOM_RACINE}" (${nouveau.getId()})`,
+  );
+  return nouveau;
 }
 
 /**
@@ -37,22 +44,30 @@ function getRoutesFolder() {
  * @returns {GoogleAppsScript.Drive.Folder}
  */
 function getDateOccasionFolder(date, occasion) {
-    const racine = getRoutesFolder();
+  const racine = getRoutesFolder();
 
-    const dateObj = date instanceof Date ? date : new Date(date);
-    const dateStr = Utilities.formatDate(dateObj, CONFIG.TIMEZONE || 'Europe/Paris', 'yyyyMMdd');
-    const nomSousDossier = `${dateStr}_${occasion}`;
+  const dateObj = date instanceof Date ? date : new Date(date);
+  const dateStr = Utilities.formatDate(
+    dateObj,
+    CONFIG.TIMEZONE || "Europe/Paris",
+    "yyyyMMdd",
+  );
+  const nomSousDossier = `${dateStr}_${occasion}`;
 
-    const sousDossiers = racine.getFoldersByName(nomSousDossier);
-    if (sousDossiers.hasNext()) {
-        const sousDossier = sousDossiers.next();
-        Logger.log(`[DRIVE] 📁 Sous-dossier trouvé : "${nomSousDossier}" (${sousDossier.getId()})`);
-        return sousDossier;
-    }
+  const sousDossiers = racine.getFoldersByName(nomSousDossier);
+  if (sousDossiers.hasNext()) {
+    const sousDossier = sousDossiers.next();
+    Logger.log(
+      `[DRIVE] 📁 Sous-dossier trouvé : "${nomSousDossier}" (${sousDossier.getId()})`,
+    );
+    return sousDossier;
+  }
 
-    const nouveau = racine.createFolder(nomSousDossier);
-    Logger.log(`[DRIVE] ✅ Sous-dossier créé : "${nomSousDossier}" (${nouveau.getId()})`);
-    return nouveau;
+  const nouveau = racine.createFolder(nomSousDossier);
+  Logger.log(
+    `[DRIVE] ✅ Sous-dossier créé : "${nomSousDossier}" (${nouveau.getId()})`,
+  );
+  return nouveau;
 }
 
 /**
@@ -61,16 +76,18 @@ function getDateOccasionFolder(date, occasion) {
  * @returns {GoogleAppsScript.Drive.File|null}
  */
 function findLabelFileInRoutes(nomFichier) {
-    const dossier = getRoutesFolder();
-    const fichiers = dossier.getFilesByName(nomFichier);
+  const dossier = getRoutesFolder();
+  const fichiers = dossier.getFilesByName(nomFichier);
 
-    if (fichiers.hasNext()) {
-        const fichier = fichiers.next();
-        Logger.log(`[DRIVE] 📄 Fichier existant trouvé : "${nomFichier}" (${fichier.getId()})`);
-        return fichier;
-    }
+  if (fichiers.hasNext()) {
+    const fichier = fichiers.next();
+    Logger.log(
+      `[DRIVE] 📄 Fichier existant trouvé : "${nomFichier}" (${fichier.getId()})`,
+    );
+    return fichier;
+  }
 
-    return null;
+  return null;
 }
 
 /**
@@ -79,16 +96,16 @@ function findLabelFileInRoutes(nomFichier) {
  * @returns {boolean}
  */
 function deleteLabelFileIfExists(nomFichier) {
-    const fichier = findLabelFileInRoutes(nomFichier);
+  const fichier = findLabelFileInRoutes(nomFichier);
 
-    if (fichier) {
-        fichier.setTrashed(true);
-        Logger.log(`[DRIVE] 🗑️ Fichier supprimé : "${nomFichier}"`);
-        return true;
-    }
+  if (fichier) {
+    fichier.setTrashed(true);
+    Logger.log(`[DRIVE] 🗑️ Fichier supprimé : "${nomFichier}"`);
+    return true;
+  }
 
-    Logger.log(`[DRIVE] ℹ️ Aucun fichier existant à supprimer : "${nomFichier}"`);
-    return false;
+  Logger.log(`[DRIVE] ℹ️ Aucun fichier existant à supprimer : "${nomFichier}"`);
+  return false;
 }
 
 /**
@@ -97,12 +114,12 @@ function deleteLabelFileIfExists(nomFichier) {
  * @returns {GoogleAppsScript.Drive.File}
  */
 function moveFileToRoutesFolder(fileId) {
-    const dossier = getRoutesFolder();
-    const fichier = DriveApp.getFileById(fileId);
+  const dossier = getRoutesFolder();
+  const fichier = DriveApp.getFileById(fileId);
 
-    dossier.addFile(fichier);
-    DriveApp.getRootFolder().removeFile(fichier);
+  dossier.addFile(fichier);
+  DriveApp.getRootFolder().removeFile(fichier);
 
-    Logger.log(`[DRIVE] ✅ Fichier déplacé vers Routes/ : ${fichier.getName()}`);
-    return fichier;
+  Logger.log(`[DRIVE] ✅ Fichier déplacé vers Routes/ : ${fichier.getName()}`);
+  return fichier;
 }

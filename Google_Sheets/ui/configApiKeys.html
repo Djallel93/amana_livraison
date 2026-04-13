@@ -1,136 +1,191 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <?!= include('styles'); ?>
+  </head>
 
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <?!= include('styles'); ?>
-</head>
-
-<body>
-  <div class="page-wrap">
-    <div class="card">
-
-      <div class="form-header">
-        <div class="form-header__icon">🔑</div>
-        <div class="form-header__text">
-          <h1>Configuration des API Keys</h1>
-          <p>Renseigner les URLs et clés d'authentification</p>
-        </div>
-      </div>
-
-      <!-- FORM STATE -->
-      <div id="formState">
-        <div class="form-body">
-          <div id="alert-success" class="alert alert--success"></div>
-          <div id="alert-error" class="alert alert--error"></div>
-
-          <form id="configForm">
-
-            <div class="form-section">
-              <div class="form-section__title">📊 API Familles</div>
-              <div class="form-group">
-                <label for="famillesUrl">URL de l'API</label>
-                <input type="text" id="famillesUrl" placeholder="https://script.google.com/macros/s/…/exec" required>
-                <div class="help-text">Family Management REST API v2.2</div>
-              </div>
-              <div class="form-group">
-                <label for="famillesKey">Clé API</label>
-                <input type="password" id="famillesKey" placeholder="Entrez la clé API" required>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">👥 API Bénévoles</div>
-              <div class="form-group">
-                <label for="benevolesUrl">URL de l'API</label>
-                <input type="text" id="benevolesUrl" placeholder="https://script.google.com/macros/s/…/exec" required>
-                <div class="help-text">Volunteer Management API v1.0</div>
-              </div>
-              <div class="form-group">
-                <label for="benevolesKey">Clé API</label>
-                <input type="password" id="benevolesKey" placeholder="Entrez la clé API" required>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">🌍 API GEO</div>
-              <div class="form-group">
-                <label for="geoUrl">URL de l'API</label>
-                <input type="text" id="geoUrl" placeholder="https://script.google.com/macros/s/…/exec" required>
-                <div class="help-text">AMANA GEO API v5.0</div>
-              </div>
-              <div class="form-group">
-                <label for="geoKey">Clé API</label>
-                <input type="password" id="geoKey" placeholder="Entrez la clé API (X-Api-Key)" required>
-              </div>
-            </div>
-
-          </form>
+  <body>
+    <div class="page-wrap">
+      <div class="card">
+        <div class="form-header">
+          <div class="form-header__icon">🔑</div>
+          <div class="form-header__text">
+            <h1>Configuration des API Keys</h1>
+            <p>Renseigner les URLs et clés d'authentification</p>
+          </div>
         </div>
 
-        <div class="form-footer">
-          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="configForm" class="btn btn--primary">💾 Enregistrer</button>
+        <!-- FORM STATE -->
+        <div id="formState">
+          <div class="form-body">
+            <div id="alert-success" class="alert alert--success"></div>
+            <div id="alert-error" class="alert alert--error"></div>
+
+            <form id="configForm">
+              <div class="form-section">
+                <div class="form-section__title">📊 API Familles</div>
+                <div class="form-group">
+                  <label for="famillesUrl">URL de l'API</label>
+                  <input
+                    type="text"
+                    id="famillesUrl"
+                    placeholder="https://script.google.com/macros/s/…/exec"
+                    required
+                  />
+                  <div class="help-text">Family Management REST API v2.2</div>
+                </div>
+                <div class="form-group">
+                  <label for="famillesKey">Clé API</label>
+                  <input
+                    type="password"
+                    id="famillesKey"
+                    placeholder="Entrez la clé API"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section__title">👥 API Bénévoles</div>
+                <div class="form-group">
+                  <label for="benevolesUrl">URL de l'API</label>
+                  <input
+                    type="text"
+                    id="benevolesUrl"
+                    placeholder="https://script.google.com/macros/s/…/exec"
+                    required
+                  />
+                  <div class="help-text">Volunteer Management API v1.0</div>
+                </div>
+                <div class="form-group">
+                  <label for="benevolesKey">Clé API</label>
+                  <input
+                    type="password"
+                    id="benevolesKey"
+                    placeholder="Entrez la clé API"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section__title">🌍 API GEO</div>
+                <div class="form-group">
+                  <label for="geoUrl">URL de l'API</label>
+                  <input
+                    type="text"
+                    id="geoUrl"
+                    placeholder="https://script.google.com/macros/s/…/exec"
+                    required
+                  />
+                  <div class="help-text">AMANA GEO API v5.0</div>
+                </div>
+                <div class="form-group">
+                  <label for="geoKey">Clé API</label>
+                  <input
+                    type="password"
+                    id="geoKey"
+                    placeholder="Entrez la clé API (X-Api-Key)"
+                    required
+                  />
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button type="submit" form="configForm" class="btn btn--primary">
+              💾 Enregistrer
+            </button>
+          </div>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div id="loadingState" class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Sauvegarde en cours…</div>
         </div>
       </div>
-
-      <!-- LOADING STATE -->
-      <div id="loadingState" class="loading-state">
-        <div class="spinner"></div>
-        <div class="loading-state__text">Sauvegarde en cours…</div>
-      </div>
-
     </div>
-  </div>
 
-  <script>
-    window.addEventListener('load', function () {
-      google.script.run
-        .withSuccessHandler(loadConfig)
-        .withFailureHandler(function (e) { showAlert('error', e.message); })
-        .getApiKeysConfig();
-    });
+    <script>
+      window.addEventListener("load", function () {
+        google.script.run
+          .withSuccessHandler(loadConfig)
+          .withFailureHandler(function (e) {
+            showAlert("error", e.message);
+          })
+          .getApiKeysConfig();
+      });
 
-    function loadConfig(config) {
-      if (config.famillesUrl) document.getElementById('famillesUrl').value = config.famillesUrl;
-      if (config.benevolesUrl) document.getElementById('benevolesUrl').value = config.benevolesUrl;
-      if (config.geoUrl) document.getElementById('geoUrl').value = config.geoUrl;
-    }
+      function loadConfig(config) {
+        if (config.famillesUrl)
+          document.getElementById("famillesUrl").value = config.famillesUrl;
+        if (config.benevolesUrl)
+          document.getElementById("benevolesUrl").value = config.benevolesUrl;
+        if (config.geoUrl)
+          document.getElementById("geoUrl").value = config.geoUrl;
+      }
 
-    document.getElementById('configForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const config = {
-        famillesUrl: document.getElementById('famillesUrl').value,
-        famillesKey: document.getElementById('famillesKey').value,
-        benevolesUrl: document.getElementById('benevolesUrl').value,
-        benevolesKey: document.getElementById('benevolesKey').value,
-        geoUrl: document.getElementById('geoUrl').value,
-        geoKey: document.getElementById('geoKey').value
-      };
-      setState('loading');
-      google.script.run
-        .withSuccessHandler(function (r) {
-          if (r.success) { setState('form'); showAlert('success', '✅ Configuration sauvegardée !'); setTimeout(function () { google.script.host.close(); }, 1800); }
-          else { setState('form'); showAlert('error', r.error || 'Erreur inconnue'); }
-        })
-        .withFailureHandler(function (e) { setState('form'); showAlert('error', e.message); })
-        .saveApiKeysConfig(config);
-    });
+      document
+        .getElementById("configForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          const config = {
+            famillesUrl: document.getElementById("famillesUrl").value,
+            famillesKey: document.getElementById("famillesKey").value,
+            benevolesUrl: document.getElementById("benevolesUrl").value,
+            benevolesKey: document.getElementById("benevolesKey").value,
+            geoUrl: document.getElementById("geoUrl").value,
+            geoKey: document.getElementById("geoKey").value,
+          };
+          setState("loading");
+          google.script.run
+            .withSuccessHandler(function (r) {
+              if (r.success) {
+                setState("form");
+                showAlert("success", "✅ Configuration sauvegardée !");
+                setTimeout(function () {
+                  google.script.host.close();
+                }, 1800);
+              } else {
+                setState("form");
+                showAlert("error", r.error || "Erreur inconnue");
+              }
+            })
+            .withFailureHandler(function (e) {
+              setState("form");
+              showAlert("error", e.message);
+            })
+            .saveApiKeysConfig(config);
+        });
 
-    function setState(s) {
-      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-    }
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+      }
 
-    function showAlert(type, msg) {
-      var el = document.getElementById('alert-' + type);
-      el.textContent = msg;
-      el.classList.add('alert--visible');
-      el.classList.add('alert--' + type);
-      setTimeout(function () { el.classList.remove('alert--visible'); }, 5000);
-    }
-  </script>
-</body>
-
+      function showAlert(type, msg) {
+        var el = document.getElementById("alert-" + type);
+        el.textContent = msg;
+        el.classList.add("alert--visible");
+        el.classList.add("alert--" + type);
+        setTimeout(function () {
+          el.classList.remove("alert--visible");
+        }, 5000);
+      }
+    </script>
+  </body>
 </html>

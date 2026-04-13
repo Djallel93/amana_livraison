@@ -8,11 +8,16 @@ function sendRouteEmails(routeIds) {
 
   const result = { success: false, sent: 0, errors: [] };
 
-  const apiWebUrl = PropertiesService.getScriptProperties().getProperty('API_LIVRAISON_URL') || '';
-  const adminPhone = PropertiesService.getScriptProperties().getProperty('ADMIN_PHONE') || '';
+  const apiWebUrl =
+    PropertiesService.getScriptProperties().getProperty("API_LIVRAISON_URL") ||
+    "";
+  const adminPhone =
+    PropertiesService.getScriptProperties().getProperty("ADMIN_PHONE") || "";
 
   if (!apiWebUrl) {
-    result.errors.push('API_LIVRAISON_URL non configurée (Menu > Configuration > Configurer API Web)');
+    result.errors.push(
+      "API_LIVRAISON_URL non configurée (Menu > Configuration > Configurer API Web)",
+    );
     return result;
   }
 
@@ -29,7 +34,9 @@ function sendRouteEmails(routeIds) {
   }
 
   result.success = result.sent > 0;
-  Logger.log(`[EMAIL] 🎉 Terminé : ${result.sent} envoyés, ${result.errors.length} erreurs`);
+  Logger.log(
+    `[EMAIL] 🎉 Terminé : ${result.sent} envoyés, ${result.errors.length} erreurs`,
+  );
   return result;
 }
 
@@ -44,15 +51,17 @@ function sendRouteEmail(routeId, apiWebUrl, adminPhone) {
   const statutNormalise = normalizeStatut(route.statut);
   const statutsAutorises = [
     CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE,
-    CONFIG.ENUMS.STATUT_ROUTE.PRETE
+    CONFIG.ENUMS.STATUT_ROUTE.PRETE,
   ];
 
   if (!statutsAutorises.includes(statutNormalise)) {
-    throw new Error(`Route ${routeId} n'est pas Confirmée ou Prête (statut: [${route.statut}])`);
+    throw new Error(
+      `Route ${routeId} n'est pas Confirmée ou Prête (statut: [${route.statut}])`,
+    );
   }
 
   const benevoleResponse = getVolunteerById(route.id_benevole);
-  const benevole = extractData(benevoleResponse, ['volunteer', 'benevole']);
+  const benevole = extractData(benevoleResponse, ["volunteer", "benevole"]);
 
   if (!benevole || !benevole.email) {
     throw new Error(`Bénévole ${route.id_benevole} introuvable ou sans email`);
@@ -61,18 +70,26 @@ function sendRouteEmail(routeId, apiWebUrl, adminPhone) {
   const token = generateOrGetToken(routeId);
 
   const stops = getDeliveryStopsForRoute(routeId);
-  if (stops.length === 0) throw new Error(`Aucune étape de livraison pour ${routeId}`);
+  if (stops.length === 0)
+    throw new Error(`Aucune étape de livraison pour ${routeId}`);
 
   const stopsWithData = buildStopsData(stops);
 
-  const emailHtml = buildEmailHtml({ route, benevole, stops: stopsWithData, token, apiWebUrl, adminPhone });
+  const emailHtml = buildEmailHtml({
+    route,
+    benevole,
+    stops: stopsWithData,
+    token,
+    apiWebUrl,
+    adminPhone,
+  });
   const subject = `🗺️ Votre itinéraire de livraison — Route ${routeId}`;
 
   MailApp.sendEmail({
     to: benevole.email,
     subject: subject,
     htmlBody: emailHtml,
-    name: CONFIG.EMAIL.FROM_NAME
+    name: CONFIG.EMAIL.FROM_NAME,
   });
 
   Logger.log(`[EMAIL] 📬 Envoyé à ${benevole.email} pour route ${routeId}`);
@@ -82,7 +99,10 @@ function sendRouteEmail(routeId, apiWebUrl, adminPhone) {
  * Génère ou réutilise un token valide pour la route.
  */
 function generateOrGetToken(routeId) {
-  const existing = filterData(CONFIG.SHEETS.TOKENS, row => String(row.id_route) === String(routeId));
+  const existing = filterData(
+    CONFIG.SHEETS.TOKENS,
+    (row) => String(row.id_route) === String(routeId),
+  );
 
   for (const row of existing) {
     const expiration = parseDate(row.date_expiration);
@@ -105,15 +125,17 @@ function generateOrGetToken(routeId) {
  * Détermine si un token est valide selon la logique force_active.
  */
 function isTokenValid(forceActive, expiration) {
-  const active = forceActive === true || forceActive === 'true' || forceActive === 'TRUE';
+  const active =
+    forceActive === true || forceActive === "true" || forceActive === "TRUE";
   if (active) return true;
   if (!expiration) return false;
   return !isTokenExpired(expiration);
 }
 
 function generateSecureToken() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let t = '';
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let t = "";
   for (let i = 0; i < CONFIG.TOKENS.LENGTH; i++) {
     t += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -121,39 +143,42 @@ function generateSecureToken() {
 }
 
 function buildStopsData(stops) {
-  return stops.map(stop => {
+  return stops.map((stop) => {
     const delivery = getDeliveryById(stop.id_livraison);
     if (!delivery) {
       Logger.log(`[EMAIL] ⚠️ Livraison ${stop.id_livraison} introuvable`);
       return {
         ...stop,
-        adresse: '— adresse inconnue —',
+        adresse: "— adresse inconnue —",
         id_famille: stop.id_livraison,
-        nombre_personnes: '?',
-        telephone: '',
-        telephoneBis: ''
+        nombre_personnes: "?",
+        telephone: "",
+        telephoneBis: "",
       };
     }
 
-    let telephone = '', telephoneBis = '';
+    let telephone = "",
+      telephoneBis = "";
     try {
       const familleResp = getFamilyById(delivery.id_famille);
-      const famille = extractData(familleResp, ['family', 'famille']);
+      const famille = extractData(familleResp, ["family", "famille"]);
       if (famille) {
-        telephone = famille.telephone || '';
-        telephoneBis = famille.telephoneBis || '';
+        telephone = famille.telephone || "";
+        telephoneBis = famille.telephoneBis || "";
       }
     } catch (err) {
-      Logger.log(`[EMAIL] ⚠️ Téléphone famille ${delivery.id_famille} : ${err.message}`);
+      Logger.log(
+        `[EMAIL] ⚠️ Téléphone famille ${delivery.id_famille} : ${err.message}`,
+      );
     }
 
     return {
       ...stop,
-      adresse: delivery.adresse || '—',
+      adresse: delivery.adresse || "—",
       id_famille: delivery.id_famille,
       nombre_personnes: delivery.nombre_personnes || 1,
       telephone,
-      telephoneBis
+      telephoneBis,
     };
   });
 }
@@ -165,7 +190,7 @@ function buildEmailHtml(ctx) {
   const startUrl = `${baseUrl}&action=start_route`;
   const finishUrl = `${baseUrl}&action=finish_route`;
 
-  const benevolePrenom = benevole.prenom || benevole.nom || 'Bénévole';
+  const benevolePrenom = benevole.prenom || benevole.nom || "Bénévole";
   const dateFormatted = formatDateFr(route.date_debut);
 
   return `<!DOCTYPE html>
@@ -184,7 +209,7 @@ function buildEmailHtml(ctx) {
       <p style="color:#fff;margin:0;font-size:22px;font-weight:700;line-height:1.3;">
         🚗 Route <strong>${route.id_route}</strong>
       </p>
-      ${dateFormatted ? `<p style="color:rgba(255,255,255,.85);margin:4px 0 0;font-size:13px;">${dateFormatted}</p>` : ''}
+      ${dateFormatted ? `<p style="color:rgba(255,255,255,.85);margin:4px 0 0;font-size:13px;">${dateFormatted}</p>` : ""}
     </td></tr>
 
     <tr><td style="background:#fff;padding:16px;">
@@ -192,10 +217,14 @@ function buildEmailHtml(ctx) {
         Bonjour <strong>${benevolePrenom}</strong> — <strong>${stops.length} livraison(s)</strong> aujourd'hui.
       </p>
 
-      ${route.lien_maps ? `
+      ${
+        route.lien_maps
+          ? `
       <a href="${route.lien_maps}" style="display:block;padding:13px 16px;margin-bottom:10px;background:linear-gradient(135deg,#38b2ac 0%,#2c7a7b 100%);color:#fff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:700;text-align:center;box-shadow:0 4px 12px rgba(56,178,172,.35);">
         🗺️&nbsp; Itinéraire Google Maps
-      </a>` : ''}
+      </a>`
+          : ""
+      }
 
       <a href="${startUrl}" style="display:block;padding:13px 16px;margin-bottom:16px;background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);color:#fff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:700;text-align:center;box-shadow:0 4px 12px rgba(79,172,254,.35);">
         ▶&nbsp; Je commence ma livraison
@@ -212,11 +241,12 @@ function buildEmailHtml(ctx) {
     </td></tr>
 
     <tr><td style="background:#2d3748;border-radius:0 0 12px 12px;padding:14px 20px;text-align:center;">
-      ${adminPhone
-      ? `<a href="tel:${adminPhone.replace(/\s/g, '')}" style="color:#4facfe;font-size:18px;font-weight:700;text-decoration:none;">📞 ${adminPhone}</a>
+      ${
+        adminPhone
+          ? `<a href="tel:${adminPhone.replace(/\s/g, "")}" style="color:#4facfe;font-size:18px;font-weight:700;text-decoration:none;">📞 ${adminPhone}</a>
            <p style="color:#718096;font-size:11px;margin:6px 0 0;">Un problème ? Appelez l'administrateur</p>`
-      : `<p style="color:#a0aec0;font-size:12px;margin:0;">Un problème ? Contactez l'administrateur</p>`
-    }
+          : `<p style="color:#a0aec0;font-size:12px;margin:0;">Un problème ? Contactez l'administrateur</p>`
+      }
     </td></tr>
 
   </table>
@@ -227,19 +257,24 @@ function buildEmailHtml(ctx) {
 }
 
 function buildStopsTable(stops, baseUrl) {
-  if (stops.length === 0) return '<p style="color:#718096;font-size:13px;">Aucune livraison.</p>';
+  if (stops.length === 0)
+    return '<p style="color:#718096;font-size:13px;">Aucune livraison.</p>';
 
-  const cards = stops.map((stop, idx) => {
-    const confirmUrl = `${baseUrl}&action=confirm_delivery&id_livraison=${encodeURIComponent(stop.id_livraison)}`;
-    const skipUrl = `${baseUrl}&action=skip_delivery&id_livraison=${encodeURIComponent(stop.id_livraison)}`;
-    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.adresse)}`;
+  const cards = stops
+    .map((stop, idx) => {
+      const confirmUrl = `${baseUrl}&action=confirm_delivery&id_livraison=${encodeURIComponent(stop.id_livraison)}`;
+      const skipUrl = `${baseUrl}&action=skip_delivery&id_livraison=${encodeURIComponent(stop.id_livraison)}`;
+      const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stop.adresse)}`;
 
-    const phones = [stop.telephone, stop.telephoneBis]
-      .filter(p => p && String(p).trim())
-      .map(p => `<a href="tel:${String(p).replace(/\s/g, '')}" style="color:#3182ce;text-decoration:none;font-weight:600;">${p}</a>`)
-      .join(' &nbsp;·&nbsp; ');
+      const phones = [stop.telephone, stop.telephoneBis]
+        .filter((p) => p && String(p).trim())
+        .map(
+          (p) =>
+            `<a href="tel:${String(p).replace(/\s/g, "")}" style="color:#3182ce;text-decoration:none;font-weight:600;">${p}</a>`,
+        )
+        .join(" &nbsp;·&nbsp; ");
 
-    return `
+      return `
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:10px;margin-bottom:10px;border:1px solid #e2e8f0;overflow:hidden;">
   <tr>
     <td width="36" style="background:linear-gradient(135deg,#4facfe,#00f2fe);text-align:center;vertical-align:middle;padding:0 6px;">
@@ -251,8 +286,8 @@ function buildStopsTable(stops, baseUrl) {
   </tr>
   <tr>
     <td colspan="2" style="padding:10px 12px;background:#fff;">
-      <a href="${mapsLink}" style="color:#2d3748;font-size:14px;font-weight:600;text-decoration:none;display:block;margin-bottom:${phones ? '6px' : '0'};">📍 ${stop.adresse}</a>
-      ${phones ? `<span style="font-size:13px;color:#4a5568;">📞 ${phones}</span>` : ''}
+      <a href="${mapsLink}" style="color:#2d3748;font-size:14px;font-weight:600;text-decoration:none;display:block;margin-bottom:${phones ? "6px" : "0"};">📍 ${stop.adresse}</a>
+      ${phones ? `<span style="font-size:13px;color:#4a5568;">📞 ${phones}</span>` : ""}
     </td>
   </tr>
   <tr>
@@ -264,7 +299,8 @@ function buildStopsTable(stops, baseUrl) {
     </td>
   </tr>
 </table>`;
-  }).join('');
+    })
+    .join("");
 
   return `<div>${cards}</div>`;
 }
@@ -273,37 +309,37 @@ function buildStopsTable(stops, baseUrl) {
  * Retourne les routes Confirmées pour le formulaire d'envoi.
  */
 function getConfirmedRoutesForSending() {
-  Logger.log('[EMAIL] 🔍 getConfirmedRoutesForSending…');
+  Logger.log("[EMAIL] 🔍 getConfirmedRoutesForSending…");
 
   try {
     const allRoutes = getAllDataAsObjects(CONFIG.SHEETS.ROUTES);
     Logger.log(`[EMAIL] Total routes dans sheet : ${allRoutes.length}`);
 
-    const confirmed = allRoutes.filter(route =>
-      normalizeStatut(route.statut) === CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE
+    const confirmed = allRoutes.filter(
+      (route) =>
+        normalizeStatut(route.statut) === CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE,
     );
 
     Logger.log(`[EMAIL] Routes confirmées trouvées : ${confirmed.length}`);
 
-    return confirmed.map(route => {
+    return confirmed.map((route) => {
       const stops = getDeliveryStopsForRoute(route.id_route);
 
       let benevoleNom = String(route.id_benevole);
       try {
         const resp = getVolunteerById(route.id_benevole);
-        const vol = extractData(resp, ['volunteer', 'benevole']);
-        if (vol) benevoleNom = `${vol.prenom || ''} ${vol.nom || ''}`.trim();
-      } catch (_) { }
+        const vol = extractData(resp, ["volunteer", "benevole"]);
+        if (vol) benevoleNom = `${vol.prenom || ""} ${vol.nom || ""}`.trim();
+      } catch (_) {}
 
       return {
         id_route: String(route.id_route),
         benevole_nom: benevoleNom,
         nombre_livraisons: stops.length,
         distance_km: route.distance_totale_km || 0,
-        date_debut: formatDateForUi(route.date_debut)
+        date_debut: formatDateForUi(route.date_debut),
       };
     });
-
   } catch (err) {
     Logger.log(`[EMAIL] ❌ getConfirmedRoutesForSending : ${err.message}`);
     throw err;
@@ -311,47 +347,78 @@ function getConfirmedRoutesForSending() {
 }
 
 function formatDateFr(val) {
-  if (!val) return '';
+  if (!val) return "";
   try {
     const d = val instanceof Date ? val : new Date(val);
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  } catch (_) { return String(val); }
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch (_) {
+    return String(val);
+  }
 }
 
 function formatDateForUi(val) {
-  if (!val) return '';
+  if (!val) return "";
   try {
     const d = val instanceof Date ? val : new Date(val);
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch (_) { return String(val); }
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch (_) {
+    return String(val);
+  }
 }
 
 function debugRoutesSheet() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.ROUTES);
-  if (!sheet) { Logger.log('❌ Feuille "' + CONFIG.SHEETS.ROUTES + '" introuvable'); return; }
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+    CONFIG.SHEETS.ROUTES,
+  );
+  if (!sheet) {
+    Logger.log('❌ Feuille "' + CONFIG.SHEETS.ROUTES + '" introuvable');
+    return;
+  }
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  Logger.log('HEADERS : ' + JSON.stringify(headers));
+  Logger.log("HEADERS : " + JSON.stringify(headers));
 
-  if (sheet.getLastRow() < 2) { Logger.log('Aucune donnée'); return; }
+  if (sheet.getLastRow() < 2) {
+    Logger.log("Aucune donnée");
+    return;
+  }
 
-  const firstRow = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
-  Logger.log('ROW 1 RAW : ' + JSON.stringify(firstRow));
+  const firstRow = sheet
+    .getRange(2, 1, 1, sheet.getLastColumn())
+    .getValues()[0];
+  Logger.log("ROW 1 RAW : " + JSON.stringify(firstRow));
 
   const objects = getAllDataAsObjects(CONFIG.SHEETS.ROUTES);
   Logger.log(`getAllDataAsObjects → ${objects.length} objets`);
 
   if (objects.length > 0) {
     const r = objects[0];
-    Logger.log('  .statut         = [' + r.statut + ']  type=' + typeof r.statut);
-    Logger.log('  normalizeStatut = [' + normalizeStatut(r.statut) + ']');
-    Logger.log('  CONFIG.CONFIRM  = [' + CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE + ']');
-    Logger.log('  match?          = ' + (normalizeStatut(r.statut) === CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE));
+    Logger.log(
+      "  .statut         = [" + r.statut + "]  type=" + typeof r.statut,
+    );
+    Logger.log("  normalizeStatut = [" + normalizeStatut(r.statut) + "]");
+    Logger.log(
+      "  CONFIG.CONFIRM  = [" + CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE + "]",
+    );
+    Logger.log(
+      "  match?          = " +
+        (normalizeStatut(r.statut) === CONFIG.ENUMS.STATUT_ROUTE.CONFIRMEE),
+    );
   }
 
   const result = getConfirmedRoutesForSending();
   Logger.log(`getConfirmedRoutesForSending → ${result.length} routes`);
-  if (result.length > 0) Logger.log('  Première : ' + JSON.stringify(result[0]));
+  if (result.length > 0)
+    Logger.log("  Première : " + JSON.stringify(result[0]));
 }

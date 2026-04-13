@@ -1,122 +1,170 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <?!= include('styles'); ?>
+  </head>
 
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <?!= include('styles'); ?>
-</head>
-
-<body>
-  <div class="page-wrap">
-    <div class="card">
-
-      <div class="form-header">
-        <div class="form-header__icon">📧</div>
-        <div class="form-header__text">
-          <h1>Configuration des Emails</h1>
-          <p>Personnaliser les emails envoyés aux bénévoles</p>
-        </div>
-      </div>
-
-      <!-- FORM STATE -->
-      <div id="formState">
-        <div class="form-body">
-          <div id="alert-success" class="alert alert--success"></div>
-          <div id="alert-error" class="alert alert--error"></div>
-
-          <form id="emailForm">
-
-            <div class="form-section">
-              <div class="form-section__title">✉️ Expéditeur</div>
-              <div class="form-group">
-                <label for="fromName">Nom de l'expéditeur</label>
-                <input type="text" id="fromName" placeholder="Association AMANA" required>
-              </div>
-              <div class="form-group">
-                <label for="adminEmail">Email administrateur</label>
-                <input type="email" id="adminEmail" placeholder="admin@association.org" required>
-                <div class="help-text">Pour recevoir les notifications (livraisons sautées, etc.)</div>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">🗺️ Email de Route</div>
-              <div class="form-group">
-                <label for="subjectRoute">Sujet de l'email</label>
-                <input type="text" id="subjectRoute" placeholder="Votre Itinéraire de Livraison - {ID_ROUTE}" required>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">⚠️ Notification Admin</div>
-              <div class="form-group">
-                <label for="subjectSkip">Sujet (livraison sautée)</label>
-                <input type="text" id="subjectSkip" placeholder="⚠️ Livraison Sautée - Action Requise" required>
-              </div>
-            </div>
-
-          </form>
+  <body>
+    <div class="page-wrap">
+      <div class="card">
+        <div class="form-header">
+          <div class="form-header__icon">📧</div>
+          <div class="form-header__text">
+            <h1>Configuration des Emails</h1>
+            <p>Personnaliser les emails envoyés aux bénévoles</p>
+          </div>
         </div>
 
-        <div class="form-footer">
-          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="emailForm" class="btn btn--primary">💾 Enregistrer</button>
+        <!-- FORM STATE -->
+        <div id="formState">
+          <div class="form-body">
+            <div id="alert-success" class="alert alert--success"></div>
+            <div id="alert-error" class="alert alert--error"></div>
+
+            <form id="emailForm">
+              <div class="form-section">
+                <div class="form-section__title">✉️ Expéditeur</div>
+                <div class="form-group">
+                  <label for="fromName">Nom de l'expéditeur</label>
+                  <input
+                    type="text"
+                    id="fromName"
+                    placeholder="Association AMANA"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="adminEmail">Email administrateur</label>
+                  <input
+                    type="email"
+                    id="adminEmail"
+                    placeholder="admin@association.org"
+                    required
+                  />
+                  <div class="help-text">
+                    Pour recevoir les notifications (livraisons sautées, etc.)
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section__title">🗺️ Email de Route</div>
+                <div class="form-group">
+                  <label for="subjectRoute">Sujet de l'email</label>
+                  <input
+                    type="text"
+                    id="subjectRoute"
+                    placeholder="Votre Itinéraire de Livraison - {ID_ROUTE}"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section__title">⚠️ Notification Admin</div>
+                <div class="form-group">
+                  <label for="subjectSkip">Sujet (livraison sautée)</label>
+                  <input
+                    type="text"
+                    id="subjectSkip"
+                    placeholder="⚠️ Livraison Sautée - Action Requise"
+                    required
+                  />
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button type="submit" form="emailForm" class="btn btn--primary">
+              💾 Enregistrer
+            </button>
+          </div>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div id="loadingState" class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Sauvegarde en cours…</div>
         </div>
       </div>
-
-      <!-- LOADING STATE -->
-      <div id="loadingState" class="loading-state">
-        <div class="spinner"></div>
-        <div class="loading-state__text">Sauvegarde en cours…</div>
-      </div>
-
     </div>
-  </div>
 
-  <script>
-    window.addEventListener('load', function () {
-      google.script.run
-        .withSuccessHandler(function (config) {
-          if (!config) return;
-          document.getElementById('fromName').value = config.fromName || '';
-          document.getElementById('adminEmail').value = config.adminEmail || '';
-          document.getElementById('subjectRoute').value = config.subjectRoute || '';
-          document.getElementById('subjectSkip').value = config.subjectSkip || '';
-        })
-        .withFailureHandler(function (e) { showAlert('error', 'Erreur de chargement : ' + e.message); })
-        .getCurrentEmailConfig();
-    });
+    <script>
+      window.addEventListener("load", function () {
+        google.script.run
+          .withSuccessHandler(function (config) {
+            if (!config) return;
+            document.getElementById("fromName").value = config.fromName || "";
+            document.getElementById("adminEmail").value =
+              config.adminEmail || "";
+            document.getElementById("subjectRoute").value =
+              config.subjectRoute || "";
+            document.getElementById("subjectSkip").value =
+              config.subjectSkip || "";
+          })
+          .withFailureHandler(function (e) {
+            showAlert("error", "Erreur de chargement : " + e.message);
+          })
+          .getCurrentEmailConfig();
+      });
 
-    document.getElementById('emailForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var adminEmail = document.getElementById('adminEmail').value.trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) { showAlert('error', 'Email administrateur invalide'); return; }
-      var config = {
-        fromName: document.getElementById('fromName').value.trim(),
-        adminEmail: adminEmail,
-        subjectRoute: document.getElementById('subjectRoute').value.trim(),
-        subjectSkip: document.getElementById('subjectSkip').value.trim()
-      };
-      setState('loading');
-      google.script.run
-        .withSuccessHandler(function () { setState('form'); showAlert('success', '✅ Configuration enregistrée !'); setTimeout(function () { google.script.host.close(); }, 1800); })
-        .withFailureHandler(function (e) { setState('form'); showAlert('error', e.message); })
-        .saveEmailConfig(config);
-    });
+      document
+        .getElementById("emailForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          var adminEmail = document.getElementById("adminEmail").value.trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+            showAlert("error", "Email administrateur invalide");
+            return;
+          }
+          var config = {
+            fromName: document.getElementById("fromName").value.trim(),
+            adminEmail: adminEmail,
+            subjectRoute: document.getElementById("subjectRoute").value.trim(),
+            subjectSkip: document.getElementById("subjectSkip").value.trim(),
+          };
+          setState("loading");
+          google.script.run
+            .withSuccessHandler(function () {
+              setState("form");
+              showAlert("success", "✅ Configuration enregistrée !");
+              setTimeout(function () {
+                google.script.host.close();
+              }, 1800);
+            })
+            .withFailureHandler(function (e) {
+              setState("form");
+              showAlert("error", e.message);
+            })
+            .saveEmailConfig(config);
+        });
 
-    function setState(s) {
-      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-    }
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+      }
 
-    function showAlert(type, msg) {
-      var el = document.getElementById('alert-' + type);
-      el.textContent = msg;
-      el.classList.add('alert--visible', 'alert--' + type);
-      setTimeout(function () { el.classList.remove('alert--visible'); }, 5000);
-    }
-  </script>
-</body>
-
+      function showAlert(type, msg) {
+        var el = document.getElementById("alert-" + type);
+        el.textContent = msg;
+        el.classList.add("alert--visible", "alert--" + type);
+        setTimeout(function () {
+          el.classList.remove("alert--visible");
+        }, 5000);
+      }
+    </script>
+  </body>
 </html>

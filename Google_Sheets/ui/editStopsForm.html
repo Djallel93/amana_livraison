@@ -1,570 +1,635 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-
-<head>
-    <base target="_top">
-    <meta charset="UTF-8">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
     <?!= include('styles'); ?>
     <style>
-        .step-nav {
-            display: flex;
-            border-bottom: 2px solid var(--border);
-            background: var(--bg);
-            flex-shrink: 0;
-        }
+      .step-nav {
+        display: flex;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg);
+        flex-shrink: 0;
+      }
 
-        .step-btn {
-            flex: 1;
-            padding: 12px 16px;
-            border: none;
-            background: none;
-            font-family: inherit;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--muted);
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -2px;
-            transition: color .15s, border-color .15s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
+      .step-btn {
+        flex: 1;
+        padding: 12px 16px;
+        border: none;
+        background: none;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
 
-        .step-btn.active {
-            color: var(--c2);
-            border-bottom-color: var(--c2);
-        }
+      .step-btn.active {
+        color: var(--c2);
+        border-bottom-color: var(--c2);
+      }
 
-        .step-btn.done {
-            color: #10b981;
-        }
+      .step-btn.done {
+        color: #10b981;
+      }
 
-        .step-btn:disabled {
-            opacity: .4;
-            cursor: not-allowed;
-        }
+      .step-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
 
-        .step-panel {
-            display: none;
-            flex: 1;
-            flex-direction: column;
-            overflow: hidden;
-        }
+      .step-panel {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        overflow: hidden;
+      }
 
-        .step-panel.active {
-            display: flex;
-        }
+      .step-panel.active {
+        display: flex;
+      }
 
-        .form-body-flex {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            overflow: hidden;
-            padding: 16px 32px;
-        }
+      .form-body-flex {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+        padding: 16px 32px;
+      }
 
-        .table-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-            flex-shrink: 0;
-        }
+      .table-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+      }
 
-        .table-toolbar select {
-            padding: 6px 10px;
-            font-size: 13px;
-            border-radius: var(--radius);
-            border: 2px solid var(--border);
-            background: var(--surface);
-            color: var(--text);
-            width: auto;
-        }
+      .table-toolbar select {
+        padding: 6px 10px;
+        font-size: 13px;
+        border-radius: var(--radius);
+        border: 2px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        width: auto;
+      }
 
-        .table-toolbar select:focus {
-            outline: none;
-            border-color: var(--c1);
-        }
+      .table-toolbar select:focus {
+        outline: none;
+        border-color: var(--c1);
+      }
 
-        .table-wrap {
-            flex: 1;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-        }
+      .table-wrap {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
 
-        .sel-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
+      .sel-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
 
-        .sel-table thead th {
-            background: var(--bg);
-            padding: 8px 12px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--text-2);
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
+      .sel-table thead th {
+        background: var(--bg);
+        padding: 8px 12px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-2);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
 
-        .sel-table tbody tr {
-            border-bottom: 1px solid var(--border-light);
-            transition: background .1s;
-        }
+      .sel-table tbody tr {
+        border-bottom: 1px solid var(--border-light);
+        transition: background 0.1s;
+      }
 
-        .sel-table tbody tr:last-child {
-            border-bottom: none;
-        }
+      .sel-table tbody tr:last-child {
+        border-bottom: none;
+      }
 
-        .sel-table tbody tr:hover {
-            background: var(--bg);
-        }
+      .sel-table tbody tr:hover {
+        background: var(--bg);
+      }
 
-        .sel-table tbody tr.selected {
-            background: rgba(0, 254, 207, .07);
-        }
+      .sel-table tbody tr.selected {
+        background: rgba(0, 254, 207, 0.07);
+      }
 
-        .sel-table td {
-            padding: 8px 12px;
-            vertical-align: middle;
-        }
+      .sel-table td {
+        padding: 8px 12px;
+        vertical-align: middle;
+      }
 
-        .sel-table td:first-child {
-            width: 36px;
-            text-align: center;
-        }
+      .sel-table td:first-child {
+        width: 36px;
+        text-align: center;
+      }
 
-        .route-info-bar {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 10px 14px;
-            background: var(--bg2);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-            flex-shrink: 0;
-        }
+      .route-info-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 10px 14px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+      }
 
-        .route-info-bar .ri-item {
-            font-size: 12px;
-            color: var(--muted);
-        }
+      .route-info-bar .ri-item {
+        font-size: 12px;
+        color: var(--muted);
+      }
 
-        .route-info-bar .ri-item strong {
-            color: var(--text);
-            font-size: 13px;
-        }
+      .route-info-bar .ri-item strong {
+        color: var(--text);
+        font-size: 13px;
+      }
 
-        .two-panels {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            flex: 1;
-            overflow: hidden;
-            min-height: 0;
-        }
+      .two-panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        flex: 1;
+        overflow: hidden;
+        min-height: 0;
+      }
 
-        .panel-box {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-        }
+      .panel-box {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+      }
 
-        .panel-box__title {
-            padding: 10px 14px;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-            color: var(--muted);
-            border-bottom: 1px solid var(--border);
-            background: var(--bg);
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+      .panel-box__title {
+        padding: 10px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        background: var(--bg);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
-        .panel-box__body {
-            flex: 1;
-            overflow-y: auto;
-        }
+      .panel-box__body {
+        flex: 1;
+        overflow-y: auto;
+      }
 
-        .stop-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--border-light);
-            transition: background .1s;
-        }
+      .stop-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border-light);
+        transition: background 0.1s;
+      }
 
-        .stop-row:last-child {
-            border-bottom: none;
-        }
+      .stop-row:last-child {
+        border-bottom: none;
+      }
 
-        .stop-row:hover {
-            background: var(--bg);
-        }
+      .stop-row:hover {
+        background: var(--bg);
+      }
 
-        .stop-row__num {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: var(--grad);
-            color: var(--text);
-            font-size: 11px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
+      .stop-row__num {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--grad);
+        color: var(--text);
+        font-size: 11px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
 
-        .stop-row__info {
-            flex: 1;
-            min-width: 0;
-        }
+      .stop-row__info {
+        flex: 1;
+        min-width: 0;
+      }
 
-        .stop-row__famille {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text);
-            margin-bottom: 2px;
-        }
+      .stop-row__famille {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 2px;
+      }
 
-        .stop-row__adresse {
-            font-size: 11px;
-            color: var(--muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+      .stop-row__adresse {
+        font-size: 11px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
-        .stop-row__meta {
-            display: flex;
-            gap: 6px;
-            margin-top: 3px;
-            flex-wrap: wrap;
-        }
+      .stop-row__meta {
+        display: flex;
+        gap: 6px;
+        margin-top: 3px;
+        flex-wrap: wrap;
+      }
 
-        .mini-badge {
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 20px;
-            font-weight: 600;
-        }
+      .mini-badge {
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 20px;
+        font-weight: 600;
+      }
 
-        .mini-badge--pret {
-            background: #d1fae5;
-            color: #065f46;
-        }
+      .mini-badge--pret {
+        background: #d1fae5;
+        color: #065f46;
+      }
 
-        .mini-badge--attente {
-            background: #fef3c7;
-            color: #92400e;
-        }
+      .mini-badge--attente {
+        background: #fef3c7;
+        color: #92400e;
+      }
 
-        .mini-badge--hotel {
-            background: #e0f2fe;
-            color: #0369a1;
-        }
+      .mini-badge--hotel {
+        background: #e0f2fe;
+        color: #0369a1;
+      }
 
-        .mini-badge--proche {
-            background: rgba(0, 254, 207, .15);
-            color: var(--c2);
-        }
+      .mini-badge--proche {
+        background: rgba(0, 254, 207, 0.15);
+        color: var(--c2);
+      }
 
-        .btn-remove {
-            padding: 5px 10px;
-            background: #fee2e2;
-            color: #7f1d1d;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-            transition: background .15s;
-            flex-shrink: 0;
-        }
+      .btn-remove {
+        padding: 5px 10px;
+        background: #fee2e2;
+        color: #7f1d1d;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s;
+        flex-shrink: 0;
+      }
 
-        .btn-remove:hover {
-            background: #fca5a5;
-        }
+      .btn-remove:hover {
+        background: #fca5a5;
+      }
 
-        .btn-remove:disabled {
-            opacity: .4;
-            cursor: not-allowed;
-        }
+      .btn-remove:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
 
-        .btn-add {
-            padding: 5px 10px;
-            background: #d1fae5;
-            color: #065f46;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-            transition: background .15s;
-            flex-shrink: 0;
-        }
+      .btn-add {
+        padding: 5px 10px;
+        background: #d1fae5;
+        color: #065f46;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s;
+        flex-shrink: 0;
+      }
 
-        .btn-add:hover {
-            background: #6ee7b7;
-        }
+      .btn-add:hover {
+        background: #6ee7b7;
+      }
 
-        .btn-add:disabled {
-            opacity: .4;
-            cursor: not-allowed;
-        }
+      .btn-add:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
 
-        .add-tabs {
-            display: flex;
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
+      .add-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
 
-        .add-tab {
-            flex: 1;
-            padding: 8px 12px;
-            background: none;
-            border: none;
-            font-family: inherit;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--muted);
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
-            transition: color .15s, border-color .15s;
-        }
+      .add-tab {
+        flex: 1;
+        padding: 8px 12px;
+        background: none;
+        border: none;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
 
-        .add-tab.active {
-            color: var(--c2);
-            border-bottom-color: var(--c2);
-        }
+      .add-tab.active {
+        color: var(--c2);
+        border-bottom-color: var(--c2);
+      }
 
-        .add-tab-panel {
-            display: none;
-            flex-direction: column;
-            flex: 1;
-            overflow: hidden;
-        }
+      .add-tab-panel {
+        display: none;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+      }
 
-        .add-tab-panel.active {
-            display: flex;
-        }
+      .add-tab-panel.active {
+        display: flex;
+      }
 
-        .selection-bar {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 14px;
-            background: var(--bg2);
-            border-top: 1px solid var(--border);
-            font-size: 12px;
-            color: var(--text-2);
-            flex-shrink: 0;
-        }
+      .selection-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        background: var(--bg2);
+        border-top: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--text-2);
+        flex-shrink: 0;
+      }
 
-        .op-feedback {
-            padding: 8px 14px;
-            font-size: 12px;
-            font-weight: 600;
-            border-radius: var(--radius);
-            margin-bottom: 10px;
-            flex-shrink: 0;
-            display: none;
-        }
+      .op-feedback {
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: var(--radius);
+        margin-bottom: 10px;
+        flex-shrink: 0;
+        display: none;
+      }
 
-        .op-feedback.success {
-            background: var(--success-bg);
-            color: var(--success-text);
-            display: block;
-        }
+      .op-feedback.success {
+        background: var(--success-bg);
+        color: var(--success-text);
+        display: block;
+      }
 
-        .op-feedback.error {
-            background: var(--error-bg);
-            color: var(--error-text);
-            display: block;
-        }
+      .op-feedback.error {
+        background: var(--error-bg);
+        color: var(--error-text);
+        display: block;
+      }
 
-        .op-feedback.info {
-            background: var(--info-bg);
-            color: var(--info-text);
-            display: block;
-        }
+      .op-feedback.info {
+        background: var(--info-bg);
+        color: var(--info-text);
+        display: block;
+      }
 
-        .op-feedback.warning {
-            background: var(--warning-bg);
-            color: var(--warning-text);
-            display: block;
-        }
+      .op-feedback.warning {
+        background: var(--warning-bg);
+        color: var(--warning-text);
+        display: block;
+      }
 
-        .selection-bar .count {
-            color: var(--c2);
-            font-family: 'DM Mono', monospace;
-            font-size: 14px;
-            font-weight: 700;
-        }
+      .selection-bar .count {
+        color: var(--c2);
+        font-family: "DM Mono", monospace;
+        font-size: 14px;
+        font-weight: 700;
+      }
 
-        .route-stats {
-            display: flex;
-            gap: 16px;
-            padding: 8px 0;
-            flex-shrink: 0;
-            margin-bottom: 8px;
-        }
+      .route-stats {
+        display: flex;
+        gap: 16px;
+        padding: 8px 0;
+        flex-shrink: 0;
+        margin-bottom: 8px;
+      }
 
-        .route-stat {
-            font-size: 12px;
-            color: var(--muted);
-        }
+      .route-stat {
+        font-size: 12px;
+        color: var(--muted);
+      }
 
-        .route-stat strong {
-            color: var(--text);
-            font-family: 'DM Mono', monospace;
-        }
+      .route-stat strong {
+        color: var(--text);
+        font-family: "DM Mono", monospace;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="page-wrap">
-        <div class="card" style="height:100vh; max-height:800px;">
-
-            <div class="form-header">
-                <div class="form-header__icon">➕</div>
-                <div class="form-header__text">
-                    <h1>Modifier les Stops d'une Route</h1>
-                    <p>Ajouter ou retirer des livraisons en temps réel</p>
-                </div>
-            </div>
-
-            <div class="step-nav" id="stepNav">
-                <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)">📋 Choisir la Route</button>
-                <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled>✏️ Modifier les Stops</button>
-            </div>
-
-            <!-- ÉTAPE 1 — SÉLECTION ROUTE -->
-            <div class="step-panel active" id="step1">
-                <div class="form-body-flex">
-                    <div id="alert-error-1" class="alert alert--error"></div>
-
-                    <div class="table-toolbar">
-                        <span class="text-muted" style="font-size:12px; font-weight:600;">Statut</span>
-                        <select id="filtre-statut" onchange="filtrerRoutes()">
-                            <option value="">Tous</option>
-                            <option value="Brouillon">Brouillon</option>
-                            <option value="Confirmée">Confirmée</option>
-                            <option value="Prete">Prête</option>
-                            <option value="En Cours">En Cours</option>
-                        </select>
-                        <span class="text-muted" id="routes-counter" style="margin-left:auto; font-size:12px;"></span>
-                    </div>
-
-                    <div class="table-wrap" id="routes-wrap">
-                        <div class="loading-state loading-state--visible" style="padding:32px 0;">
-                            <div class="spinner"></div>
-                            <div class="loading-state__text">Chargement des routes…</div>
-                        </div>
-                    </div>
-
-                    <div class="selection-bar" id="route-summary" style="display:none;">
-                        <span>Route sélectionnée :</span>
-                        <span class="count" id="route-selected-id">—</span>
-                        <span class="text-muted" id="route-selected-info" style="font-size:12px;"></span>
-                    </div>
-                </div>
-
-                <div class="form-footer">
-                    <button type="button" class="btn btn--secondary"
-                        onclick="google.script.host.close()">Annuler</button>
-                    <button type="button" class="btn btn--primary" id="btnStep1Next" onclick="validerEtape1()"
-                        disabled>Modifier les Stops →</button>
-                </div>
-            </div>
-
-            <!-- ÉTAPE 2 — MODIFICATION STOPS -->
-            <div class="step-panel" id="step2">
-                <div class="form-body-flex">
-                    <div id="alert-error-2" class="alert alert--error"></div>
-                    <div id="op-feedback" class="op-feedback"></div>
-
-                    <div class="route-info-bar" id="route-info-bar"></div>
-
-                    <div class="route-stats" id="route-stats"></div>
-
-                    <div class="two-panels">
-
-                        <!-- PANEL GAUCHE — STOPS ACTUELS -->
-                        <div class="panel-box">
-                            <div class="panel-box__title">
-                                📍 Stops actuels
-                                <span class="text-muted" id="stops-count"
-                                    style="margin-left:auto; font-weight:400;"></span>
-                            </div>
-                            <div class="panel-box__body" id="stops-list">
-                                <div class="loading-state loading-state--visible" style="padding:24px 0;">
-                                    <div class="spinner"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- PANEL DROIT — AJOUTER UN STOP -->
-                        <div class="panel-box" style="display:flex; flex-direction:column;">
-                            <div class="panel-box__title">➕ Ajouter un stop</div>
-                            <div class="add-tabs" id="add-tabs">
-                                <button class="add-tab active" id="tab-nearby" onclick="switchTab('nearby')">📍
-                                    Proches</button>
-                                <button class="add-tab" id="tab-all" onclick="switchTab('all')">📋 Toutes</button>
-                            </div>
-                            <div class="add-tab-panel active" id="panel-nearby">
-                                <div class="panel-box__body" id="nearby-list">
-                                    <div class="loading-state loading-state--visible" style="padding:24px 0;">
-                                        <div class="spinner"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="add-tab-panel" id="panel-all">
-                                <div class="panel-box__body" id="all-list"></div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                <div class="form-footer">
-                    <button type="button" class="btn btn--secondary" onclick="goToStep(1)">← Retour</button>
-                    <button type="button" class="btn btn--primary"
-                        onclick="google.script.host.close()">Terminer</button>
-                </div>
-            </div>
-
-            <!-- LOADING -->
-            <div id="loadingState" class="loading-state" style="display:none;">
-                <div class="spinner"></div>
-                <div class="loading-state__text" id="loading-text">Traitement en cours…</div>
-                <div class="loading-state__sub">TSP · Régénération feuille · Maps</div>
-            </div>
-
+      <div class="card" style="height: 100vh; max-height: 800px">
+        <div class="form-header">
+          <div class="form-header__icon">➕</div>
+          <div class="form-header__text">
+            <h1>Modifier les Stops d'une Route</h1>
+            <p>Ajouter ou retirer des livraisons en temps réel</p>
+          </div>
         </div>
+
+        <div class="step-nav" id="stepNav">
+          <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)">
+            📋 Choisir la Route
+          </button>
+          <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled>
+            ✏️ Modifier les Stops
+          </button>
+        </div>
+
+        <!-- ÉTAPE 1 — SÉLECTION ROUTE -->
+        <div class="step-panel active" id="step1">
+          <div class="form-body-flex">
+            <div id="alert-error-1" class="alert alert--error"></div>
+
+            <div class="table-toolbar">
+              <span class="text-muted" style="font-size: 12px; font-weight: 600"
+                >Statut</span
+              >
+              <select id="filtre-statut" onchange="filtrerRoutes()">
+                <option value="">Tous</option>
+                <option value="Brouillon">Brouillon</option>
+                <option value="Confirmée">Confirmée</option>
+                <option value="Prete">Prête</option>
+                <option value="En Cours">En Cours</option>
+              </select>
+              <span
+                class="text-muted"
+                id="routes-counter"
+                style="margin-left: auto; font-size: 12px"
+              ></span>
+            </div>
+
+            <div class="table-wrap" id="routes-wrap">
+              <div
+                class="loading-state loading-state--visible"
+                style="padding: 32px 0"
+              >
+                <div class="spinner"></div>
+                <div class="loading-state__text">Chargement des routes…</div>
+              </div>
+            </div>
+
+            <div class="selection-bar" id="route-summary" style="display: none">
+              <span>Route sélectionnée :</span>
+              <span class="count" id="route-selected-id">—</span>
+              <span
+                class="text-muted"
+                id="route-selected-info"
+                style="font-size: 12px"
+              ></span>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              class="btn btn--primary"
+              id="btnStep1Next"
+              onclick="validerEtape1()"
+              disabled
+            >
+              Modifier les Stops →
+            </button>
+          </div>
+        </div>
+
+        <!-- ÉTAPE 2 — MODIFICATION STOPS -->
+        <div class="step-panel" id="step2">
+          <div class="form-body-flex">
+            <div id="alert-error-2" class="alert alert--error"></div>
+            <div id="op-feedback" class="op-feedback"></div>
+
+            <div class="route-info-bar" id="route-info-bar"></div>
+
+            <div class="route-stats" id="route-stats"></div>
+
+            <div class="two-panels">
+              <!-- PANEL GAUCHE — STOPS ACTUELS -->
+              <div class="panel-box">
+                <div class="panel-box__title">
+                  📍 Stops actuels
+                  <span
+                    class="text-muted"
+                    id="stops-count"
+                    style="margin-left: auto; font-weight: 400"
+                  ></span>
+                </div>
+                <div class="panel-box__body" id="stops-list">
+                  <div
+                    class="loading-state loading-state--visible"
+                    style="padding: 24px 0"
+                  >
+                    <div class="spinner"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANEL DROIT — AJOUTER UN STOP -->
+              <div
+                class="panel-box"
+                style="display: flex; flex-direction: column"
+              >
+                <div class="panel-box__title">➕ Ajouter un stop</div>
+                <div class="add-tabs" id="add-tabs">
+                  <button
+                    class="add-tab active"
+                    id="tab-nearby"
+                    onclick="switchTab('nearby')"
+                  >
+                    📍 Proches
+                  </button>
+                  <button
+                    class="add-tab"
+                    id="tab-all"
+                    onclick="switchTab('all')"
+                  >
+                    📋 Toutes
+                  </button>
+                </div>
+                <div class="add-tab-panel active" id="panel-nearby">
+                  <div class="panel-box__body" id="nearby-list">
+                    <div
+                      class="loading-state loading-state--visible"
+                      style="padding: 24px 0"
+                    >
+                      <div class="spinner"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="add-tab-panel" id="panel-all">
+                  <div class="panel-box__body" id="all-list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="goToStep(1)"
+            >
+              ← Retour
+            </button>
+            <button
+              type="button"
+              class="btn btn--primary"
+              onclick="google.script.host.close()"
+            >
+              Terminer
+            </button>
+          </div>
+        </div>
+
+        <!-- LOADING -->
+        <div id="loadingState" class="loading-state" style="display: none">
+          <div class="spinner"></div>
+          <div class="loading-state__text" id="loading-text">
+            Traitement en cours…
+          </div>
+          <div class="loading-state__sub">
+            TSP · Régénération feuille · Maps
+          </div>
+        </div>
+      </div>
     </div>
 
     <?!= include('ui/scripts/editStopsFormScript'); ?>
-</body>
-
+  </body>
 </html>

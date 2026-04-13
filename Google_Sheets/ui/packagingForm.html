@@ -1,120 +1,155 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-
-<head>
-    <base target="_top">
-    <meta charset="UTF-8">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
     <?!= include('styles'); ?>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="page-wrap">
-        <div class="card">
-
-            <div class="form-header">
-                <div class="form-header__icon">📦</div>
-                <div class="form-header__text">
-                    <h1>Feuille de Préparation</h1>
-                    <p>Génère une feuille avec QR codes pour l'équipe de conditionnement</p>
-                </div>
-            </div>
-
-            <!-- FORM STATE -->
-            <div id="formState">
-                <div class="form-body">
-                    <div id="alert-success" class="alert alert--success"></div>
-                    <div id="alert-error" class="alert alert--error"></div>
-
-                    <form id="packagingForm">
-                        <div class="form-section">
-                            <div class="form-section__title">📅 Paramètres</div>
-                            <div class="form-group">
-                                <label for="date">Date de livraison</label>
-                                <input type="date" id="date" required>
-                            </div>
-                            <div class="form-group mb-0">
-                                <label for="occasion">Occasion</label>
-                                <select id="occasion">
-                                    <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
-                                    <option value="recolte">🌾 Récolte</option>
-                                    <option value="ponctuelle">📦 Ponctuelle</option>
-                                </select>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="form-footer">
-                    <button type="button" class="btn btn--secondary"
-                        onclick="google.script.host.close()">Annuler</button>
-                    <button type="submit" form="packagingForm" class="btn btn--primary">🚀 Générer la feuille</button>
-                </div>
-            </div>
-
-            <!-- LOADING STATE -->
-            <div id="loadingState" class="loading-state">
-                <div class="spinner"></div>
-                <div class="loading-state__text">Génération en cours…</div>
-                <div class="loading-state__sub">Création de la feuille et des QR codes</div>
-            </div>
-
-            <!-- RESULTS STATE -->
-            <div id="resultsState" class="results-state">
-                <div class="results-header">
-                    <h2>✅ Feuille générée</h2>
-                    <p id="resultsSubtitle"></p>
-                </div>
-                <div class="results-body text-center">
-                    <div id="resultsContent"></div>
-                </div>
-                <div class="form-footer">
-                    <button type="button" class="btn btn--secondary"
-                        onclick="google.script.host.close()">Fermer</button>
-                </div>
-            </div>
-
+      <div class="card">
+        <div class="form-header">
+          <div class="form-header__icon">📦</div>
+          <div class="form-header__text">
+            <h1>Feuille de Préparation</h1>
+            <p>
+              Génère une feuille avec QR codes pour l'équipe de conditionnement
+            </p>
+          </div>
         </div>
+
+        <!-- FORM STATE -->
+        <div id="formState">
+          <div class="form-body">
+            <div id="alert-success" class="alert alert--success"></div>
+            <div id="alert-error" class="alert alert--error"></div>
+
+            <form id="packagingForm">
+              <div class="form-section">
+                <div class="form-section__title">📅 Paramètres</div>
+                <div class="form-group">
+                  <label for="date">Date de livraison</label>
+                  <input type="date" id="date" required />
+                </div>
+                <div class="form-group mb-0">
+                  <label for="occasion">Occasion</label>
+                  <select id="occasion">
+                    <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
+                    <option value="recolte">🌾 Récolte</option>
+                    <option value="ponctuelle">📦 Ponctuelle</option>
+                  </select>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button type="submit" form="packagingForm" class="btn btn--primary">
+              🚀 Générer la feuille
+            </button>
+          </div>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div id="loadingState" class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Génération en cours…</div>
+          <div class="loading-state__sub">
+            Création de la feuille et des QR codes
+          </div>
+        </div>
+
+        <!-- RESULTS STATE -->
+        <div id="resultsState" class="results-state">
+          <div class="results-header">
+            <h2>✅ Feuille générée</h2>
+            <p id="resultsSubtitle"></p>
+          </div>
+          <div class="results-body text-center">
+            <div id="resultsContent"></div>
+          </div>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
-        window.addEventListener('load', function () {
-            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+      window.addEventListener("load", function () {
+        document.getElementById("date").value = new Date()
+          .toISOString()
+          .split("T")[0];
+      });
+
+      document
+        .getElementById("packagingForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          var date = document.getElementById("date").value;
+          if (!date) {
+            showAlert("error", "Veuillez sélectionner une date.");
+            return;
+          }
+          setState("loading");
+          google.script.run
+            .withSuccessHandler(function (result) {
+              if (result.success) {
+                document.getElementById("resultsSubtitle").textContent =
+                  result.count + " livraison(s) trouvée(s)";
+                document.getElementById("resultsContent").innerHTML =
+                  '<a class="link-btn" href="' +
+                  result.url +
+                  '" target="_blank">📂 Ouvrir la feuille</a>';
+                setState("results");
+              } else {
+                setState("form");
+                showAlert("error", "❌ " + (result.errors || []).join(", "));
+              }
+            })
+            .withFailureHandler(function (e) {
+              setState("form");
+              showAlert("error", "❌ Erreur : " + e.message);
+            })
+            .generatePackagingSheetFromForm({
+              date: date,
+              occasion: document.getElementById("occasion").value,
+            });
         });
 
-        document.getElementById('packagingForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            var date = document.getElementById('date').value;
-            if (!date) { showAlert('error', 'Veuillez sélectionner une date.'); return; }
-            setState('loading');
-            google.script.run
-                .withSuccessHandler(function (result) {
-                    if (result.success) {
-                        document.getElementById('resultsSubtitle').textContent = result.count + ' livraison(s) trouvée(s)';
-                        document.getElementById('resultsContent').innerHTML =
-                            '<a class="link-btn" href="' + result.url + '" target="_blank">📂 Ouvrir la feuille</a>';
-                        setState('results');
-                    } else {
-                        setState('form');
-                        showAlert('error', '❌ ' + (result.errors || []).join(', '));
-                    }
-                })
-                .withFailureHandler(function (e) { setState('form'); showAlert('error', '❌ Erreur : ' + e.message); })
-                .generatePackagingSheetFromForm({ date: date, occasion: document.getElementById('occasion').value });
-        });
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+        document
+          .getElementById("resultsState")
+          .classList.toggle("results-state--visible", s === "results");
+      }
 
-        function setState(s) {
-            document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-            document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-            document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
-        }
-
-        function showAlert(type, msg) {
-            var el = document.getElementById('alert-' + type);
-            el.textContent = msg;
-            el.classList.add('alert--visible', 'alert--' + type);
-            setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
-        }
+      function showAlert(type, msg) {
+        var el = document.getElementById("alert-" + type);
+        el.textContent = msg;
+        el.classList.add("alert--visible", "alert--" + type);
+        setTimeout(function () {
+          el.classList.remove("alert--visible");
+        }, 6000);
+      }
     </script>
-</body>
-
+  </body>
 </html>

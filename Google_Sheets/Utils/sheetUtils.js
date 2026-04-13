@@ -15,7 +15,9 @@ function getSheet(sheetName) {
   const sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
-    throw new Error(`La feuille "${sheetName}" n'existe pas dans le spreadsheet`);
+    throw new Error(
+      `La feuille "${sheetName}" n'existe pas dans le spreadsheet`,
+    );
   }
 
   return sheet;
@@ -51,9 +53,11 @@ function getAllDataAsObjects(sheetName) {
   }
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  const data = sheet
+    .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
+    .getValues();
 
-  return data.map(row => {
+  return data.map((row) => {
     const obj = {};
     headers.forEach((header, index) => {
       obj[header] = row[index];
@@ -73,7 +77,9 @@ function appendRow(sheetName, rowData) {
   sheet.appendRow(rowData);
 
   const lastRow = sheet.getLastRow();
-  Logger.log(`[SHEETS] ✅ Ligne ajoutée dans ${sheetName} à l'index ${lastRow}`);
+  Logger.log(
+    `[SHEETS] ✅ Ligne ajoutée dans ${sheetName} à l'index ${lastRow}`,
+  );
 
   return lastRow;
 }
@@ -90,9 +96,13 @@ function appendRows(sheetName, rowsData) {
   const sheet = getSheet(sheetName);
   const startRow = sheet.getLastRow() + 1;
 
-  sheet.getRange(startRow, 1, rowsData.length, rowsData[0].length).setValues(rowsData);
+  sheet
+    .getRange(startRow, 1, rowsData.length, rowsData[0].length)
+    .setValues(rowsData);
 
-  Logger.log(`[SHEETS] ✅ ${rowsData.length} lignes ajoutées dans ${sheetName}`);
+  Logger.log(
+    `[SHEETS] ✅ ${rowsData.length} lignes ajoutées dans ${sheetName}`,
+  );
 
   return rowsData.length;
 }
@@ -121,7 +131,9 @@ function updateCell(sheetName, row, col, value) {
   const sheet = getSheet(sheetName);
   sheet.getRange(row, col).setValue(value);
 
-  Logger.log(`[SHEETS] ✅ Cellule (${row},${col}) mise à jour dans ${sheetName}`);
+  Logger.log(
+    `[SHEETS] ✅ Cellule (${row},${col}) mise à jour dans ${sheetName}`,
+  );
 }
 
 /**
@@ -147,7 +159,8 @@ function findRowByValue(sheetName, colIndex, value) {
   const sheet = getSheet(sheetName);
   const data = sheet.getDataRange().getValues();
 
-  for (let i = 1; i < data.length; i++) { // Commence à 1 pour sauter l'en-tête
+  for (let i = 1; i < data.length; i++) {
+    // Commence à 1 pour sauter l'en-tête
     if (data[i][colIndex - 1] === value) {
       return i + 1; // +1 car les indices Google Sheets commencent à 1
     }
@@ -224,10 +237,10 @@ function generateNextId(sheetName, prefix, colIndex) {
     } else {
       // Extract existing numbers
       const numbers = data
-        .map(row => row[colIndex - 1])
-        .filter(id => id && typeof id === 'string' && id.startsWith(prefix))
-        .map(id => parseInt(id.substring(prefix.length)))
-        .filter(num => !isNaN(num));
+        .map((row) => row[colIndex - 1])
+        .filter((id) => id && typeof id === "string" && id.startsWith(prefix))
+        .map((id) => parseInt(id.substring(prefix.length)))
+        .filter((num) => !isNaN(num));
 
       const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
       ID_COUNTER_CACHE[cacheKey] = maxNumber + 1;
@@ -239,7 +252,7 @@ function generateNextId(sheetName, prefix, colIndex) {
   ID_COUNTER_CACHE[cacheKey]++;
 
   // Format with padding (ex: 001, 042)
-  return `${prefix}${String(currentNumber).padStart(3, '0')}`;
+  return `${prefix}${String(currentNumber).padStart(3, "0")}`;
 }
 
 /**
@@ -247,8 +260,8 @@ function generateNextId(sheetName, prefix, colIndex) {
  * Call this if you need to force re-reading from sheet
  */
 function resetIdCounterCache() {
-  Object.keys(ID_COUNTER_CACHE).forEach(key => delete ID_COUNTER_CACHE[key]);
-  Logger.log('[CACHE] ID counter cache reset');
+  Object.keys(ID_COUNTER_CACHE).forEach((key) => delete ID_COUNTER_CACHE[key]);
+  Logger.log("[CACHE] ID counter cache reset");
 }
 
 /**
@@ -289,7 +302,9 @@ function getRowById(sheetName, id, idColIndex) {
 
   const sheet = getSheet(sheetName);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const rowData = sheet
+    .getRange(rowIndex, 1, 1, sheet.getLastColumn())
+    .getValues()[0];
 
   const obj = { _rowIndex: rowIndex };
   headers.forEach((header, index) => {
@@ -409,5 +424,5 @@ function getColumnValues(sheetName, colIndex, skipHeader = true) {
  */
 function getUniqueColumnValues(sheetName, colIndex) {
   const values = getColumnValues(sheetName, colIndex, true);
-  return [...new Set(values.filter(v => v !== ''))];
+  return [...new Set(values.filter((v) => v !== ""))];
 }

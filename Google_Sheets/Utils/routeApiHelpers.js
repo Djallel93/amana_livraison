@@ -9,9 +9,9 @@
 // ============================================================
 
 function jsonOk(data) {
-    return ContentService
-        .createTextOutput(JSON.stringify(data))
-        .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(
+    ContentService.MimeType.JSON,
+  );
 }
 
 // ============================================================
@@ -19,47 +19,47 @@ function jsonOk(data) {
 // ============================================================
 
 function htmlSuccess(titre, corpsHtml, emoji) {
-    return _buildPage(titre, corpsHtml, emoji, {
-        textColor: '#065f46',
-        bgColor: '#d1fae5',
-        accentColor: '#38a169',
-        badgeColor: '#38a169',
-        badgeLabel: 'Succès'
-    });
+  return _buildPage(titre, corpsHtml, emoji, {
+    textColor: "#065f46",
+    bgColor: "#d1fae5",
+    accentColor: "#38a169",
+    badgeColor: "#38a169",
+    badgeLabel: "Succès",
+  });
 }
 
 function htmlInfo(titre, corpsHtml, emoji) {
-    return _buildPage(titre, corpsHtml, emoji, {
-        textColor: '#0c4a6e',
-        bgColor: '#e0f2fe',
-        accentColor: '#3182ce',
-        badgeColor: '#3182ce',
-        badgeLabel: 'Info'
-    });
+  return _buildPage(titre, corpsHtml, emoji, {
+    textColor: "#0c4a6e",
+    bgColor: "#e0f2fe",
+    accentColor: "#3182ce",
+    badgeColor: "#3182ce",
+    badgeLabel: "Info",
+  });
 }
 
 function htmlWarning(titre, corpsHtml, emoji) {
-    return _buildPage(titre, corpsHtml, emoji, {
-        textColor: '#92400e',
-        bgColor: '#fef3c7',
-        accentColor: '#d97706',
-        badgeColor: '#d97706',
-        badgeLabel: 'Attention'
-    });
+  return _buildPage(titre, corpsHtml, emoji, {
+    textColor: "#92400e",
+    bgColor: "#fef3c7",
+    accentColor: "#d97706",
+    badgeColor: "#d97706",
+    badgeLabel: "Attention",
+  });
 }
 
 function htmlError(titre, corpsHtml) {
-    return _buildPage(titre, corpsHtml, '⚠️', {
-        textColor: '#7f1d1d',
-        bgColor: '#fee2e2',
-        accentColor: '#e53e3e',
-        badgeColor: '#e53e3e',
-        badgeLabel: 'Erreur'
-    });
+  return _buildPage(titre, corpsHtml, "⚠️", {
+    textColor: "#7f1d1d",
+    bgColor: "#fee2e2",
+    accentColor: "#e53e3e",
+    badgeColor: "#e53e3e",
+    badgeLabel: "Erreur",
+  });
 }
 
 function _buildPage(titre, corpsHtml, emoji, couleurs) {
-    const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -148,12 +148,12 @@ function _buildPage(titre, corpsHtml, emoji, couleurs) {
     <h1>${titre}</h1>
     <div class="message">${corpsHtml}</div>
     <button class="btn-close" onclick="window.close()">Fermer</button>
-    <div class="timestamp">${new Date().toLocaleString('fr-FR')}</div>
+    <div class="timestamp">${new Date().toLocaleString("fr-FR")}</div>
     </div>
 </body>
 </html>`;
 
-    return HtmlService.createHtmlOutput(html);
+  return HtmlService.createHtmlOutput(html);
 }
 
 // ============================================================
@@ -161,15 +161,15 @@ function _buildPage(titre, corpsHtml, emoji, couleurs) {
 // ============================================================
 
 function normalizeStatut(val) {
-    if (!val) return '';
-    if (val instanceof Date) return '';
-    return String(val).trim();
+  if (!val) return "";
+  if (val instanceof Date) return "";
+  return String(val).trim();
 }
 
 function extractData(response, keys) {
-    if (!response) return null;
-    for (const key of keys) {
-        if (response[key]) return response[key];
-    }
-    return response;
+  if (!response) return null;
+  for (const key of keys) {
+    if (response[key]) return response[key];
+  }
+  return response;
 }

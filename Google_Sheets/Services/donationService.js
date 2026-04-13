@@ -11,17 +11,17 @@
  * @returns {Array<Object>}
  */
 function getDonationsForDate(date, occasion) {
-    const cible = new Date(date);
-    cible.setHours(0, 0, 0, 0);
+  const cible = new Date(date);
+  cible.setHours(0, 0, 0, 0);
 
-    return filterData(CONFIG_SHEETS.SHEETS.DONATIONS, function (row) {
-        if (!row.date) return false;
-        if (row.occasion !== occasion) return false;
+  return filterData(CONFIG_SHEETS.SHEETS.DONATIONS, function (row) {
+    if (!row.date) return false;
+    if (row.occasion !== occasion) return false;
 
-        const rowDate = new Date(row.date);
-        rowDate.setHours(0, 0, 0, 0);
-        return rowDate.getTime() === cible.getTime();
-    });
+    const rowDate = new Date(row.date);
+    rowDate.setHours(0, 0, 0, 0);
+    return rowDate.getTime() === cible.getTime();
+  });
 }
 
 /**
@@ -31,10 +31,10 @@ function getDonationsForDate(date, occasion) {
  * @returns {number} Poids total en kg
  */
 function getTotalDonatedWeight(date, occasion) {
-    const donations = getDonationsForDate(date, occasion);
-    return donations.reduce(function (sum, row) {
-        return sum + (parseFloat(row.poids_kg) || 0);
-    }, 0);
+  const donations = getDonationsForDate(date, occasion);
+  return donations.reduce(function (sum, row) {
+    return sum + (parseFloat(row.poids_kg) || 0);
+  }, 0);
 }
 
 /**
@@ -44,5 +44,5 @@ function getTotalDonatedWeight(date, occasion) {
  * @returns {number}
  */
 function countDonations(date, occasion) {
-    return getDonationsForDate(date, occasion).length;
+  return getDonationsForDate(date, occasion).length;
 }

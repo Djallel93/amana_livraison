@@ -1,204 +1,270 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <?!= include('styles'); ?>
+  </head>
 
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <?!= include('styles'); ?>
-</head>
-
-<body>
-  <div class="page-wrap">
-    <div class="card">
-
-      <div class="form-header">
-        <div class="form-header__icon">🏷️</div>
-        <div class="form-header__text">
-          <h1>Générer les Étiquettes</h1>
-          <p>Étiquettes avec QR codes — indépendant des routes</p>
-        </div>
-      </div>
-
-      <!-- FORM STATE -->
-      <div id="formState">
-        <div class="form-body">
-          <div id="alert-error" class="alert alert--error"></div>
-
-          <form id="labelsForm">
-
-            <div class="form-section">
-              <div class="form-section__title">📅 Paramètres</div>
-              <div class="form-group">
-                <label for="date">Date de livraison</label>
-                <input type="date" id="date" required>
-              </div>
-              <div class="form-group mb-0">
-                <label for="occasion">Occasion</label>
-                <select id="occasion">
-                  <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
-                  <option value="recolte">🌾 Récolte</option>
-                  <option value="ponctuelle">📦 Ponctuelle</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">📐 Format A4</div>
-              <div class="form-row">
-                <div class="form-group mb-0">
-                  <label for="rows">Lignes par page</label>
-                  <input type="number" id="rows" min="1" max="15" value="7" required>
-                </div>
-                <div class="form-group mb-0">
-                  <label for="cols">Colonnes par page</label>
-                  <input type="number" id="cols" min="1" max="5" value="3" required>
-                </div>
-              </div>
-              <div
-                style="margin-top: 14px; padding: 14px; background: var(--bg2); border-radius: var(--radius); text-align: center; border: 1px solid var(--border);">
-                <div style="font-weight: 600; font-size: 13px; color: var(--text-2); margin-bottom: 10px;"
-                  id="format-display">
-                  7×3 = 21 étiquettes par page
-                </div>
-                <div class="label-preview-grid" id="grid-preview"></div>
-              </div>
-            </div>
-
-          </form>
-        </div>
-
-        <div class="form-footer">
-          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="labelsForm" class="btn btn--primary">✨ Générer les Étiquettes</button>
-        </div>
-      </div>
-
-      <!-- LOADING STATE -->
-      <div id="loadingState" class="loading-state">
-        <div class="spinner"></div>
-        <div class="loading-state__text">Génération en cours…</div>
-        <div class="loading-state__sub">Création des QR codes et mise en page</div>
-      </div>
-
-      <!-- RESULTS STATE -->
-      <div id="resultsState" class="results-state">
-        <div class="results-header">
-          <h2>✅ Étiquettes générées</h2>
-          <p id="results-subtitle"></p>
-        </div>
-        <div class="results-body">
-          <div id="documents-list"></div>
-          <div id="errors-box" class="error-box hidden">
-            <div class="error-box__title">⚠️ Erreurs</div>
-            <ul id="errors-list"></ul>
+  <body>
+    <div class="page-wrap">
+      <div class="card">
+        <div class="form-header">
+          <div class="form-header__icon">🏷️</div>
+          <div class="form-header__text">
+            <h1>Générer les Étiquettes</h1>
+            <p>Étiquettes avec QR codes — indépendant des routes</p>
           </div>
         </div>
-        <div class="form-footer">
-          <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
+
+        <!-- FORM STATE -->
+        <div id="formState">
+          <div class="form-body">
+            <div id="alert-error" class="alert alert--error"></div>
+
+            <form id="labelsForm">
+              <div class="form-section">
+                <div class="form-section__title">📅 Paramètres</div>
+                <div class="form-group">
+                  <label for="date">Date de livraison</label>
+                  <input type="date" id="date" required />
+                </div>
+                <div class="form-group mb-0">
+                  <label for="occasion">Occasion</label>
+                  <select id="occasion">
+                    <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
+                    <option value="recolte">🌾 Récolte</option>
+                    <option value="ponctuelle">📦 Ponctuelle</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section__title">📐 Format A4</div>
+                <div class="form-row">
+                  <div class="form-group mb-0">
+                    <label for="rows">Lignes par page</label>
+                    <input
+                      type="number"
+                      id="rows"
+                      min="1"
+                      max="15"
+                      value="7"
+                      required
+                    />
+                  </div>
+                  <div class="form-group mb-0">
+                    <label for="cols">Colonnes par page</label>
+                    <input
+                      type="number"
+                      id="cols"
+                      min="1"
+                      max="5"
+                      value="3"
+                      required
+                    />
+                  </div>
+                </div>
+                <div
+                  style="
+                    margin-top: 14px;
+                    padding: 14px;
+                    background: var(--bg2);
+                    border-radius: var(--radius);
+                    text-align: center;
+                    border: 1px solid var(--border);
+                  "
+                >
+                  <div
+                    style="
+                      font-weight: 600;
+                      font-size: 13px;
+                      color: var(--text-2);
+                      margin-bottom: 10px;
+                    "
+                    id="format-display"
+                  >
+                    7×3 = 21 étiquettes par page
+                  </div>
+                  <div class="label-preview-grid" id="grid-preview"></div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button type="submit" form="labelsForm" class="btn btn--primary">
+              ✨ Générer les Étiquettes
+            </button>
+          </div>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div id="loadingState" class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Génération en cours…</div>
+          <div class="loading-state__sub">
+            Création des QR codes et mise en page
+          </div>
+        </div>
+
+        <!-- RESULTS STATE -->
+        <div id="resultsState" class="results-state">
+          <div class="results-header">
+            <h2>✅ Étiquettes générées</h2>
+            <p id="results-subtitle"></p>
+          </div>
+          <div class="results-body">
+            <div id="documents-list"></div>
+            <div id="errors-box" class="error-box hidden">
+              <div class="error-box__title">⚠️ Erreurs</div>
+              <ul id="errors-list"></ul>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--primary"
+              onclick="google.script.host.close()"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       </div>
-
     </div>
-  </div>
 
-  <script>
-    window.addEventListener('load', function () {
-      document.getElementById('date').value = new Date().toISOString().split('T')[0];
-      updateFormatDisplay();
-      document.getElementById('rows').addEventListener('input', updateFormatDisplay);
-      document.getElementById('cols').addEventListener('input', updateFormatDisplay);
-    });
-
-    function updateFormatDisplay() {
-      var rows = parseInt(document.getElementById('rows').value) || 7;
-      var cols = parseInt(document.getElementById('cols').value) || 3;
-      document.getElementById('format-display').textContent = rows + '×' + cols + ' = ' + (rows * cols) + ' étiquettes par page';
-      updateGridPreview(rows, cols);
-    }
-
-    function updateGridPreview(rows, cols) {
-      var grid = document.getElementById('grid-preview');
-      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 56px)';
-      grid.style.gridTemplateRows = 'repeat(' + rows + ', 38px)';
-      grid.innerHTML = '';
-      for (var i = 0; i < rows * cols; i++) {
-        var cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.textContent = i + 1;
-        grid.appendChild(cell);
-      }
-    }
-
-    document.getElementById('labelsForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      var date = document.getElementById('date').value;
-      if (!date) { showAlert('Veuillez sélectionner une date.'); return; }
-
-      setState('loading');
-
-      google.script.run
-        .withSuccessHandler(onSuccess)
-        .withFailureHandler(function (err) {
-          setState('form');
-          showAlert('Erreur : ' + err.message);
-        })
-        .generateLabelsFromForm({
-          date: date,
-          occasion: document.getElementById('occasion').value,
-          rows: parseInt(document.getElementById('rows').value),
-          cols: parseInt(document.getElementById('cols').value)
-        });
-    });
-
-    function onSuccess(result) {
-      if (!result.success) {
-        setState('form');
-        showAlert((result.errors || []).join(', ') || 'Erreur inconnue');
-        return;
-      }
-
-      var subtitle = result.processed + ' livraison(s)';
-      if (result.documents.length > 0) {
-        subtitle += ' · ' + result.documents[0].labelCount + ' étiquette(s)';
-      }
-      document.getElementById('results-subtitle').textContent = subtitle;
-
-      var list = document.getElementById('documents-list');
-      list.innerHTML = '';
-      result.documents.forEach(function (doc) {
-        list.innerHTML +=
-          '<div class="doc-item">' +
-          '<div>' +
-          '<div class="doc-item__label">Étiquettes générées</div>' +
-          '<div class="doc-item__sub">' + doc.labelCount + ' étiquettes</div>' +
-          '</div>' +
-          '<a href="' + doc.url + '" target="_blank">📄 Ouvrir</a>' +
-          '</div>';
+    <script>
+      window.addEventListener("load", function () {
+        document.getElementById("date").value = new Date()
+          .toISOString()
+          .split("T")[0];
+        updateFormatDisplay();
+        document
+          .getElementById("rows")
+          .addEventListener("input", updateFormatDisplay);
+        document
+          .getElementById("cols")
+          .addEventListener("input", updateFormatDisplay);
       });
 
-      if (result.errors && result.errors.length > 0) {
-        var ul = document.getElementById('errors-list');
-        ul.innerHTML = result.errors.map(function (e) { return '<li>' + e + '</li>'; }).join('');
-        document.getElementById('errors-box').classList.remove('hidden');
+      function updateFormatDisplay() {
+        var rows = parseInt(document.getElementById("rows").value) || 7;
+        var cols = parseInt(document.getElementById("cols").value) || 3;
+        document.getElementById("format-display").textContent =
+          rows + "×" + cols + " = " + rows * cols + " étiquettes par page";
+        updateGridPreview(rows, cols);
       }
 
-      setState('results');
-    }
+      function updateGridPreview(rows, cols) {
+        var grid = document.getElementById("grid-preview");
+        grid.style.gridTemplateColumns = "repeat(" + cols + ", 56px)";
+        grid.style.gridTemplateRows = "repeat(" + rows + ", 38px)";
+        grid.innerHTML = "";
+        for (var i = 0; i < rows * cols; i++) {
+          var cell = document.createElement("div");
+          cell.className = "cell";
+          cell.textContent = i + 1;
+          grid.appendChild(cell);
+        }
+      }
 
-    function setState(s) {
-      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-      document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
-    }
+      document
+        .getElementById("labelsForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
 
-    function showAlert(msg) {
-      var el = document.getElementById('alert-error');
-      el.textContent = msg;
-      el.classList.add('alert--visible', 'alert--error');
-      setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
-    }
-  </script>
-</body>
+          var date = document.getElementById("date").value;
+          if (!date) {
+            showAlert("Veuillez sélectionner une date.");
+            return;
+          }
 
+          setState("loading");
+
+          google.script.run
+            .withSuccessHandler(onSuccess)
+            .withFailureHandler(function (err) {
+              setState("form");
+              showAlert("Erreur : " + err.message);
+            })
+            .generateLabelsFromForm({
+              date: date,
+              occasion: document.getElementById("occasion").value,
+              rows: parseInt(document.getElementById("rows").value),
+              cols: parseInt(document.getElementById("cols").value),
+            });
+        });
+
+      function onSuccess(result) {
+        if (!result.success) {
+          setState("form");
+          showAlert((result.errors || []).join(", ") || "Erreur inconnue");
+          return;
+        }
+
+        var subtitle = result.processed + " livraison(s)";
+        if (result.documents.length > 0) {
+          subtitle += " · " + result.documents[0].labelCount + " étiquette(s)";
+        }
+        document.getElementById("results-subtitle").textContent = subtitle;
+
+        var list = document.getElementById("documents-list");
+        list.innerHTML = "";
+        result.documents.forEach(function (doc) {
+          list.innerHTML +=
+            '<div class="doc-item">' +
+            "<div>" +
+            '<div class="doc-item__label">Étiquettes générées</div>' +
+            '<div class="doc-item__sub">' +
+            doc.labelCount +
+            " étiquettes</div>" +
+            "</div>" +
+            '<a href="' +
+            doc.url +
+            '" target="_blank">📄 Ouvrir</a>' +
+            "</div>";
+        });
+
+        if (result.errors && result.errors.length > 0) {
+          var ul = document.getElementById("errors-list");
+          ul.innerHTML = result.errors
+            .map(function (e) {
+              return "<li>" + e + "</li>";
+            })
+            .join("");
+          document.getElementById("errors-box").classList.remove("hidden");
+        }
+
+        setState("results");
+      }
+
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+        document
+          .getElementById("resultsState")
+          .classList.toggle("results-state--visible", s === "results");
+      }
+
+      function showAlert(msg) {
+        var el = document.getElementById("alert-error");
+        el.textContent = msg;
+        el.classList.add("alert--visible", "alert--error");
+        setTimeout(function () {
+          el.classList.remove("alert--visible");
+        }, 6000);
+      }
+    </script>
+  </body>
 </html>

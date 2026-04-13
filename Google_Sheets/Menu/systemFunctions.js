@@ -22,7 +22,9 @@ function include(filename) {
  */
 function generateLabelsFromForm(params) {
   try {
-    Logger.log(`[MENU] 🏷️ Génération étiquettes depuis formulaire : ${JSON.stringify(params)}`);
+    Logger.log(
+      `[MENU] 🏷️ Génération étiquettes depuis formulaire : ${JSON.stringify(params)}`,
+    );
     const result = generateLabels(params);
     Logger.log(`[MENU] ✅ ${result.processed} livraison(s) traitée(s)`);
     return result;
@@ -40,13 +42,13 @@ function generateLabelsFromForm(params) {
  * Affiche le formulaire de configuration des API Keys.
  */
 function showApiKeysConfig() {
-  const html = HtmlService.createTemplateFromFile('ui/configApiKeys')
+  const html = HtmlService.createTemplateFromFile("ui/configApiKeys")
     .evaluate()
     .setWidth(600)
     .setHeight(560)
-    .setTitle('🔑 Configuration des API Keys');
+    .setTitle("🔑 Configuration des API Keys");
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Configuration des API Keys');
+  SpreadsheetApp.getUi().showModalDialog(html, "Configuration des API Keys");
 }
 
 // ============================================================
@@ -60,9 +62,13 @@ function refreshApiData() {
   const ui = SpreadsheetApp.getUi();
   try {
     invalidateAllCache();
-    ui.alert('Succès', 'Le cache a été vidé. Les prochaines requêtes récupéreront des données fraîches.', ui.ButtonSet.OK);
+    ui.alert(
+      "Succès",
+      "Le cache a été vidé. Les prochaines requêtes récupéreront des données fraîches.",
+      ui.ButtonSet.OK,
+    );
   } catch (err) {
-    ui.alert('Erreur', err.message, ui.ButtonSet.OK);
+    ui.alert("Erreur", err.message, ui.ButtonSet.OK);
   }
 }
 
@@ -80,29 +86,40 @@ function testApiConnections() {
   const ui = SpreadsheetApp.getUi();
 
   if (!isApiConfigured()) {
-    ui.alert('Configuration Manquante', CONFIG.MESSAGES.ERROR_API_KEY_MISSING, ui.ButtonSet.OK);
+    ui.alert(
+      "Configuration Manquante",
+      CONFIG.MESSAGES.ERROR_API_KEY_MISSING,
+      ui.ButtonSet.OK,
+    );
     return;
   }
 
   try {
-    ui.alert('Test en cours…', 'Vérification de la connexion aux 3 APIs.\nCela peut prendre quelques secondes.', ui.ButtonSet.OK);
+    ui.alert(
+      "Test en cours…",
+      "Vérification de la connexion aux 3 APIs.\nCela peut prendre quelques secondes.",
+      ui.ButtonSet.OK,
+    );
 
     const status = checkAllApis();
-    let message = 'Résultats des tests :\n\n';
+    let message = "Résultats des tests :\n\n";
 
     for (const [apiName, apiStatus] of Object.entries(status.apis)) {
-      const emoji = apiStatus.status === 'ok' ? '✅' : '❌';
+      const emoji = apiStatus.status === "ok" ? "✅" : "❌";
       message += `${emoji} ${apiName.toUpperCase()}\n`;
       message += `   Status: ${apiStatus.status}\n`;
       if (apiStatus.version) message += `   Version: ${apiStatus.version}\n`;
       message += `   ${apiStatus.message}\n\n`;
     }
 
-    ui.alert('Résultats des Tests', message, ui.ButtonSet.OK);
+    ui.alert("Résultats des Tests", message, ui.ButtonSet.OK);
     logApiStatus();
-
   } catch (err) {
-    ui.alert('Erreur', `Erreur lors du test des APIs :\n${err.message}`, ui.ButtonSet.OK);
+    ui.alert(
+      "Erreur",
+      `Erreur lors du test des APIs :\n${err.message}`,
+      ui.ButtonSet.OK,
+    );
   }
 }
 
@@ -132,5 +149,5 @@ Ce système permet de gérer les livraisons de l'association :
 ${CONFIG.EMAIL.ADMIN_EMAIL}
   `;
 
-  ui.alert('Documentation', message, ui.ButtonSet.OK);
+  ui.alert("Documentation", message, ui.ButtonSet.OK);
 }

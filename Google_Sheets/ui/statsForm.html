@@ -1,390 +1,611 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-
-<head>
-    <base target="_top">
-    <meta charset="UTF-8">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <?!= include('styles'); ?>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="page-wrap">
-
-        <!-- ═══════════ FORM STATE ═══════════ -->
-        <div id="formState" class="card" style="max-width: 560px; margin: auto; width: 100%;">
-            <div class="form-header">
-                <div class="form-header__icon">📊</div>
-                <div class="form-header__text">
-                    <h1>Statistiques</h1>
-                    <p>Sélectionner la date et l'occasion</p>
+      <!-- ═══════════ FORM STATE ═══════════ -->
+      <div
+        id="formState"
+        class="card"
+        style="max-width: 560px; margin: auto; width: 100%"
+      >
+        <div class="form-header">
+          <div class="form-header__icon">📊</div>
+          <div class="form-header__text">
+            <h1>Statistiques</h1>
+            <p>Sélectionner la date et l'occasion</p>
+          </div>
+        </div>
+        <div class="form-body">
+          <div id="alert-error" class="alert alert--error"></div>
+          <form id="statsForm">
+            <div class="form-section">
+              <div class="form-section__title">📅 Période</div>
+              <div class="form-group">
+                <label for="f-date">Date</label>
+                <input type="date" id="f-date" required />
+              </div>
+              <div class="form-group mb-0">
+                <label for="f-occasion">Occasion</label>
+                <select id="f-occasion">
+                  <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
+                  <option value="recolte">🌾 Récolte</option>
+                  <option value="ponctuelle">📦 Ponctuelle</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-section">
+              <div class="form-section__title">
+                ⚖️ Poids moyen par personne (kg)
+              </div>
+              <div class="form-row">
+                <div class="form-group mb-0">
+                  <label for="f-poids-dom">Domicile 🏠</label>
+                  <input
+                    type="number"
+                    id="f-poids-dom"
+                    value="15"
+                    min="1"
+                    max="100"
+                    step="0.5"
+                  />
                 </div>
+                <div class="form-group mb-0">
+                  <label for="f-poids-hot">Hôtel 🏨</label>
+                  <input
+                    type="number"
+                    id="f-poids-hot"
+                    value="10"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
+              </div>
             </div>
-            <div class="form-body">
-                <div id="alert-error" class="alert alert--error"></div>
-                <form id="statsForm">
-                    <div class="form-section">
-                        <div class="form-section__title">📅 Période</div>
-                        <div class="form-group">
-                            <label for="f-date">Date</label>
-                            <input type="date" id="f-date" required>
-                        </div>
-                        <div class="form-group mb-0">
-                            <label for="f-occasion">Occasion</label>
-                            <select id="f-occasion">
-                                <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
-                                <option value="recolte">🌾 Récolte</option>
-                                <option value="ponctuelle">📦 Ponctuelle</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-section">
-                        <div class="form-section__title">⚖️ Poids moyen par personne (kg)</div>
-                        <div class="form-row">
-                            <div class="form-group mb-0">
-                                <label for="f-poids-dom">Domicile 🏠</label>
-                                <input type="number" id="f-poids-dom" value="15" min="1" max="100" step="0.5">
-                            </div>
-                            <div class="form-group mb-0">
-                                <label for="f-poids-hot">Hôtel 🏨</label>
-                                <input type="number" id="f-poids-hot" value="10" min="0" max="100" step="0.1">
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="form-footer">
-                <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Fermer</button>
-                <button type="submit" form="statsForm" class="btn btn--primary">Afficher les statistiques</button>
-            </div>
+          </form>
+        </div>
+        <div class="form-footer">
+          <button
+            type="button"
+            class="btn btn--secondary"
+            onclick="google.script.host.close()"
+          >
+            Fermer
+          </button>
+          <button type="submit" form="statsForm" class="btn btn--primary">
+            Afficher les statistiques
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══════════ LOADING STATE ═══════════ -->
+      <div id="loadingState" class="loading-state" style="flex: 1">
+        <div class="spinner"></div>
+        <div class="loading-state__text">Calcul des statistiques…</div>
+      </div>
+
+      <!-- ═══════════ RESULTS STATE ═══════════ -->
+      <div
+        id="resultsState"
+        class="results-state"
+        style="flex: 1; flex-direction: column"
+      >
+        <div class="topbar">
+          <div>
+            <div class="topbar__title">📊 Statistiques</div>
+            <div class="topbar__sub" id="topbar-sub"></div>
+          </div>
+          <div class="topbar__actions">
+            <div id="alert-email" class="alert" style="margin: 0"></div>
+            <button class="btn btn--secondary" onclick="goBack()">
+              ← Retour
+            </button>
+            <button
+              class="btn btn--success"
+              id="btn-email"
+              onclick="sendEmail()"
+            >
+              ✉️ Envoyer par email
+            </button>
+          </div>
         </div>
 
-        <!-- ═══════════ LOADING STATE ═══════════ -->
-        <div id="loadingState" class="loading-state" style="flex:1;">
-            <div class="spinner"></div>
-            <div class="loading-state__text">Calcul des statistiques…</div>
-        </div>
+        <div class="results-body" style="flex: 1; overflow-y: auto">
+          <div class="section-divider">📦 Chiffres globaux</div>
+          <div class="tile-grid">
+            <div class="tile">
+              <div class="tile__icon">📦</div>
+              <div>
+                <div class="tile__value" id="t-livraisons">—</div>
+                <div class="tile__label">Livraisons</div>
+              </div>
+            </div>
+            <div class="tile">
+              <div class="tile__icon">🗺️</div>
+              <div>
+                <div class="tile__value" id="t-routes">—</div>
+                <div class="tile__label">Routes</div>
+              </div>
+            </div>
+            <div class="tile">
+              <div class="tile__icon">👥</div>
+              <div>
+                <div class="tile__value" id="t-parts">—</div>
+                <div class="tile__label">Bénéficiaires</div>
+              </div>
+            </div>
+          </div>
 
-        <!-- ═══════════ RESULTS STATE ═══════════ -->
-        <div id="resultsState" class="results-state" style="flex:1; flex-direction: column;">
+          <div class="section-divider">📈 Progression des livraisons</div>
+          <div class="two-col" style="margin-bottom: 20px">
+            <div class="inner-card">
+              <div class="inner-card__title">Taux de complétion</div>
+              <div class="progress-pct" id="pct-val">0%</div>
+              <div class="progress-bar-wrap">
+                <div
+                  class="progress-bar-fill"
+                  id="pct-bar"
+                  style="width: 0%"
+                ></div>
+              </div>
+              <div id="status-detail"></div>
+            </div>
+            <div class="inner-card">
+              <div class="inner-card__title">Répartition par statut</div>
+              <div class="chart-wrap">
+                <canvas id="pie-chart"></canvas>
+              </div>
+            </div>
+          </div>
 
-            <div class="topbar">
+          <div class="section-divider">⚖️ Données de poids</div>
+          <div class="two-col" style="margin-bottom: 20px">
+            <div class="inner-card">
+              <div class="inner-card__title">Comparaison des poids</div>
+              <div class="chart-wrap" style="height: 180px">
+                <canvas id="bar-chart"></canvas>
+              </div>
+            </div>
+            <div class="inner-card">
+              <div class="inner-card__title">Détail</div>
+              <div class="ws-item">
+                <div class="ws-item__icon">🎁</div>
                 <div>
-                    <div class="topbar__title">📊 Statistiques</div>
-                    <div class="topbar__sub" id="topbar-sub"></div>
+                  <div class="ws-item__value" id="ws-donne">— kg</div>
+                  <div class="ws-item__label" id="ws-donne-sub">
+                    Poids donné
+                  </div>
                 </div>
-                <div class="topbar__actions">
-                    <div id="alert-email" class="alert" style="margin:0;"></div>
-                    <button class="btn btn--secondary" onclick="goBack()">← Retour</button>
-                    <button class="btn btn--success" id="btn-email" onclick="sendEmail()">✉️ Envoyer par email</button>
+              </div>
+              <div class="ws-item">
+                <div class="ws-item__icon">🚗</div>
+                <div>
+                  <div class="ws-item__value" id="ws-livre">— kg</div>
+                  <div class="ws-item__label">
+                    Poids livré (routes terminées)
+                  </div>
                 </div>
+              </div>
+              <div class="ws-item">
+                <div class="ws-item__icon">🗺️</div>
+                <div>
+                  <div class="ws-item__value" id="ws-projete">— kg</div>
+                  <div class="ws-item__label">
+                    Poids projeté (toutes routes actives)
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
 
-            <div class="results-body" style="flex:1; overflow-y: auto;">
-
-                <div class="section-divider">📦 Chiffres globaux</div>
-                <div class="tile-grid">
-                    <div class="tile">
-                        <div class="tile__icon">📦</div>
-                        <div>
-                            <div class="tile__value" id="t-livraisons">—</div>
-                            <div class="tile__label">Livraisons</div>
-                        </div>
-                    </div>
-                    <div class="tile">
-                        <div class="tile__icon">🗺️</div>
-                        <div>
-                            <div class="tile__value" id="t-routes">—</div>
-                            <div class="tile__label">Routes</div>
-                        </div>
-                    </div>
-                    <div class="tile">
-                        <div class="tile__icon">👥</div>
-                        <div>
-                            <div class="tile__value" id="t-parts">—</div>
-                            <div class="tile__label">Bénéficiaires</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section-divider">📈 Progression des livraisons</div>
-                <div class="two-col" style="margin-bottom: 20px;">
-                    <div class="inner-card">
-                        <div class="inner-card__title">Taux de complétion</div>
-                        <div class="progress-pct" id="pct-val">0%</div>
-                        <div class="progress-bar-wrap">
-                            <div class="progress-bar-fill" id="pct-bar" style="width:0%"></div>
-                        </div>
-                        <div id="status-detail"></div>
-                    </div>
-                    <div class="inner-card">
-                        <div class="inner-card__title">Répartition par statut</div>
-                        <div class="chart-wrap">
-                            <canvas id="pie-chart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section-divider">⚖️ Données de poids</div>
-                <div class="two-col" style="margin-bottom: 20px;">
-                    <div class="inner-card">
-                        <div class="inner-card__title">Comparaison des poids</div>
-                        <div class="chart-wrap" style="height: 180px;">
-                            <canvas id="bar-chart"></canvas>
-                        </div>
-                    </div>
-                    <div class="inner-card">
-                        <div class="inner-card__title">Détail</div>
-                        <div class="ws-item">
-                            <div class="ws-item__icon">🎁</div>
-                            <div>
-                                <div class="ws-item__value" id="ws-donne">— kg</div>
-                                <div class="ws-item__label" id="ws-donne-sub">Poids donné</div>
-                            </div>
-                        </div>
-                        <div class="ws-item">
-                            <div class="ws-item__icon">🚗</div>
-                            <div>
-                                <div class="ws-item__value" id="ws-livre">— kg</div>
-                                <div class="ws-item__label">Poids livré (routes terminées)</div>
-                            </div>
-                        </div>
-                        <div class="ws-item">
-                            <div class="ws-item__icon">🗺️</div>
-                            <div>
-                                <div class="ws-item__value" id="ws-projete">— kg</div>
-                                <div class="ws-item__label">Poids projeté (toutes routes actives)</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECTION AJUSTEMENT -->
-                <div class="section-divider">🎯 Ajustement des poids</div>
-                <div class="two-col" style="margin-bottom: 0;">
-                    <div class="inner-card">
-                        <div class="inner-card__title">Surplus / Déficit</div>
-                        <div id="surplus-value"
-                            style="font-size:42px;font-weight:700;font-family:'DM Mono',monospace;text-align:center;line-height:1;margin-bottom:8px;">
-                            —</div>
-                        <div id="surplus-label"
-                            style="text-align:center;font-size:13px;color:#718096;margin-bottom:16px;">—</div>
-                        <div class="progress-bar-wrap" style="margin-bottom:6px;">
-                            <div id="coverage-bar" class="progress-bar-fill"
-                                style="width:0%;background:linear-gradient(135deg,#38a169,#276749);"></div>
-                        </div>
-                        <div id="coverage-label" style="text-align:center;font-size:12px;color:#718096;">Taux de
-                            couverture : —%</div>
-                        <div id="non-assignees-warning" class="hidden"
-                            style="margin-top:10px;padding:8px 10px;background:#fef9c3;border-radius:6px;font-size:11px;color:#713f12;">
-                            ⚠️ <span id="non-assignees-count"></span> livraison(s) non assignée(s) non incluses dans le
-                            calcul.
-                        </div>
-                    </div>
-                    <div class="inner-card">
-                        <div class="inner-card__title">Poids recommandé</div>
-                        <div style="font-size:12px;color:#718096;margin-bottom:14px;">
-                            Calculé à partir du stock disponible et du nombre total de bénéficiaires, en conservant le
-                            ratio hôtel/domicile existant.
-                        </div>
-                        <div class="ws-item">
-                            <div class="ws-item__icon">🏠</div>
-                            <div>
-                                <div class="ws-item__value" id="reco-dom">— kg/pers</div>
-                                <div class="ws-item__label">Domicile</div>
-                            </div>
-                        </div>
-                        <div class="ws-item">
-                            <div class="ws-item__icon">🏨</div>
-                            <div>
-                                <div class="ws-item__value" id="reco-hotel">— kg/pers</div>
-                                <div class="ws-item__label">Hôtel</div>
-                            </div>
-                        </div>
-                        <div id="transfer-box" class="hidden"
-                            style="margin-top:12px;padding:12px;background:#d1fae5;border-radius:8px;text-align:center;">
-                            <div style="font-size:12px;color:#065f46;font-weight:600;">📦 Transfert estimé vers autre
-                                centre</div>
-                            <div id="transfer-value"
-                                style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace;color:#065f46;margin-top:4px;">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
+          <!-- SECTION AJUSTEMENT -->
+          <div class="section-divider">🎯 Ajustement des poids</div>
+          <div class="two-col" style="margin-bottom: 0">
+            <div class="inner-card">
+              <div class="inner-card__title">Surplus / Déficit</div>
+              <div
+                id="surplus-value"
+                style="
+                  font-size: 42px;
+                  font-weight: 700;
+                  font-family: &quot;DM Mono&quot;, monospace;
+                  text-align: center;
+                  line-height: 1;
+                  margin-bottom: 8px;
+                "
+              >
+                —
+              </div>
+              <div
+                id="surplus-label"
+                style="
+                  text-align: center;
+                  font-size: 13px;
+                  color: #718096;
+                  margin-bottom: 16px;
+                "
+              >
+                —
+              </div>
+              <div class="progress-bar-wrap" style="margin-bottom: 6px">
+                <div
+                  id="coverage-bar"
+                  class="progress-bar-fill"
+                  style="
+                    width: 0%;
+                    background: linear-gradient(135deg, #38a169, #276749);
+                  "
+                ></div>
+              </div>
+              <div
+                id="coverage-label"
+                style="text-align: center; font-size: 12px; color: #718096"
+              >
+                Taux de couverture : —%
+              </div>
+              <div
+                id="non-assignees-warning"
+                class="hidden"
+                style="
+                  margin-top: 10px;
+                  padding: 8px 10px;
+                  background: #fef9c3;
+                  border-radius: 6px;
+                  font-size: 11px;
+                  color: #713f12;
+                "
+              >
+                ⚠️ <span id="non-assignees-count"></span> livraison(s) non
+                assignée(s) non incluses dans le calcul.
+              </div>
             </div>
+            <div class="inner-card">
+              <div class="inner-card__title">Poids recommandé</div>
+              <div style="font-size: 12px; color: #718096; margin-bottom: 14px">
+                Calculé à partir du stock disponible et du nombre total de
+                bénéficiaires, en conservant le ratio hôtel/domicile existant.
+              </div>
+              <div class="ws-item">
+                <div class="ws-item__icon">🏠</div>
+                <div>
+                  <div class="ws-item__value" id="reco-dom">— kg/pers</div>
+                  <div class="ws-item__label">Domicile</div>
+                </div>
+              </div>
+              <div class="ws-item">
+                <div class="ws-item__icon">🏨</div>
+                <div>
+                  <div class="ws-item__value" id="reco-hotel">— kg/pers</div>
+                  <div class="ws-item__label">Hôtel</div>
+                </div>
+              </div>
+              <div
+                id="transfer-box"
+                class="hidden"
+                style="
+                  margin-top: 12px;
+                  padding: 12px;
+                  background: #d1fae5;
+                  border-radius: 8px;
+                  text-align: center;
+                "
+              >
+                <div style="font-size: 12px; color: #065f46; font-weight: 600">
+                  📦 Transfert estimé vers autre centre
+                </div>
+                <div
+                  id="transfer-value"
+                  style="
+                    font-size: 24px;
+                    font-weight: 700;
+                    font-family: &quot;DM Mono&quot;, monospace;
+                    color: #065f46;
+                    margin-top: 4px;
+                  "
+                ></div>
+              </div>
+            </div>
+          </div>
         </div>
-
+      </div>
     </div>
 
     <script>
-        var STATUS_COLORS = { 'Non Assignée': '#94a3b8', 'Assignée': '#00fecf', 'En Cours': '#fbbf24', 'Livrée': '#10b981', 'Annulée': '#ef4444' };
-        var _statsData = null, _params = null, _pieChart = null, _barChart = null;
+      var STATUS_COLORS = {
+        "Non Assignée": "#94a3b8",
+        Assignée: "#00fecf",
+        "En Cours": "#fbbf24",
+        Livrée: "#10b981",
+        Annulée: "#ef4444",
+      };
+      var _statsData = null,
+        _params = null,
+        _pieChart = null,
+        _barChart = null;
 
-        window.addEventListener('load', function () {
-            document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+      window.addEventListener("load", function () {
+        document.getElementById("f-date").value = new Date()
+          .toISOString()
+          .split("T")[0];
+      });
+
+      document
+        .getElementById("statsForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          var date = document.getElementById("f-date").value;
+          if (!date) {
+            alert("Veuillez sélectionner une date.");
+            return;
+          }
+          _params = {
+            date: date,
+            occasion: document.getElementById("f-occasion").value,
+            poids_moyen_kg:
+              parseFloat(document.getElementById("f-poids-dom").value) || 20,
+            poids_moyen_hotel_kg:
+              parseFloat(document.getElementById("f-poids-hot").value) || 15,
+          };
+          setState("loading");
+          google.script.run
+            .withSuccessHandler(renderResults)
+            .withFailureHandler(function (e) {
+              setState("form");
+              document.getElementById("alert-error").textContent =
+                "Erreur : " + e.message;
+              document
+                .getElementById("alert-error")
+                .classList.add("alert--visible", "alert--error");
+            })
+            .getStatsData(_params);
         });
 
-        document.getElementById('statsForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            var date = document.getElementById('f-date').value;
-            if (!date) { alert('Veuillez sélectionner une date.'); return; }
-            _params = {
-                date: date,
-                occasion: document.getElementById('f-occasion').value,
-                poids_moyen_kg: parseFloat(document.getElementById('f-poids-dom').value) || 20,
-                poids_moyen_hotel_kg: parseFloat(document.getElementById('f-poids-hot').value) || 15
-            };
-            setState('loading');
-            google.script.run
-                .withSuccessHandler(renderResults)
-                .withFailureHandler(function (e) {
-                    setState('form');
-                    document.getElementById('alert-error').textContent = 'Erreur : ' + e.message;
-                    document.getElementById('alert-error').classList.add('alert--visible', 'alert--error');
-                })
-                .getStatsData(_params);
-        });
-
-        function goBack() {
-            if (_pieChart) { _pieChart.destroy(); _pieChart = null; }
-            if (_barChart) { _barChart.destroy(); _barChart = null; }
-            document.getElementById('alert-email').className = 'alert';
-            setState('form');
+      function goBack() {
+        if (_pieChart) {
+          _pieChart.destroy();
+          _pieChart = null;
         }
+        if (_barChart) {
+          _barChart.destroy();
+          _barChart = null;
+        }
+        document.getElementById("alert-email").className = "alert";
+        setState("form");
+      }
 
-        function renderResults(data) {
-            _statsData = data;
-            var occ = { zakat_el_fitr: '🌙 Zakat El Fitr', recolte: '🌾 Récolte', ponctuelle: '📦 Ponctuelle' };
-            document.getElementById('topbar-sub').textContent = data.date + ' · ' + (occ[data.occasion] || data.occasion);
+      function renderResults(data) {
+        _statsData = data;
+        var occ = {
+          zakat_el_fitr: "🌙 Zakat El Fitr",
+          recolte: "🌾 Récolte",
+          ponctuelle: "📦 Ponctuelle",
+        };
+        document.getElementById("topbar-sub").textContent =
+          data.date + " · " + (occ[data.occasion] || data.occasion);
 
-            document.getElementById('t-livraisons').textContent = data.global.totalLivraisons;
-            document.getElementById('t-routes').textContent = data.global.totalRoutes;
-            document.getElementById('t-parts').textContent = data.global.totalParts;
+        document.getElementById("t-livraisons").textContent =
+          data.global.totalLivraisons;
+        document.getElementById("t-routes").textContent =
+          data.global.totalRoutes;
+        document.getElementById("t-parts").textContent = data.global.totalParts;
 
-            var pct = data.statuts.pourcentageTermine;
-            document.getElementById('pct-val').textContent = pct + '%';
-            document.getElementById('pct-bar').style.width = pct + '%';
+        var pct = data.statuts.pourcentageTermine;
+        document.getElementById("pct-val").textContent = pct + "%";
+        document.getElementById("pct-bar").style.width = pct + "%";
 
-            var detail = document.getElementById('status-detail');
-            detail.innerHTML = '';
-            Object.entries(data.statuts.counts).forEach(function (entry) {
-                if (entry[1] === 0) return;
-                var color = STATUS_COLORS[entry[0]] || '#94a3b8';
-                var div = document.createElement('div');
-                div.className = 'progress-row';
-                div.innerHTML = '<span><span class="dot" style="background:' + color + '"></span>' + entry[0] + '</span><strong>' + entry[1] + '</strong>';
-                detail.appendChild(div);
-            });
+        var detail = document.getElementById("status-detail");
+        detail.innerHTML = "";
+        Object.entries(data.statuts.counts).forEach(function (entry) {
+          if (entry[1] === 0) return;
+          var color = STATUS_COLORS[entry[0]] || "#94a3b8";
+          var div = document.createElement("div");
+          div.className = "progress-row";
+          div.innerHTML =
+            '<span><span class="dot" style="background:' +
+            color +
+            '"></span>' +
+            entry[0] +
+            "</span><strong>" +
+            entry[1] +
+            "</strong>";
+          detail.appendChild(div);
+        });
 
-            var pieLabels = [], pieData = [], pieColors = [];
-            Object.entries(data.statuts.counts).forEach(function (entry) {
-                if (entry[1] === 0) return;
-                pieLabels.push(entry[0]); pieData.push(entry[1]); pieColors.push(STATUS_COLORS[entry[0]] || '#94a3b8');
-            });
-            if (_pieChart) _pieChart.destroy();
-            _pieChart = new Chart(document.getElementById('pie-chart'), {
-                type: 'doughnut',
-                data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: pieColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } } } }
-            });
+        var pieLabels = [],
+          pieData = [],
+          pieColors = [];
+        Object.entries(data.statuts.counts).forEach(function (entry) {
+          if (entry[1] === 0) return;
+          pieLabels.push(entry[0]);
+          pieData.push(entry[1]);
+          pieColors.push(STATUS_COLORS[entry[0]] || "#94a3b8");
+        });
+        if (_pieChart) _pieChart.destroy();
+        _pieChart = new Chart(document.getElementById("pie-chart"), {
+          type: "doughnut",
+          data: {
+            labels: pieLabels,
+            datasets: [
+              {
+                data: pieData,
+                backgroundColor: pieColors,
+                borderWidth: 2,
+                borderColor: "#fff",
+                hoverOffset: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "right",
+                labels: { font: { size: 11 }, padding: 10, boxWidth: 12 },
+              },
+            },
+          },
+        });
 
-            var p = data.poids;
-            var aj = data.ajustement;
-            document.getElementById('ws-donne').textContent = p.poidsDonne + ' kg';
-            document.getElementById('ws-donne-sub').textContent = 'Poids donné (' + p.nbDons + ' don(s))';
-            document.getElementById('ws-livre').textContent = p.poidsLivre + ' kg';
-            document.getElementById('ws-projete').textContent = aj.poidsProjecte + ' kg';
+        var p = data.poids;
+        var aj = data.ajustement;
+        document.getElementById("ws-donne").textContent = p.poidsDonne + " kg";
+        document.getElementById("ws-donne-sub").textContent =
+          "Poids donné (" + p.nbDons + " don(s))";
+        document.getElementById("ws-livre").textContent = p.poidsLivre + " kg";
+        document.getElementById("ws-projete").textContent =
+          aj.poidsProjecte + " kg";
 
-            if (_barChart) _barChart.destroy();
-            _barChart = new Chart(document.getElementById('bar-chart'), {
-                type: 'bar',
-                data: {
-                    labels: ['Donné', 'Livré', 'Projeté'],
-                    datasets: [{ data: [p.poidsDonne, p.poidsLivre, aj.poidsProjecte], backgroundColor: ['rgba(0,254,207,.7)', 'rgba(16,185,129,.7)', 'rgba(79,172,254,.7)'], borderColor: ['#00fecf', '#10b981', '#4facfe'], borderWidth: 2, borderRadius: 6 }]
+        if (_barChart) _barChart.destroy();
+        _barChart = new Chart(document.getElementById("bar-chart"), {
+          type: "bar",
+          data: {
+            labels: ["Donné", "Livré", "Projeté"],
+            datasets: [
+              {
+                data: [p.poidsDonne, p.poidsLivre, aj.poidsProjecte],
+                backgroundColor: [
+                  "rgba(0,254,207,.7)",
+                  "rgba(16,185,129,.7)",
+                  "rgba(79,172,254,.7)",
+                ],
+                borderColor: ["#00fecf", "#10b981", "#4facfe"],
+                borderWidth: 2,
+                borderRadius: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function (v) {
+                    return v + " kg";
+                  },
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return v + ' kg'; } }, grid: { color: 'rgba(0,0,0,.05)' } }, x: { grid: { display: false } } } }
-            });
+                grid: { color: "rgba(0,0,0,.05)" },
+              },
+              x: { grid: { display: false } },
+            },
+          },
+        });
 
-            renderAjustement(aj);
-            setState('results');
+        renderAjustement(aj);
+        setState("results");
+      }
+
+      function renderAjustement(aj) {
+        var surplusEl = document.getElementById("surplus-value");
+        var surplusLabel = document.getElementById("surplus-label");
+        var coverageBar = document.getElementById("coverage-bar");
+        var coverageLabel = document.getElementById("coverage-label");
+
+        var sign = aj.surplusDeficit >= 0 ? "+" : "";
+        surplusEl.textContent = sign + aj.surplusDeficit + " kg";
+        surplusEl.style.color = aj.surplusDeficit >= 0 ? "#065f46" : "#7f1d1d";
+
+        if (aj.surplusDeficit > 0) {
+          surplusLabel.textContent =
+            "✅ Surplus — vous pouvez transférer au centre partenaire";
+          surplusLabel.style.color = "#065f46";
+        } else if (aj.surplusDeficit < 0) {
+          surplusLabel.textContent =
+            "⚠️ Déficit — réduire le poids par personne";
+          surplusLabel.style.color = "#7f1d1d";
+        } else {
+          surplusLabel.textContent = "🎯 Équilibré";
+          surplusLabel.style.color = "#718096";
         }
 
-        function renderAjustement(aj) {
-            var surplusEl = document.getElementById('surplus-value');
-            var surplusLabel = document.getElementById('surplus-label');
-            var coverageBar = document.getElementById('coverage-bar');
-            var coverageLabel = document.getElementById('coverage-label');
+        var coveragePct = Math.min(aj.tauxCouverture, 100);
+        coverageBar.style.width = coveragePct + "%";
+        coverageBar.style.background =
+          aj.tauxCouverture >= 100
+            ? "linear-gradient(135deg,#38a169,#276749)"
+            : "linear-gradient(135deg,#e53e3e,#c53030)";
+        coverageLabel.textContent =
+          "Taux de couverture : " + aj.tauxCouverture + "%";
 
-            var sign = aj.surplusDeficit >= 0 ? '+' : '';
-            surplusEl.textContent = sign + aj.surplusDeficit + ' kg';
-            surplusEl.style.color = aj.surplusDeficit >= 0 ? '#065f46' : '#7f1d1d';
+        document.getElementById("reco-dom").textContent =
+          aj.poidsRecommandeDom !== null
+            ? aj.poidsRecommandeDom + " kg/pers"
+            : "N/A";
+        document.getElementById("reco-hotel").textContent =
+          aj.poidsRecommandeHotel !== null
+            ? aj.poidsRecommandeHotel + " kg/pers"
+            : "N/A";
 
-            if (aj.surplusDeficit > 0) {
-                surplusLabel.textContent = '✅ Surplus — vous pouvez transférer au centre partenaire';
-                surplusLabel.style.color = '#065f46';
-            } else if (aj.surplusDeficit < 0) {
-                surplusLabel.textContent = '⚠️ Déficit — réduire le poids par personne';
-                surplusLabel.style.color = '#7f1d1d';
-            } else {
-                surplusLabel.textContent = '🎯 Équilibré';
-                surplusLabel.style.color = '#718096';
-            }
-
-            var coveragePct = Math.min(aj.tauxCouverture, 100);
-            coverageBar.style.width = coveragePct + '%';
-            coverageBar.style.background = aj.tauxCouverture >= 100
-                ? 'linear-gradient(135deg,#38a169,#276749)'
-                : 'linear-gradient(135deg,#e53e3e,#c53030)';
-            coverageLabel.textContent = 'Taux de couverture : ' + aj.tauxCouverture + '%';
-
-            document.getElementById('reco-dom').textContent = aj.poidsRecommandeDom !== null
-                ? aj.poidsRecommandeDom + ' kg/pers'
-                : 'N/A';
-            document.getElementById('reco-hotel').textContent = aj.poidsRecommandeHotel !== null
-                ? aj.poidsRecommandeHotel + ' kg/pers'
-                : 'N/A';
-
-            if (aj.surplusDeficit > 0) {
-                document.getElementById('transfer-value').textContent = aj.surplusDeficit + ' kg';
-                document.getElementById('transfer-box').classList.remove('hidden');
-            } else {
-                document.getElementById('transfer-box').classList.add('hidden');
-            }
-
-            if (aj.nbLivraisonsNonAssignees > 0) {
-                document.getElementById('non-assignees-count').textContent = aj.nbLivraisonsNonAssignees;
-                document.getElementById('non-assignees-warning').classList.remove('hidden');
-            } else {
-                document.getElementById('non-assignees-warning').classList.add('hidden');
-            }
+        if (aj.surplusDeficit > 0) {
+          document.getElementById("transfer-value").textContent =
+            aj.surplusDeficit + " kg";
+          document.getElementById("transfer-box").classList.remove("hidden");
+        } else {
+          document.getElementById("transfer-box").classList.add("hidden");
         }
 
-        function sendEmail() {
-            var btn = document.getElementById('btn-email');
-            btn.disabled = true; btn.textContent = '… Envoi en cours';
-            google.script.run
-                .withSuccessHandler(function (r) {
-                    btn.disabled = false; btn.textContent = '✉️ Envoyer par email';
-                    var el = document.getElementById('alert-email');
-                    el.className = 'alert alert--visible ' + (r.success ? 'alert--success' : 'alert--error');
-                    el.textContent = r.success ? '✅ Email envoyé à ' + r.sent + ' destinataire(s)' : '❌ ' + r.error;
-                    setTimeout(function () { el.className = 'alert'; }, 5000);
-                })
-                .withFailureHandler(function (e) {
-                    btn.disabled = false; btn.textContent = '✉️ Envoyer par email';
-                    var el = document.getElementById('alert-email');
-                    el.className = 'alert alert--visible alert--error'; el.textContent = '❌ ' + e.message;
-                })
-                .sendStatsEmail(_statsData, _params);
+        if (aj.nbLivraisonsNonAssignees > 0) {
+          document.getElementById("non-assignees-count").textContent =
+            aj.nbLivraisonsNonAssignees;
+          document
+            .getElementById("non-assignees-warning")
+            .classList.remove("hidden");
+        } else {
+          document
+            .getElementById("non-assignees-warning")
+            .classList.add("hidden");
         }
+      }
 
-        function setState(s) {
-            document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-            document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-            document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
-        }
+      function sendEmail() {
+        var btn = document.getElementById("btn-email");
+        btn.disabled = true;
+        btn.textContent = "… Envoi en cours";
+        google.script.run
+          .withSuccessHandler(function (r) {
+            btn.disabled = false;
+            btn.textContent = "✉️ Envoyer par email";
+            var el = document.getElementById("alert-email");
+            el.className =
+              "alert alert--visible " +
+              (r.success ? "alert--success" : "alert--error");
+            el.textContent = r.success
+              ? "✅ Email envoyé à " + r.sent + " destinataire(s)"
+              : "❌ " + r.error;
+            setTimeout(function () {
+              el.className = "alert";
+            }, 5000);
+          })
+          .withFailureHandler(function (e) {
+            btn.disabled = false;
+            btn.textContent = "✉️ Envoyer par email";
+            var el = document.getElementById("alert-email");
+            el.className = "alert alert--visible alert--error";
+            el.textContent = "❌ " + e.message;
+          })
+          .sendStatsEmail(_statsData, _params);
+      }
+
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+        document
+          .getElementById("resultsState")
+          .classList.toggle("results-state--visible", s === "results");
+      }
     </script>
-</body>
-
+  </body>
 </html>

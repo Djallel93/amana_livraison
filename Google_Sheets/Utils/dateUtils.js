@@ -9,17 +9,17 @@
  * @param {string} format - Format souhaité ('date', 'datetime', 'time')
  * @returns {string} Date formatée
  */
-function getCurrentDateTime(format = 'datetime') {
+function getCurrentDateTime(format = "datetime") {
   const now = new Date();
 
   switch (format) {
-    case 'date':
-      return Utilities.formatDate(now, CONFIG.TIMEZONE, 'yyyy-MM-dd');
-    case 'time':
-      return Utilities.formatDate(now, CONFIG.TIMEZONE, 'HH:mm:ss');
-    case 'datetime':
+    case "date":
+      return Utilities.formatDate(now, CONFIG.TIMEZONE, "yyyy-MM-dd");
+    case "time":
+      return Utilities.formatDate(now, CONFIG.TIMEZONE, "HH:mm:ss");
+    case "datetime":
     default:
-      return Utilities.formatDate(now, CONFIG.TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+      return Utilities.formatDate(now, CONFIG.TIMEZONE, "yyyy-MM-dd HH:mm:ss");
   }
 }
 
@@ -29,9 +29,9 @@ function getCurrentDateTime(format = 'datetime') {
  * @param {string} format - Format (ex: 'yyyy-MM-dd', 'dd/MM/yyyy HH:mm')
  * @returns {string} Date formatée
  */
-function formatDate(date, format = 'yyyy-MM-dd HH:mm:ss') {
+function formatDate(date, format = "yyyy-MM-dd HH:mm:ss") {
   if (!date || !(date instanceof Date)) {
-    return '';
+    return "";
   }
 
   return Utilities.formatDate(date, CONFIG.TIMEZONE, format);
@@ -148,9 +148,11 @@ function isFutureDate(date) {
  */
 function isToday(date) {
   const today = new Date();
-  return date.getDate() === today.getDate() &&
+  return (
+    date.getDate() === today.getDate() &&
     date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear();
+    date.getFullYear() === today.getFullYear()
+  );
 }
 
 /**
@@ -212,7 +214,7 @@ function formatDuration(minutes) {
  * @returns {string}
  */
 function generateFolderName(date, occasion) {
-  const dateStr = Utilities.formatDate(date, CONFIG.TIMEZONE, 'yyyyMMdd');
+  const dateStr = Utilities.formatDate(date, CONFIG.TIMEZONE, "yyyyMMdd");
   return `${dateStr}_${occasion}`;
 }
 
@@ -222,7 +224,7 @@ function generateFolderName(date, occasion) {
  * @returns {Object} {date: Date, occasion: string}
  */
 function parseFolderName(folderName) {
-  const parts = folderName.split('_');
+  const parts = folderName.split("_");
 
   if (parts.length < 2) {
     return { date: null, occasion: null };
@@ -234,7 +236,7 @@ function parseFolderName(folderName) {
   const day = parseInt(dateStr.substring(6, 8));
 
   const date = new Date(year, month, day);
-  const occasion = parts.slice(1).join('_');
+  const occasion = parts.slice(1).join("_");
 
   return { date, occasion };
 }
@@ -289,7 +291,15 @@ function formatDateForMaps(date) {
  * @returns {string}
  */
 function getDayOfWeekFr(date) {
-  const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  const days = [
+    "Dimanche",
+    "Lundi",
+    "Mardi",
+    "Mercredi",
+    "Jeudi",
+    "Vendredi",
+    "Samedi",
+  ];
   return days[date.getDay()];
 }
 
@@ -300,8 +310,18 @@ function getDayOfWeekFr(date) {
  */
 function getMonthFr(date) {
   const months = [
-    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    "Janvier",
+    "Février",
+    "Mars",
+    "Avril",
+    "Mai",
+    "Juin",
+    "Juillet",
+    "Août",
+    "Septembre",
+    "Octobre",
+    "Novembre",
+    "Décembre",
   ];
   return months[date.getMonth()];
 }
@@ -317,8 +337,8 @@ function formatDateReadableFr(date) {
   const dayNum = date.getDate();
   const month = getMonthFr(date);
   const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
 
   return `${day} ${dayNum} ${month} ${year} à ${hours}h${minutes}`;
 }
@@ -359,9 +379,11 @@ function dateRangesOverlap(start1, end1, start2, end2) {
  * @returns {number}
  */
 function getWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }

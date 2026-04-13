@@ -1,420 +1,560 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <?!= include('styles'); ?>
+    <style>
+      .step-nav {
+        display: flex;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg);
+        flex-shrink: 0;
+      }
+      .step-btn {
+        flex: 1;
+        padding: 12px 16px;
+        border: none;
+        background: none;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .step-btn.active {
+        color: var(--c2);
+        border-bottom-color: var(--c2);
+      }
+      .step-btn.done {
+        color: #10b981;
+      }
+      .step-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .step-panel {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .step-panel.active {
+        display: flex;
+      }
+      .form-body-flex {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+        padding: 20px 32px;
+      }
+      .filters-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+      }
+      .filters-bar select {
+        padding: 6px 10px;
+        font-size: 13px;
+        border-radius: var(--radius);
+        border: 2px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        width: auto;
+      }
+      .filters-bar select:focus {
+        outline: none;
+        border-color: var(--c1);
+      }
+      .admin-toggle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-2);
+        padding: 6px 12px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        transition: border-color 0.15s;
+      }
+      .admin-toggle:hover {
+        border-color: var(--c1);
+      }
+      .admin-toggle input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--c2);
+      }
+      .table-wrap {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .sel-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .sel-table thead th {
+        background: var(--bg);
+        padding: 8px 12px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-2);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+      .sel-table tbody tr {
+        border-bottom: 1px solid var(--border-light);
+        transition: background 0.1s;
+      }
+      .sel-table tbody tr:last-child {
+        border-bottom: none;
+      }
+      .sel-table tbody tr:hover {
+        background: var(--bg);
+      }
+      .sel-table td {
+        padding: 8px 12px;
+        vertical-align: middle;
+      }
+      .sel-table td:first-child {
+        width: 36px;
+        text-align: center;
+      }
+      .dispo-tag {
+        display: inline-block;
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 20px;
+        background: rgba(0, 254, 207, 0.15);
+        color: var(--c2);
+        margin-right: 3px;
+        font-weight: 600;
+      }
+      .admin-badge {
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 20px;
+        background: #ede9fe;
+        color: #6d28d9;
+        font-weight: 600;
+      }
+      .statut-badge {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 99px;
+        font-weight: 500;
+      }
+      .selection-bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 8px 14px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--text-2);
+        flex-shrink: 0;
+      }
+      .selection-bar .count {
+        color: var(--c2);
+        font-family: "DM Mono", monospace;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .livraisons-restantes {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: var(--radius);
+        padding: 6px 12px;
+        font-size: 13px;
+        color: #1d4ed8;
+        margin-top: 6px;
+      }
+      .btn-refresh {
+        padding: 6px 12px;
+        background: var(--surface);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+        white-space: nowrap;
+      }
+      .btn-refresh:hover {
+        border-color: var(--c1);
+        color: var(--text);
+      }
+      .btn-refresh:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
 
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <?!= include('styles'); ?>
-  <style>
-    .filters-bar {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-
-    .filter-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .filter-group label {
-      margin: 0;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    .filter-group select {
-      padding: 6px 10px;
-      font-size: 13px;
-      border-radius: var(--radius);
-      border: 2px solid var(--border);
-      background: var(--surface);
-      color: var(--text);
-      width: auto;
-    }
-
-    .filter-group select:focus {
-      outline: none;
-      border-color: var(--c1);
-    }
-
-    .admin-toggle {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-2);
-      padding: 6px 12px;
-      border: 2px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--surface);
-      transition: border-color .15s, background .15s;
-    }
-
-    .admin-toggle:hover {
-      border-color: var(--c1);
-      background: var(--bg2);
-    }
-
-    .admin-toggle input[type="checkbox"] {
-      width: 15px;
-      height: 15px;
-      accent-color: var(--c2);
-      cursor: pointer;
-    }
-
-    .benevoles-counter {
-      font-size: 12px;
-      color: var(--muted);
-      margin-left: auto;
-    }
-
-    .benevoles-table-wrap {
-      max-height: 260px;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-
-    .benevoles-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    .benevoles-table thead th {
-      background: var(--bg);
-      padding: 8px 12px;
-      text-align: left;
-      font-weight: 600;
-      color: var(--text-2);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-    }
-
-    .benevoles-table tbody tr {
-      border-bottom: 1px solid var(--border-light);
-    }
-
-    .benevoles-table tbody tr:last-child {
-      border-bottom: none;
-    }
-
-    .benevoles-table tbody tr:hover {
-      background: var(--bg);
-    }
-
-    .benevoles-table td {
-      padding: 8px 12px;
-      vertical-align: middle;
-    }
-
-    .benevoles-table td:first-child {
-      width: 36px;
-      text-align: center;
-    }
-
-    .statut-badge {
-      display: inline-block;
-      font-size: 11px;
-      padding: 2px 7px;
-      border-radius: 99px;
-      font-weight: 500;
-    }
-
-    .statut-none {
-      background: #f3f4f6;
-      color: #6b7280;
-    }
-
-    .statut-brouillon {
-      background: #eff6ff;
-      color: #3b82f6;
-    }
-
-    .statut-en-cours {
-      background: #fef3c7;
-      color: #d97706;
-    }
-
-    .statut-terminee {
-      background: #d1fae5;
-      color: #059669;
-    }
-
-    .dispo-tag {
-      display: inline-block;
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 20px;
-      background: rgba(0, 254, 207, .15);
-      color: var(--c2);
-      margin-right: 3px;
-      font-weight: 600;
-    }
-
-    .admin-badge {
-      display: inline-block;
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 20px;
-      background: #ede9fe;
-      color: #6d28d9;
-      font-weight: 600;
-      margin-left: 4px;
-    }
-
-    .select-all-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-      font-size: 13px;
-      color: var(--text-2);
-      cursor: pointer;
-    }
-
-    .benevoles-loading {
-      padding: 20px;
-      text-align: center;
-      color: var(--muted-light);
-      font-size: 13px;
-    }
-
-    .livraisons-restantes {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: var(--radius);
-      padding: 6px 12px;
-      font-size: 13px;
-      color: #1d4ed8;
-      margin-top: 6px;
-    }
-  </style>
-</head>
-
-<body>
-  <div class="page-wrap">
-    <div class="card">
-
-      <div class="form-header">
-        <div class="form-header__icon">🗺️</div>
-        <div class="form-header__text">
-          <h1>Planifier les Routes</h1>
-          <p>Optimiser l'attribution des livraisons aux bénévoles</p>
+  <body>
+    <div class="page-wrap">
+      <div class="card" style="height: 100vh; max-height: 800px">
+        <div class="form-header">
+          <div class="form-header__icon">🗺️</div>
+          <div class="form-header__text">
+            <h1>Planifier les Routes</h1>
+            <p>Optimiser l'attribution des livraisons aux bénévoles</p>
+          </div>
         </div>
-      </div>
 
-      <!-- FORM STATE -->
-      <div id="formState">
-        <div class="form-body">
-          <div id="alert-success" class="alert alert--success"></div>
-          <div id="alert-error" class="alert alert--error"></div>
-          <div id="alert-warning" class="alert alert--warning"></div>
+        <div class="step-nav">
+          <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)">
+            ⚙️ Configuration
+          </button>
+          <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled>
+            👥 Bénévoles
+          </button>
+        </div>
 
-          <form id="routeForm">
+        <!-- ═══════════════ ÉTAPE 1 — CONFIGURATION ═══════════════ -->
+        <div class="step-panel active" id="step1">
+          <div class="form-body" style="overflow-y: auto; flex: 1">
+            <div id="alert-error-1" class="alert alert--error"></div>
+            <div id="alert-warning-1" class="alert alert--warning"></div>
 
-            <div class="form-section">
-              <div class="form-section__title">📅 Configuration de base</div>
-
-              <div class="form-group">
-                <label for="date_livraison">Date de livraison</label>
-                <input type="date" id="date_livraison">
-                <div id="livraisons-restantes-wrap" style="display:none;">
-                  <div class="livraisons-restantes">
-                    📦 <span id="livraisons-restantes-count">—</span> livraison(s) non assignée(s)
+            <form id="configForm">
+              <div class="form-section">
+                <div class="form-section__title">📅 Date et occasion</div>
+                <div class="form-group">
+                  <label for="date_livraison">Date de livraison</label>
+                  <input
+                    type="date"
+                    id="date_livraison"
+                    onchange="onDateChange()"
+                  />
+                  <div id="livraisons-restantes-wrap" style="display: none">
+                    <div class="livraisons-restantes">
+                      📦
+                      <span id="livraisons-restantes-count">—</span>
+                      livraison(s) non assignée(s)
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="max_livraisons"
+                    >Livraisons max par route (par bénévole)</label
+                  >
+                  <input
+                    type="number"
+                    id="max_livraisons"
+                    min="1"
+                    max="30"
+                    value="10"
+                    required
+                  />
+                  <div class="help-text">
+                    Limite le nombre d'arrêts par bénévole — ne contrôle pas le
+                    nombre total de routes générées
+                  </div>
+                </div>
+                <div class="form-group mb-0">
+                  <label>Occasion</label>
+                  <div class="radio-group">
+                    <div
+                      class="checkbox-row"
+                      style="flex: none; padding: 8px 14px"
+                    >
+                      <input
+                        type="radio"
+                        id="occ-zakat"
+                        name="occasion"
+                        value="zakat_el_fitr"
+                        checked
+                      />
+                      <label for="occ-zakat">🌙 Zakat El Fitr</label>
+                    </div>
+                    <div
+                      class="checkbox-row"
+                      style="flex: none; padding: 8px 14px"
+                    >
+                      <input
+                        type="radio"
+                        id="occ-recolte"
+                        name="occasion"
+                        value="recolte"
+                      />
+                      <label for="occ-recolte">🌾 Récolte</label>
+                    </div>
+                    <div
+                      class="checkbox-row"
+                      style="flex: none; padding: 8px 14px"
+                    >
+                      <input
+                        type="radio"
+                        id="occ-ponctuelle"
+                        name="occasion"
+                        value="ponctuelle"
+                      />
+                      <label for="occ-ponctuelle">📦 Ponctuelle</label>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="max_livraisons">Livraisons maximum par bénévole</label>
-                <input type="number" id="max_livraisons" min="1" max="30" value="10" required>
-                <div class="help-text">Limite le nombre d'arrêts par route</div>
-              </div>
-
-              <div class="form-group">
-                <label>Occasion</label>
-                <div class="radio-group">
-                  <div class="checkbox-row" style="flex:none; padding: 8px 14px;">
-                    <input type="radio" id="occ-zakat" name="occasion" value="zakat_el_fitr" checked>
-                    <label for="occ-zakat">🌙 Zakat El Fitr</label>
-                  </div>
-                  <div class="checkbox-row" style="flex:none; padding: 8px 14px;">
-                    <input type="radio" id="occ-recolte" name="occasion" value="recolte">
-                    <label for="occ-recolte">🌾 Récolte</label>
-                  </div>
-                  <div class="checkbox-row" style="flex:none; padding: 8px 14px;">
-                    <input type="radio" id="occ-ponctuelle" name="occasion" value="ponctuelle">
-                    <label for="occ-ponctuelle">📦 Ponctuelle</label>
-                  </div>
+              <div class="form-section">
+                <div class="form-section__title">
+                  ⚖️ Poids moyen par personne (kg)
                 </div>
-              </div>
-
-              <div class="form-group">
-                <label>Poids moyen par personne (kg)</label>
                 <div class="form-row">
-                  <div>
-                    <input type="number" id="poids_moyen_kg" min="1" max="100" value="15" step="0.5" required>
-                    <div class="help-text">🏠 Domicile</div>
+                  <div class="form-group mb-0">
+                    <label for="poids_moyen_kg">Domicile 🏠</label>
+                    <input
+                      type="number"
+                      id="poids_moyen_kg"
+                      min="1"
+                      max="100"
+                      value="15"
+                      step="0.5"
+                      required
+                    />
                   </div>
-                  <div>
-                    <input type="number" id="poids_moyen_hotel_kg" min="0" max="100" value="10" step="0.1">
-                    <div class="help-text">🏨 Hôtel</div>
+                  <div class="form-group mb-0">
+                    <label for="poids_moyen_hotel_kg">Hôtel 🏨</label>
+                    <input
+                      type="number"
+                      id="poids_moyen_hotel_kg"
+                      min="0"
+                      max="100"
+                      value="10"
+                      step="0.1"
+                    />
                   </div>
                 </div>
               </div>
+            </form>
+          </div>
 
-              <div class="form-group mb-0">
-                <div class="checkbox-row" onclick="toggleRelivre()">
-                  <input type="checkbox" id="relivre" checked>
-                  <label for="relivre">Route avec retour au QG (relivre)</label>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              class="btn btn--primary"
+              onclick="validerConfig()"
+            >
+              Suivant → Choisir les bénévoles
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══════════════ ÉTAPE 2 — BÉNÉVOLES ═══════════════ -->
+        <div class="step-panel" id="step2">
+          <div class="form-body-flex">
+            <div id="alert-error-2" class="alert alert--error"></div>
+
+            <div class="filters-bar">
+              <select id="filtre-dispo" onchange="appliquerFiltres()">
+                <option value="">Toutes disponibilités</option>
+                <option value="Matin">Matin</option>
+                <option value="Après-midi">Après-midi</option>
+                <option value="Soir">Soir</option>
+              </select>
+              <label class="admin-toggle">
+                <input
+                  type="checkbox"
+                  id="filtre-admin"
+                  checked
+                  onchange="appliquerFiltres()"
+                />
+                Afficher les administrateurs
+              </label>
+              <div
+                class="checkbox-row"
+                style="flex: none; padding: 6px 12px"
+                onclick="document.getElementById('select-all').click()"
+              >
+                <input
+                  type="checkbox"
+                  id="select-all"
+                  onchange="toggleSelectAll(this.checked)"
+                />
+                <label for="select-all">Tout sélectionner</label>
+              </div>
+              <span
+                class="text-muted"
+                id="benevoles-counter"
+                style="margin-left: auto; font-size: 12px"
+              ></span>
+              <button
+                type="button"
+                class="btn-refresh"
+                id="btn-refresh"
+                onclick="actualiserBenevoles()"
+              >
+                🔄 Actualiser
+              </button>
+            </div>
+
+            <div class="table-wrap" id="benevoles-wrap">
+              <div
+                class="loading-state loading-state--visible"
+                style="padding: 32px 0"
+              >
+                <div class="spinner"></div>
+                <div class="loading-state__text">Chargement des bénévoles…</div>
+              </div>
+            </div>
+
+            <div class="selection-bar">
+              <span>Sélectionnés :</span>
+              <span class="count" id="benevoles-selected-count">0</span>
+              <span class="text-muted">bénévole(s)</span>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="goToStep(1)"
+            >
+              ← Retour
+            </button>
+            <button
+              type="button"
+              class="btn btn--primary"
+              id="btn-planifier"
+              onclick="planifier()"
+              disabled
+            >
+              ✨ Planifier les Routes
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══════════════ CHARGEMENT ═══════════════ -->
+        <div id="loadingState" class="loading-state" style="display: none">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Planification en cours…</div>
+          <div class="loading-state__sub">
+            Clustering géographique · Attribution · Optimisation TSP
+          </div>
+        </div>
+
+        <!-- ═══════════════ RÉSULTATS ═══════════════ -->
+        <div id="resultsState" class="results-state">
+          <div class="results-header">
+            <h2>✅ Routes planifiées</h2>
+            <p id="results-subtitle"></p>
+          </div>
+          <div class="results-body">
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="stat-routes">0</div>
+                <div class="kpi-card__label">Routes créées</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="stat-deliveries">0</div>
+                <div class="kpi-card__label">Livraisons assignées</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="stat-poids">0 kg</div>
+                <div class="kpi-card__label">Poids total</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="stat-warnings">0</div>
+                <div class="kpi-card__label">Avertissements</div>
+              </div>
+            </div>
+            <div class="stat-grid">
+              <div class="stat-pill">
+                <div class="stat-pill__icon">👥</div>
+                <div>
+                  <div class="stat-pill__value" id="stat-benevoles">0</div>
+                  <div class="stat-pill__label">Bénévoles mobilisés</div>
+                </div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-pill__icon">📏</div>
+                <div>
+                  <div class="stat-pill__value" id="stat-distance">0 km</div>
+                  <div class="stat-pill__label">Distance totale</div>
+                </div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-pill__icon">📦</div>
+                <div>
+                  <div class="stat-pill__value" id="stat-avg">0</div>
+                  <div class="stat-pill__label">Moy. livraisons / route</div>
                 </div>
               </div>
             </div>
-
-            <!-- SECTION BÉNÉVOLES -->
-            <div class="form-section">
-              <div class="form-section__title">👥 Sélection des bénévoles</div>
-
-              <div class="filters-bar">
-                <div class="filter-group">
-                  <label for="filtre-dispo">Disponibilité</label>
-                  <select id="filtre-dispo" onchange="appliquerFiltres()">
-                    <option value="">Tous</option>
-                    <option value="Matin">Matin</option>
-                    <option value="Après-midi">Après-midi</option>
-                    <option value="Soir">Soir</option>
-                  </select>
-                </div>
-
-                <label class="admin-toggle" onclick="toggleAdmin()">
-                  <input type="checkbox" id="filtre-admin" checked onchange="appliquerFiltres()">
-                  Afficher les administrateurs
-                </label>
-
-                <span class="benevoles-counter" id="benevoles-counter"></span>
-              </div>
-
-              <div id="benevoles-wrap">
-                <div class="benevoles-loading">
-                  <div class="spinner" style="width:28px;height:28px;border-width:3px;margin:0 auto 8px;"></div>
-                  Chargement des bénévoles…
-                </div>
-              </div>
+            <div class="data-table-wrap" id="breakdown-section">
+              <div class="data-table-title">📋 Détail par route</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Route</th>
+                    <th>Bénévole</th>
+                    <th>Livraisons</th>
+                    <th>Poids</th>
+                    <th>Distance</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="breakdown-tbody"></tbody>
+              </table>
             </div>
-
-          </form>
-        </div>
-
-        <div class="form-footer">
-          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="routeForm" id="btn-submit" class="btn btn--primary" disabled>✨ Planifier les
-            Routes</button>
+            <div id="warnings-box" class="warnings-box hidden">
+              <div class="warnings-box__title">⚠️ Avertissements</div>
+              <ul id="warnings-list"></ul>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--primary"
+              onclick="google.script.host.close()"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       </div>
-
-      <!-- LOADING STATE -->
-      <div id="loadingState" class="loading-state">
-        <div class="spinner"></div>
-        <div class="loading-state__text">Planification en cours…</div>
-        <div class="loading-state__sub">Clustering géographique · Attribution · Optimisation TSP</div>
-      </div>
-
-      <!-- RESULTS STATE -->
-      <div id="resultsState" class="results-state">
-        <div class="results-header">
-          <h2>✅ Routes planifiées</h2>
-          <p id="results-subtitle"></p>
-        </div>
-        <div class="results-body">
-
-          <div class="kpi-grid">
-            <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-routes">0</div>
-              <div class="kpi-card__label">Routes créées</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-deliveries">0</div>
-              <div class="kpi-card__label">Livraisons assignées</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-poids">0 kg</div>
-              <div class="kpi-card__label">Poids total</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-warnings">0</div>
-              <div class="kpi-card__label">Avertissements</div>
-            </div>
-          </div>
-
-          <div class="stat-grid">
-            <div class="stat-pill">
-              <div class="stat-pill__icon">👥</div>
-              <div>
-                <div class="stat-pill__value" id="stat-benevoles">0</div>
-                <div class="stat-pill__label">Bénévoles mobilisés</div>
-              </div>
-            </div>
-            <div class="stat-pill">
-              <div class="stat-pill__icon">📏</div>
-              <div>
-                <div class="stat-pill__value" id="stat-distance">0 km</div>
-                <div class="stat-pill__label">Distance totale</div>
-              </div>
-            </div>
-            <div class="stat-pill">
-              <div class="stat-pill__icon">📦</div>
-              <div>
-                <div class="stat-pill__value" id="stat-avg">0</div>
-                <div class="stat-pill__label">Moy. livraisons / route</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="data-table-wrap" id="breakdown-section">
-            <div class="data-table-title">📋 Détail par route</div>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Route</th>
-                  <th>Bénévole</th>
-                  <th>Livraisons</th>
-                  <th>Poids</th>
-                  <th>Distance</th>
-                  <th>Statut</th>
-                </tr>
-              </thead>
-              <tbody id="breakdown-tbody"></tbody>
-            </table>
-          </div>
-
-          <div id="warnings-box" class="warnings-box hidden">
-            <div class="warnings-box__title">⚠️ Avertissements</div>
-            <ul id="warnings-list"></ul>
-          </div>
-
-        </div>
-        <div class="form-footer">
-          <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
-        </div>
-      </div>
-
     </div>
-  </div>
 
-  <?!= include('ui/scripts/routeFormScript'); ?>
-</body>
-
+    <?!= include('ui/scripts/routeFormScript'); ?>
+  </body>
 </html>

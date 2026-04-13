@@ -1,132 +1,193 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <?!= include('styles'); ?>
+  </head>
 
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <?!= include('styles'); ?>
-</head>
-
-<body>
-  <div class="page-wrap">
-    <div class="card">
-
-      <div class="form-header">
-        <div class="form-header__icon">🏢</div>
-        <div class="form-header__text">
-          <h1>Adresse du QG</h1>
-          <p>Définir l'emplacement du quartier général</p>
+  <body>
+    <div class="page-wrap">
+      <div class="card">
+        <div class="form-header">
+          <div class="form-header__icon">🏢</div>
+          <div class="form-header__text">
+            <h1>Adresse du QG</h1>
+            <p>Définir l'emplacement du quartier général</p>
+          </div>
         </div>
-      </div>
 
-      <!-- FORM STATE -->
-      <div id="formState">
-        <div class="form-body">
-          <div id="alert-success" class="alert alert--success"></div>
-          <div id="alert-error" class="alert alert--error"></div>
+        <!-- FORM STATE -->
+        <div id="formState">
+          <div class="form-body">
+            <div id="alert-success" class="alert alert--success"></div>
+            <div id="alert-error" class="alert alert--error"></div>
 
-          <form id="hqForm">
-            <div class="form-section">
-              <div class="form-section__title">📍 Localisation</div>
+            <form id="hqForm">
+              <div class="form-section">
+                <div class="form-section__title">📍 Localisation</div>
 
-              <div class="form-group">
-                <label for="address">Adresse complète</label>
-                <input type="text" id="address" placeholder="1 rue de la Paix, 75001 Paris" required>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group mb-0">
-                  <label for="lat">Latitude</label>
-                  <input type="number" id="lat" step="0.000001" min="-90" max="90" placeholder="47.215297" required>
-                  <div class="help-text">Entre −90 et 90</div>
+                <div class="form-group">
+                  <label for="address">Adresse complète</label>
+                  <input
+                    type="text"
+                    id="address"
+                    placeholder="1 rue de la Paix, 75001 Paris"
+                    required
+                  />
                 </div>
-                <div class="form-group mb-0">
-                  <label for="lng">Longitude</label>
-                  <input type="number" id="lng" step="0.000001" min="-180" max="180" placeholder="−1.611068" required>
-                  <div class="help-text">Entre −180 et 180</div>
+
+                <div class="form-row">
+                  <div class="form-group mb-0">
+                    <label for="lat">Latitude</label>
+                    <input
+                      type="number"
+                      id="lat"
+                      step="0.000001"
+                      min="-90"
+                      max="90"
+                      placeholder="47.215297"
+                      required
+                    />
+                    <div class="help-text">Entre −90 et 90</div>
+                  </div>
+                  <div class="form-group mb-0">
+                    <label for="lng">Longitude</label>
+                    <input
+                      type="number"
+                      id="lng"
+                      step="0.000001"
+                      min="-180"
+                      max="180"
+                      placeholder="−1.611068"
+                      required
+                    />
+                    <div class="help-text">Entre −180 et 180</div>
+                  </div>
+                </div>
+
+                <div class="map-preview" id="mapPreview" style="display: none">
+                  <strong>📍 Aperçu :</strong>&ensp;<a
+                    href="#"
+                    target="_blank"
+                    id="mapLink"
+                    >Voir sur Google Maps</a
+                  >
                 </div>
               </div>
+            </form>
+          </div>
 
-              <div class="map-preview" id="mapPreview" style="display:none;">
-                <strong>📍 Aperçu :</strong>&ensp;<a href="#" target="_blank" id="mapLink">Voir sur Google Maps</a>
-              </div>
-            </div>
-          </form>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button type="submit" form="hqForm" class="btn btn--primary">
+              💾 Enregistrer
+            </button>
+          </div>
         </div>
 
-        <div class="form-footer">
-          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="hqForm" class="btn btn--primary">💾 Enregistrer</button>
+        <!-- LOADING STATE -->
+        <div id="loadingState" class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Sauvegarde en cours…</div>
         </div>
       </div>
-
-      <!-- LOADING STATE -->
-      <div id="loadingState" class="loading-state">
-        <div class="spinner"></div>
-        <div class="loading-state__text">Sauvegarde en cours…</div>
-      </div>
-
     </div>
-  </div>
 
-  <script>
-    window.addEventListener('load', function () {
-      document.getElementById('lat').addEventListener('input', updatePreview);
-      document.getElementById('lng').addEventListener('input', updatePreview);
+    <script>
+      window.addEventListener("load", function () {
+        document.getElementById("lat").addEventListener("input", updatePreview);
+        document.getElementById("lng").addEventListener("input", updatePreview);
 
-      google.script.run
-        .withSuccessHandler(function (config) {
-          if (!config) return;
-          document.getElementById('address').value = config.address || '';
-          document.getElementById('lat').value = config.lat || '';
-          document.getElementById('lng').value = config.lng || '';
-          updatePreview();
-        })
-        .withFailureHandler(function (e) { showAlert('error', 'Erreur de chargement : ' + e.message); })
-        .getCurrentHqConfig();
-    });
+        google.script.run
+          .withSuccessHandler(function (config) {
+            if (!config) return;
+            document.getElementById("address").value = config.address || "";
+            document.getElementById("lat").value = config.lat || "";
+            document.getElementById("lng").value = config.lng || "";
+            updatePreview();
+          })
+          .withFailureHandler(function (e) {
+            showAlert("error", "Erreur de chargement : " + e.message);
+          })
+          .getCurrentHqConfig();
+      });
 
-    function updatePreview() {
-      var lat = document.getElementById('lat').value;
-      var lng = document.getElementById('lng').value;
-      var preview = document.getElementById('mapPreview');
-      if (lat && lng) {
-        document.getElementById('mapLink').href = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
-        preview.style.display = 'block';
-      } else {
-        preview.style.display = 'none';
+      function updatePreview() {
+        var lat = document.getElementById("lat").value;
+        var lng = document.getElementById("lng").value;
+        var preview = document.getElementById("mapPreview");
+        if (lat && lng) {
+          document.getElementById("mapLink").href =
+            "https://www.google.com/maps/search/?api=1&query=" +
+            lat +
+            "," +
+            lng;
+          preview.style.display = "block";
+        } else {
+          preview.style.display = "none";
+        }
       }
-    }
 
-    document.getElementById('hqForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var config = {
-        address: document.getElementById('address').value.trim(),
-        lat: parseFloat(document.getElementById('lat').value),
-        lng: parseFloat(document.getElementById('lng').value)
-      };
-      if (!config.address) { showAlert('error', "L'adresse est requise"); return; }
-      if (isNaN(config.lat) || config.lat < -90 || config.lat > 90) { showAlert('error', 'Latitude invalide (−90 à 90)'); return; }
-      if (isNaN(config.lng) || config.lng < -180 || config.lng > 180) { showAlert('error', 'Longitude invalide (−180 à 180)'); return; }
-      setState('loading');
-      google.script.run
-        .withSuccessHandler(function () { setState('form'); showAlert('success', '✅ QG enregistré !'); setTimeout(function () { google.script.host.close(); }, 1800); })
-        .withFailureHandler(function (e) { setState('form'); showAlert('error', e.message); })
-        .saveHqConfig(config);
-    });
+      document
+        .getElementById("hqForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          var config = {
+            address: document.getElementById("address").value.trim(),
+            lat: parseFloat(document.getElementById("lat").value),
+            lng: parseFloat(document.getElementById("lng").value),
+          };
+          if (!config.address) {
+            showAlert("error", "L'adresse est requise");
+            return;
+          }
+          if (isNaN(config.lat) || config.lat < -90 || config.lat > 90) {
+            showAlert("error", "Latitude invalide (−90 à 90)");
+            return;
+          }
+          if (isNaN(config.lng) || config.lng < -180 || config.lng > 180) {
+            showAlert("error", "Longitude invalide (−180 à 180)");
+            return;
+          }
+          setState("loading");
+          google.script.run
+            .withSuccessHandler(function () {
+              setState("form");
+              showAlert("success", "✅ QG enregistré !");
+              setTimeout(function () {
+                google.script.host.close();
+              }, 1800);
+            })
+            .withFailureHandler(function (e) {
+              setState("form");
+              showAlert("error", e.message);
+            })
+            .saveHqConfig(config);
+        });
 
-    function setState(s) {
-      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-    }
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+      }
 
-    function showAlert(type, msg) {
-      var el = document.getElementById('alert-' + type);
-      el.textContent = msg;
-      el.classList.add('alert--visible', 'alert--' + type);
-      setTimeout(function () { el.classList.remove('alert--visible'); }, 5000);
-    }
-  </script>
-</body>
-
+      function showAlert(type, msg) {
+        var el = document.getElementById("alert-" + type);
+        el.textContent = msg;
+        el.classList.add("alert--visible", "alert--" + type);
+        setTimeout(function () {
+          el.classList.remove("alert--visible");
+        }, 5000);
+      }
+    </script>
+  </body>
 </html>

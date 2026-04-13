@@ -1,403 +1,539 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-
-<head>
-    <base target="_top">
-    <meta charset="UTF-8">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
     <?!= include('styles'); ?>
     <style>
-        .step-nav {
-            display: flex;
-            border-bottom: 2px solid var(--border);
-            background: var(--bg);
-            flex-shrink: 0;
-        }
-
-        .step-btn {
-            flex: 1;
-            padding: 12px 16px;
-            border: none;
-            background: none;
-            font-family: inherit;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--muted);
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -2px;
-            transition: color .15s, border-color .15s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-
-        .step-btn.active {
-            color: var(--c2);
-            border-bottom-color: var(--c2);
-        }
-
-        .step-btn.done {
-            color: #10b981;
-        }
-
-        .step-btn:disabled {
-            opacity: .4;
-            cursor: not-allowed;
-        }
-
-        .step-panel {
-            display: none;
-            flex: 1;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .step-panel.active {
-            display: flex;
-        }
-
-        .table-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-        }
-
-        .table-toolbar select {
-            padding: 6px 10px;
-            font-size: 13px;
-            border-radius: var(--radius);
-            border: 2px solid var(--border);
-            background: var(--surface);
-            color: var(--text);
-            width: auto;
-        }
-
-        .table-toolbar select:focus {
-            outline: none;
-            border-color: var(--c1);
-        }
-
-        .table-wrap {
-            flex: 1;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-        }
-
-        .sel-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-
-        .sel-table thead th {
-            background: var(--bg);
-            padding: 8px 12px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--text-2);
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
-
-        .sel-table tbody tr {
-            border-bottom: 1px solid var(--border-light);
-            cursor: pointer;
-            transition: background .1s;
-        }
-
-        .sel-table tbody tr:last-child {
-            border-bottom: none;
-        }
-
-        .sel-table tbody tr:hover {
-            background: var(--bg);
-        }
-
-        .sel-table tbody tr.selected {
-            background: rgba(0, 254, 207, .07);
-        }
-
-        .sel-table td {
-            padding: 8px 12px;
-            vertical-align: middle;
-        }
-
-        .sel-table td:first-child {
-            width: 36px;
-            text-align: center;
-        }
-
-        .hotel-badge {
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 20px;
-            background: #e0f2fe;
-            color: #0369a1;
-            font-weight: 600;
-        }
-
-        .prio-dot {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 4px;
-            vertical-align: middle;
-        }
-
-        .admin-badge {
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 20px;
-            background: #ede9fe;
-            color: #6d28d9;
-            font-weight: 600;
-        }
-
-        .dispo-tag {
-            display: inline-block;
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 20px;
-            background: rgba(0, 254, 207, .15);
-            color: var(--c2);
-            margin-right: 3px;
-            font-weight: 600;
-        }
-
-        .selection-bar {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 10px 14px;
-            background: var(--bg2);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            margin-top: 10px;
-            font-size: 13px;
-            color: var(--text-2);
-            flex-shrink: 0;
-        }
-
-        .selection-bar .count {
-            color: var(--c2);
-            font-family: 'DM Mono', monospace;
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .form-body-flex {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            overflow: hidden;
-            padding: 28px 32px;
-        }
+      .step-nav {
+        display: flex;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg);
+        flex-shrink: 0;
+      }
+      .step-btn {
+        flex: 1;
+        padding: 12px 16px;
+        border: none;
+        background: none;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .step-btn.active {
+        color: var(--c2);
+        border-bottom-color: var(--c2);
+      }
+      .step-btn.done {
+        color: #10b981;
+      }
+      .step-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .step-panel {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .step-panel.active {
+        display: flex;
+      }
+      .table-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+      }
+      .table-toolbar select {
+        padding: 6px 10px;
+        font-size: 13px;
+        border-radius: var(--radius);
+        border: 2px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        width: auto;
+      }
+      .table-toolbar select:focus {
+        outline: none;
+        border-color: var(--c1);
+      }
+      .table-wrap {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .sel-table,
+      .deliveries-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .sel-table thead th,
+      .deliveries-table thead th {
+        background: var(--bg);
+        padding: 8px 12px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-2);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+      .sel-table tbody tr,
+      .deliveries-table tbody tr {
+        border-bottom: 1px solid var(--border-light);
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .sel-table tbody tr:last-child,
+      .deliveries-table tbody tr:last-child {
+        border-bottom: none;
+      }
+      .sel-table tbody tr:hover,
+      .deliveries-table tbody tr:hover {
+        background: var(--bg);
+      }
+      .sel-table tbody tr.selected,
+      .deliveries-table tbody tr.selected {
+        background: rgba(0, 254, 207, 0.07);
+      }
+      .sel-table td,
+      .deliveries-table td {
+        padding: 8px 12px;
+        vertical-align: middle;
+      }
+      .sel-table td:first-child,
+      .deliveries-table td:first-child {
+        width: 36px;
+        text-align: center;
+      }
+      .selection-bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 8px 14px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--text-2);
+        flex-shrink: 0;
+      }
+      .selection-bar .count {
+        color: var(--c2);
+        font-family: "DM Mono", monospace;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .form-body-flex {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+        padding: 16px 32px;
+      }
+      .btn-refresh {
+        padding: 6px 12px;
+        background: var(--surface);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+        white-space: nowrap;
+      }
+      .btn-refresh:hover {
+        border-color: var(--c1);
+        color: var(--text);
+      }
+      .btn-refresh:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      /* Barre de capacité véhicule */
+      .capacite-bar {
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 14px;
+        border: 1px solid;
+        border-radius: var(--radius);
+        margin-top: 8px;
+        flex-shrink: 0;
+      }
+      .cap-barre-wrap {
+        background: rgba(0, 0, 0, 0.07);
+        border-radius: 99px;
+        height: 8px;
+        overflow: hidden;
+      }
+      .cap-barre-fill {
+        height: 100%;
+        border-radius: 99px;
+        transition:
+          width 0.3s,
+          background 0.3s;
+      }
+      .cap-texte {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .info-cluster {
+        display: none;
+        padding: 8px 12px;
+        background: var(--info-bg);
+        color: var(--info-text);
+        border-left: 3px solid var(--info-border);
+        border-radius: var(--radius);
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        flex-shrink: 0;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="page-wrap">
-        <div class="card" style="height:100vh; max-height:800px;">
-
-            <div class="form-header">
-                <div class="form-header__icon">✏️</div>
-                <div class="form-header__text">
-                    <h1>Créer une Route Manuellement</h1>
-                    <p>Sélectionner le bénévole et les livraisons manuellement</p>
-                </div>
-            </div>
-
-            <!-- NAVIGATION -->
-            <div class="step-nav" id="stepNav">
-                <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)">⚙️ Configuration</button>
-                <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled>👤 Bénévole</button>
-                <button class="step-btn" id="stepBtn3" onclick="goToStep(3)" disabled>📦 Livraisons</button>
-            </div>
-
-            <!-- ÉTAPE 1 — CONFIGURATION -->
-            <div class="step-panel active" id="step1">
-                <div class="form-body">
-                    <div id="alert-error-1" class="alert alert--error"></div>
-
-                    <div class="form-section">
-                        <div class="form-section__title">📅 Date et occasion</div>
-                        <div class="form-group">
-                            <label for="date_livraison">Date de livraison</label>
-                            <input type="date" id="date_livraison" required>
-                        </div>
-                        <div class="form-group mb-0">
-                            <label for="occasion">Occasion</label>
-                            <select id="occasion">
-                                <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
-                                <option value="recolte">🌾 Récolte</option>
-                                <option value="ponctuelle">📦 Ponctuelle</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <div class="form-section__title">⚖️ Poids moyen par personne (kg)</div>
-                        <div class="form-row">
-                            <div class="form-group mb-0">
-                                <label for="poids_moyen_kg">Domicile 🏠</label>
-                                <input type="number" id="poids_moyen_kg" min="1" max="100" value="15" step="0.5"
-                                    required>
-                            </div>
-                            <div class="form-group mb-0">
-                                <label for="poids_moyen_hotel_kg">Hôtel 🏨</label>
-                                <input type="number" id="poids_moyen_hotel_kg" min="0" max="100" value="10" step="0.1">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-footer">
-                    <button type="button" class="btn btn--secondary"
-                        onclick="google.script.host.close()">Annuler</button>
-                    <button type="button" class="btn btn--primary" onclick="validerEtape1()">Suivant →</button>
-                </div>
-            </div>
-
-            <!-- ÉTAPE 2 — BÉNÉVOLE -->
-            <div class="step-panel" id="step2">
-                <div class="form-body-flex">
-                    <div id="alert-error-2" class="alert alert--error"></div>
-
-                    <div class="table-toolbar">
-                        <span class="text-muted" style="font-size:12px; font-weight:600;">Disponibilité</span>
-                        <select id="filtre-dispo-benv" onchange="filtrerBenevoles()">
-                            <option value="">Tous</option>
-                            <option value="Matin">Matin</option>
-                            <option value="Après-midi">Après-midi</option>
-                            <option value="Soir">Soir</option>
-                        </select>
-                        <div class="checkbox-row" style="flex:none; padding:6px 12px;"
-                            onclick="document.getElementById('filtre-admin-benv').click()">
-                            <input type="checkbox" id="filtre-admin-benv" checked onchange="filtrerBenevoles()">
-                            <label for="filtre-admin-benv">Afficher les administrateurs</label>
-                        </div>
-                        <span class="text-muted" id="benevoles-counter-manual"
-                            style="margin-left:auto; font-size:12px;"></span>
-                    </div>
-
-                    <div class="table-wrap" id="benevoles-wrap-manual">
-                        <div class="loading-state loading-state--visible" style="padding:32px 0;">
-                            <div class="spinner"></div>
-                            <div class="loading-state__text">Chargement des bénévoles…</div>
-                        </div>
-                    </div>
-
-                    <div class="selection-bar" id="benevole-summary" style="display:none;">
-                        <span>Bénévole sélectionné :</span>
-                        <span class="count" id="benevole-selected-nom">—</span>
-                        <span class="text-muted" id="benevole-selected-vehicule" style="font-size:12px;"></span>
-                    </div>
-                </div>
-
-                <div class="form-footer">
-                    <button type="button" class="btn btn--secondary" onclick="goToStep(1)">← Retour</button>
-                    <button type="button" class="btn btn--primary" id="btnStep2Next" onclick="validerEtape2()"
-                        disabled>Suivant →</button>
-                </div>
-            </div>
-
-            <!-- ÉTAPE 3 — LIVRAISONS -->
-            <div class="step-panel" id="step3">
-                <div class="form-body-flex">
-                    <div id="alert-error-3" class="alert alert--error"></div>
-
-                    <div class="table-toolbar">
-                        <span class="text-muted" style="font-size:12px; font-weight:600;">Quartier</span>
-                        <select id="filtre-quartier" onchange="filtrerLivraisons()">
-                            <option value="">Tous les quartiers</option>
-                        </select>
-                        <div class="checkbox-row" style="flex:none; padding:6px 12px;"
-                            onclick="document.getElementById('select-all-deliveries').click()">
-                            <input type="checkbox" id="select-all-deliveries"
-                                onchange="toggleToutesLivraisons(this.checked)">
-                            <label for="select-all-deliveries">Tout sélectionner</label>
-                        </div>
-                        <span class="text-muted" id="livraisons-counter"
-                            style="margin-left:auto; font-size:12px;"></span>
-                    </div>
-
-                    <div class="table-wrap" id="livraisons-wrap">
-                        <div class="loading-state loading-state--visible" style="padding:32px 0;">
-                            <div class="spinner"></div>
-                            <div class="loading-state__text">Chargement des livraisons…</div>
-                        </div>
-                    </div>
-
-                    <div class="selection-bar" id="livraisons-summary">
-                        <span>Sélectionnées :</span>
-                        <span class="count" id="livraisons-selected-count">0</span>
-                        <span class="text-muted">livraison(s)</span>
-                        <span class="text-muted" id="livraisons-selected-poids"
-                            style="margin-left:auto; font-size:12px;"></span>
-                    </div>
-                </div>
-
-                <div class="form-footer">
-                    <button type="button" class="btn btn--secondary" onclick="goToStep(2)">← Retour</button>
-                    <button type="button" class="btn btn--primary" id="btnCreer" onclick="creerRoute()" disabled>✨ Créer
-                        la Route</button>
-                </div>
-            </div>
-
-            <!-- LOADING -->
-            <div id="loadingState" class="loading-state" style="display:none;">
-                <div class="spinner"></div>
-                <div class="loading-state__text">Création de la route…</div>
-                <div class="loading-state__sub">Optimisation TSP · Sauvegarde · Génération feuille</div>
-            </div>
-
-            <!-- RÉSULTATS -->
-            <div id="resultsState" class="results-state">
-                <div class="results-header">
-                    <h2>✅ Route créée</h2>
-                    <p id="results-subtitle"></p>
-                </div>
-                <div class="results-body">
-                    <div class="kpi-grid">
-                        <div class="kpi-card">
-                            <div class="kpi-card__value" id="res-route">—</div>
-                            <div class="kpi-card__label">ID Route</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-card__value" id="res-livraisons">—</div>
-                            <div class="kpi-card__label">Livraisons</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-card__value" id="res-poids">—</div>
-                            <div class="kpi-card__label">Poids total</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-card__value" id="res-distance">—</div>
-                            <div class="kpi-card__label">Distance</div>
-                        </div>
-                    </div>
-                    <div id="res-maps-wrap" style="display:none; margin-bottom:12px;">
-                        <a id="res-maps-link" href="#" target="_blank" class="link-btn">🗺️ Voir l'itinéraire Google
-                            Maps</a>
-                    </div>
-                    <div id="res-warning" class="alert alert--warning"></div>
-                </div>
-                <div class="form-footer">
-                    <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
-                </div>
-            </div>
-
+      <div class="card" style="height: 100vh; max-height: 800px">
+        <div class="form-header">
+          <div class="form-header__icon">✏️</div>
+          <div class="form-header__text">
+            <h1>Créer une Route Manuellement</h1>
+            <p>Sélectionner le bénévole et les livraisons manuellement</p>
+          </div>
         </div>
+
+        <div class="step-nav" id="stepNav">
+          <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)">
+            ⚙️ Configuration
+          </button>
+          <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled>
+            👤 Bénévole
+          </button>
+          <button class="step-btn" id="stepBtn3" onclick="goToStep(3)" disabled>
+            📦 Livraisons
+          </button>
+        </div>
+
+        <!-- ═══════════ ÉTAPE 1 — CONFIGURATION ═══════════ -->
+        <div class="step-panel active" id="step1">
+          <div class="form-body">
+            <div id="alert-error-1" class="alert alert--error"></div>
+            <div class="form-section">
+              <div class="form-section__title">📅 Date et occasion</div>
+              <div class="form-group">
+                <label for="date_livraison">Date de livraison</label>
+                <input type="date" id="date_livraison" required />
+              </div>
+              <div class="form-group mb-0">
+                <label for="occasion">Occasion</label>
+                <select id="occasion">
+                  <option value="zakat_el_fitr">🌙 Zakat El Fitr</option>
+                  <option value="recolte">🌾 Récolte</option>
+                  <option value="ponctuelle">📦 Ponctuelle</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-section">
+              <div class="form-section__title">
+                ⚖️ Poids moyen par personne (kg)
+              </div>
+              <div class="form-row">
+                <div class="form-group mb-0">
+                  <label for="poids_moyen_kg">Domicile 🏠</label>
+                  <input
+                    type="number"
+                    id="poids_moyen_kg"
+                    min="1"
+                    max="100"
+                    value="15"
+                    step="0.5"
+                    required
+                  />
+                </div>
+                <div class="form-group mb-0">
+                  <label for="poids_moyen_hotel_kg">Hôtel 🏨</label>
+                  <input
+                    type="number"
+                    id="poids_moyen_hotel_kg"
+                    min="0"
+                    max="100"
+                    value="10"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              class="btn btn--primary"
+              onclick="validerEtape1()"
+            >
+              Suivant →
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══════════ ÉTAPE 2 — BÉNÉVOLE ═══════════ -->
+        <div class="step-panel" id="step2">
+          <div class="form-body-flex">
+            <div id="alert-error-2" class="alert alert--error"></div>
+            <div class="table-toolbar">
+              <span class="text-muted" style="font-size: 12px; font-weight: 600"
+                >Disponibilité</span
+              >
+              <select id="filtre-dispo-benv" onchange="filtrerBenevoles()">
+                <option value="">Tous</option>
+                <option value="Matin">Matin</option>
+                <option value="Après-midi">Après-midi</option>
+                <option value="Soir">Soir</option>
+              </select>
+              <div
+                class="checkbox-row"
+                style="flex: none; padding: 6px 12px"
+                onclick="document.getElementById('filtre-admin-benv').click()"
+              >
+                <input
+                  type="checkbox"
+                  id="filtre-admin-benv"
+                  checked
+                  onchange="filtrerBenevoles()"
+                />
+                <label for="filtre-admin-benv"
+                  >Afficher les administrateurs</label
+                >
+              </div>
+              <span
+                class="text-muted"
+                id="benevoles-counter-manual"
+                style="margin-left: auto; font-size: 12px"
+              ></span>
+              <button
+                type="button"
+                class="btn-refresh"
+                id="btn-refresh-manual"
+                onclick="actualiserBenevoles()"
+              >
+                🔄 Actualiser
+              </button>
+            </div>
+            <div class="table-wrap" id="benevoles-wrap-manual">
+              <div
+                class="loading-state loading-state--visible"
+                style="padding: 32px 0"
+              >
+                <div class="spinner"></div>
+                <div class="loading-state__text">Chargement des bénévoles…</div>
+              </div>
+            </div>
+            <div
+              class="selection-bar"
+              id="benevole-summary"
+              style="display: none"
+            >
+              <span>Bénévole sélectionné :</span>
+              <span class="count" id="benevole-selected-nom">—</span>
+              <span
+                class="text-muted"
+                id="benevole-selected-vehicule"
+                style="font-size: 12px"
+              ></span>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="goToStep(1)"
+            >
+              ← Retour
+            </button>
+            <button
+              type="button"
+              class="btn btn--primary"
+              id="btnStep2Next"
+              onclick="validerEtape2()"
+              disabled
+            >
+              Suivant →
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══════════ ÉTAPE 3 — LIVRAISONS ═══════════ -->
+        <div class="step-panel" id="step3">
+          <div class="form-body-flex">
+            <div id="alert-error-3" class="alert alert--error"></div>
+            <div id="info-cluster" class="info-cluster"></div>
+
+            <div class="table-toolbar">
+              <span class="text-muted" style="font-size: 12px; font-weight: 600"
+                >Quartier</span
+              >
+              <select id="filtre-quartier" onchange="filtrerLivraisons()">
+                <option value="">Tous les quartiers</option>
+              </select>
+              <div
+                class="checkbox-row"
+                style="flex: none; padding: 6px 12px"
+                onclick="
+                  document.getElementById('select-all-deliveries').click()
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="select-all-deliveries"
+                  onchange="toggleToutesLivraisons(this.checked)"
+                />
+                <label for="select-all-deliveries">Tout sélectionner</label>
+              </div>
+              <span
+                class="text-muted"
+                id="livraisons-counter"
+                style="margin-left: auto; font-size: 12px"
+              ></span>
+            </div>
+
+            <div class="table-wrap" id="livraisons-wrap">
+              <div
+                class="loading-state loading-state--visible"
+                style="padding: 32px 0"
+              >
+                <div class="spinner"></div>
+                <div class="loading-state__text">
+                  Calcul du cluster optimal…
+                </div>
+              </div>
+            </div>
+
+            <!-- Barre de sélection -->
+            <div class="selection-bar" id="livraisons-summary">
+              <span>Sélectionnées :</span>
+              <span class="count" id="livraisons-selected-count">0</span>
+              <span class="text-muted">livraison(s)</span>
+              <span
+                class="text-muted"
+                id="livraisons-selected-poids"
+                style="margin-left: auto; font-size: 12px"
+              ></span>
+            </div>
+
+            <!-- Barre de capacité véhicule (non bloquante) -->
+            <div class="capacite-bar" id="capacite-bar">
+              <div class="cap-texte"></div>
+              <div class="cap-barre-wrap">
+                <div class="cap-barre-fill" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="goToStep(2)"
+            >
+              ← Retour
+            </button>
+            <button
+              type="button"
+              class="btn btn--primary"
+              id="btnCreer"
+              onclick="creerRoute()"
+              disabled
+            >
+              ✨ Créer la Route
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══════════ CHARGEMENT ═══════════ -->
+        <div id="loadingState" class="loading-state" style="display: none">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Création de la route…</div>
+          <div class="loading-state__sub">
+            Optimisation TSP · Sauvegarde · Génération feuille
+          </div>
+        </div>
+
+        <!-- ═══════════ RÉSULTATS ═══════════ -->
+        <div id="resultsState" class="results-state">
+          <div class="results-header">
+            <h2>✅ Route créée</h2>
+            <p id="results-subtitle"></p>
+          </div>
+          <div class="results-body">
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="res-route">—</div>
+                <div class="kpi-card__label">ID Route</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="res-livraisons">—</div>
+                <div class="kpi-card__label">Livraisons</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="res-poids">—</div>
+                <div class="kpi-card__label">Poids total</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="res-distance">—</div>
+                <div class="kpi-card__label">Distance</div>
+              </div>
+            </div>
+            <div id="res-maps-wrap" style="display: none; margin-bottom: 12px">
+              <a id="res-maps-link" href="#" target="_blank" class="link-btn">
+                🗺️ Voir l'itinéraire Google Maps
+              </a>
+            </div>
+            <div id="res-warning" class="alert alert--warning"></div>
+          </div>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--primary"
+              onclick="google.script.host.close()"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <?!= include('ui/scripts/manualRouteFormScript'); ?>
-</body>
-
+  </body>
 </html>

@@ -1,385 +1,481 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <?!= include('styles'); ?>
-  <style>
-    .quartiers-list {
-      max-height: 200px;
-      overflow-y: auto;
-      border: 2px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--surface);
-    }
-
-    .quartier-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border-light);
-      cursor: pointer;
-      transition: background .1s;
-    }
-
-    .quartier-item:last-child {
-      border-bottom: none;
-    }
-
-    .quartier-item:hover {
-      background: var(--bg2);
-    }
-
-    .quartier-item input[type="checkbox"] {
-      width: 15px;
-      height: 15px;
-      accent-color: var(--c2);
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .quartier-item label {
-      margin: 0;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 400;
-      color: var(--text);
-    }
-
-    .quartiers-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 8px;
-    }
-  </style>
-</head>
-
-<body>
-  <div class="page-wrap">
-    <div class="card">
-
-      <div class="form-header">
-        <div class="form-header__icon">📦</div>
-        <div class="form-header__text">
-          <h1>Générer des Livraisons</h1>
-          <p>Créer des demandes à partir des familles validées</p>
-        </div>
-      </div>
-
-      <!-- FORM STATE -->
-      <div id="formState">
-        <div class="form-body">
-          <div id="alert-success" class="alert alert--success"></div>
-          <div id="alert-error" class="alert alert--error"></div>
-          <div id="alert-info" class="alert alert--info"></div>
-
-          <form id="deliveryForm">
-
-            <!-- PRIORITÉS -->
-            <div class="form-section">
-              <div class="form-section__title">🎯 Niveaux de priorité</div>
-              <div class="checkbox-grid" id="priorites-group">
-                <div class="checkbox-item">
-                  <input type="checkbox" id="prio1" value="1" checked>
-                  <label for="prio1">1 — Urgent</label>
-                </div>
-                <div class="checkbox-item">
-                  <input type="checkbox" id="prio2" value="2" checked>
-                  <label for="prio2">2 — Haute</label>
-                </div>
-                <div class="checkbox-item">
-                  <input type="checkbox" id="prio3" value="3" checked>
-                  <label for="prio3">3 — Moyenne</label>
-                </div>
-                <div class="checkbox-item">
-                  <input type="checkbox" id="prio4" value="4" checked>
-                  <label for="prio4">4 — Basse</label>
-                </div>
-                <div class="checkbox-item">
-                  <input type="checkbox" id="prio5" value="5" checked>
-                  <label for="prio5">5 — Standard</label>
-                </div>
-              </div>
-              <div style="display: flex; gap: 10px; margin-top: 8px;">
-                <button type="button" class="text-link" onclick="selectAllPriorities()">✓ Tout sélectionner</button>
-                <button type="button" class="text-link" onclick="deselectAllPriorities()">✕ Tout désélectionner</button>
-              </div>
-            </div>
-
-            <!-- TYPES D'AIDE -->
-            <div class="form-section">
-              <div class="form-section__title">💝 Types d'aide</div>
-              <div class="checkbox-grid">
-                <div class="checkbox-item">
-                  <input type="checkbox" id="zakat" name="type_aide" value="zakat_el_fitr">
-                  <label for="zakat">🌙 Zakat El Fitr</label>
-                </div>
-                <div class="checkbox-item">
-                  <input type="checkbox" id="ponctuelle" name="type_aide" value="ponctuelle">
-                  <label for="ponctuelle">💝 Ponctuelle</label>
-                </div>
-                <div class="checkbox-item">
-                  <input type="checkbox" id="recolte" name="type_aide" value="recolte">
-                  <label for="recolte">🌾 Récolte</label>
-                </div>
-              </div>
-            </div>
-
-            <!-- QUARTIERS -->
-            <div class="form-section">
-              <div class="form-section__title">📍 Quartiers</div>
-
-              <div id="quartiers-loading" class="help-text">Chargement des quartiers…</div>
-
-              <div id="quartiers-wrap" style="display: none;">
-                <div class="quartiers-list" id="quartiers-list"></div>
-                <div class="quartiers-actions">
-                  <button type="button" class="text-link" onclick="selectAllQuartiers()">✓ Tout sélectionner</button>
-                  <button type="button" class="text-link" onclick="deselectAllQuartiers()">✕ Tout
-                    désélectionner</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- DATE ET QUANTITÉ -->
-            <div class="form-section">
-              <div class="form-section__title">📅 Date et quantité</div>
-              <div class="form-row">
-                <div class="form-group mb-0">
-                  <label for="date_livraison">Date de livraison</label>
-                  <input type="date" id="date_livraison" required>
-                  <div class="help-text">Fenêtre par défaut : 09h00 – 18h00</div>
-                </div>
-                <div class="form-group mb-0">
-                  <label for="nombre">Nombre maximum</label>
-                  <input type="number" id="nombre" min="1" max="1000" value="500" required>
-                  <div class="help-text">Toutes les familles si moins correspondent</div>
-                </div>
-              </div>
-            </div>
-
-          </form>
-        </div>
-
-        <div class="form-footer">
-          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="deliveryForm" class="btn btn--primary">✨ Générer les Livraisons</button>
-        </div>
-      </div>
-
-      <!-- LOADING STATE -->
-      <div id="loadingState" class="loading-state">
-        <div class="spinner"></div>
-        <div class="loading-state__text">Génération en cours…</div>
-        <div class="loading-state__sub">Récupération des familles, géocodage et création des livraisons</div>
-      </div>
-
-      <!-- RESULTS STATE -->
-      <div id="resultsState" class="results-state">
-        <div class="results-header">
-          <h2>✅ Livraisons générées</h2>
-        </div>
-        <div class="results-body">
-          <div class="kpi-grid">
-            <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-created">0</div>
-              <div class="kpi-card__label">Créées</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-skipped">0</div>
-              <div class="kpi-card__label">Ignorées</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-card__value" id="stat-errors">0</div>
-              <div class="kpi-card__label">Erreurs</div>
-            </div>
-          </div>
-          <div id="error-details" class="error-box hidden">
-            <div class="error-box__title">⚠️ Détails des erreurs</div>
-            <ul id="error-list"></ul>
-          </div>
-        </div>
-        <div class="form-footer">
-          <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <script>
-    window.addEventListener('load', function () {
-      var d = new Date();
-      d.setDate(d.getDate() + 1);
-      document.getElementById('date_livraison').value = d.toISOString().split('T')[0];
-      loadQuartiers();
-    });
-
-    // ── Chargement des quartiers ──────────────────────────────
-
-    function loadQuartiers() {
-      google.script.run
-        .withSuccessHandler(populateQuartiers)
-        .withFailureHandler(function (e) {
-          document.getElementById('quartiers-loading').textContent =
-            'Erreur de chargement : ' + e.message;
-        })
-        .getQuartiersForDeliveryForm();
-    }
-
-    function populateQuartiers(quartiers) {
-      var loading = document.getElementById('quartiers-loading');
-      var wrap = document.getElementById('quartiers-wrap');
-      var list = document.getElementById('quartiers-list');
-
-      if (!quartiers || quartiers.length === 0) {
-        loading.textContent = 'Aucun quartier disponible.';
-        return;
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <?!= include('styles'); ?>
+    <style>
+      .quartiers-list {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
       }
 
-      list.innerHTML = '';
+      .quartier-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border-light);
+        cursor: pointer;
+        transition: background 0.1s;
+      }
 
-      quartiers.forEach(function (q) {
-        var item = document.createElement('div');
-        item.className = 'quartier-item';
+      .quartier-item:last-child {
+        border-bottom: none;
+      }
 
-        var cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.id = 'q_' + q.id;
-        cb.value = q.id;
-        cb.checked = true;
-        cb.className = 'quartier-cb';
+      .quartier-item:hover {
+        background: var(--bg2);
+      }
 
-        var lbl = document.createElement('label');
-        lbl.htmlFor = 'q_' + q.id;
-        lbl.textContent = q.nom;
+      .quartier-item input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--c2);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
 
-        item.appendChild(cb);
-        item.appendChild(lbl);
-        list.appendChild(item);
+      .quartier-item label {
+        margin: 0;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--text);
+      }
+
+      .quartiers-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="page-wrap">
+      <div class="card">
+        <div class="form-header">
+          <div class="form-header__icon">📦</div>
+          <div class="form-header__text">
+            <h1>Générer des Livraisons</h1>
+            <p>Créer des demandes à partir des familles validées</p>
+          </div>
+        </div>
+
+        <!-- FORM STATE -->
+        <div id="formState">
+          <div class="form-body">
+            <div id="alert-success" class="alert alert--success"></div>
+            <div id="alert-error" class="alert alert--error"></div>
+            <div id="alert-info" class="alert alert--info"></div>
+
+            <form id="deliveryForm">
+              <!-- PRIORITÉS -->
+              <div class="form-section">
+                <div class="form-section__title">🎯 Niveaux de priorité</div>
+                <div class="checkbox-grid" id="priorites-group">
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="prio1" value="1" checked />
+                    <label for="prio1">1 — Urgent</label>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="prio2" value="2" checked />
+                    <label for="prio2">2 — Haute</label>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="prio3" value="3" checked />
+                    <label for="prio3">3 — Moyenne</label>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="prio4" value="4" checked />
+                    <label for="prio4">4 — Basse</label>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="prio5" value="5" checked />
+                    <label for="prio5">5 — Standard</label>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 8px">
+                  <button
+                    type="button"
+                    class="text-link"
+                    onclick="selectAllPriorities()"
+                  >
+                    ✓ Tout sélectionner
+                  </button>
+                  <button
+                    type="button"
+                    class="text-link"
+                    onclick="deselectAllPriorities()"
+                  >
+                    ✕ Tout désélectionner
+                  </button>
+                </div>
+              </div>
+
+              <!-- TYPES D'AIDE -->
+              <div class="form-section">
+                <div class="form-section__title">💝 Types d'aide</div>
+                <div class="checkbox-grid">
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="zakat"
+                      name="type_aide"
+                      value="zakat_el_fitr"
+                    />
+                    <label for="zakat">🌙 Zakat El Fitr</label>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="ponctuelle"
+                      name="type_aide"
+                      value="ponctuelle"
+                    />
+                    <label for="ponctuelle">💝 Ponctuelle</label>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="recolte"
+                      name="type_aide"
+                      value="recolte"
+                    />
+                    <label for="recolte">🌾 Récolte</label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- QUARTIERS -->
+              <div class="form-section">
+                <div class="form-section__title">📍 Quartiers</div>
+
+                <div id="quartiers-loading" class="help-text">
+                  Chargement des quartiers…
+                </div>
+
+                <div id="quartiers-wrap" style="display: none">
+                  <div class="quartiers-list" id="quartiers-list"></div>
+                  <div class="quartiers-actions">
+                    <button
+                      type="button"
+                      class="text-link"
+                      onclick="selectAllQuartiers()"
+                    >
+                      ✓ Tout sélectionner
+                    </button>
+                    <button
+                      type="button"
+                      class="text-link"
+                      onclick="deselectAllQuartiers()"
+                    >
+                      ✕ Tout désélectionner
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DATE ET QUANTITÉ -->
+              <div class="form-section">
+                <div class="form-section__title">📅 Date et quantité</div>
+                <div class="form-row">
+                  <div class="form-group mb-0">
+                    <label for="date_livraison">Date de livraison</label>
+                    <input type="date" id="date_livraison" required />
+                    <div class="help-text">
+                      Fenêtre par défaut : 09h00 – 18h00
+                    </div>
+                  </div>
+                  <div class="form-group mb-0">
+                    <label for="nombre">Nombre maximum</label>
+                    <input
+                      type="number"
+                      id="nombre"
+                      min="1"
+                      max="1000"
+                      value="500"
+                      required
+                    />
+                    <div class="help-text">
+                      Toutes les familles si moins correspondent
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button type="submit" form="deliveryForm" class="btn btn--primary">
+              ✨ Générer les Livraisons
+            </button>
+          </div>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div id="loadingState" class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Génération en cours…</div>
+          <div class="loading-state__sub">
+            Récupération des familles, géocodage et création des livraisons
+          </div>
+        </div>
+
+        <!-- RESULTS STATE -->
+        <div id="resultsState" class="results-state">
+          <div class="results-header">
+            <h2>✅ Livraisons générées</h2>
+          </div>
+          <div class="results-body">
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="stat-created">0</div>
+                <div class="kpi-card__label">Créées</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="stat-skipped">0</div>
+                <div class="kpi-card__label">Ignorées</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-card__value" id="stat-errors">0</div>
+                <div class="kpi-card__label">Erreurs</div>
+              </div>
+            </div>
+            <div id="error-details" class="error-box hidden">
+              <div class="error-box__title">⚠️ Détails des erreurs</div>
+              <ul id="error-list"></ul>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--primary"
+              onclick="google.script.host.close()"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      window.addEventListener("load", function () {
+        var d = new Date();
+        d.setDate(d.getDate() + 1);
+        document.getElementById("date_livraison").value = d
+          .toISOString()
+          .split("T")[0];
+        loadQuartiers();
       });
 
-      loading.style.display = 'none';
-      wrap.style.display = '';
-    }
+      // ── Chargement des quartiers ──────────────────────────────
 
-    // ── Priorités ─────────────────────────────────────────────
-
-    function selectAllPriorities() {
-      document.querySelectorAll('#priorites-group input[type="checkbox"]')
-        .forEach(function (b) { b.checked = true; });
-    }
-
-    function deselectAllPriorities() {
-      document.querySelectorAll('#priorites-group input[type="checkbox"]')
-        .forEach(function (b) { b.checked = false; });
-    }
-
-    // ── Quartiers ─────────────────────────────────────────────
-
-    function selectAllQuartiers() {
-      document.querySelectorAll('.quartier-cb')
-        .forEach(function (cb) { cb.checked = true; });
-    }
-
-    function deselectAllQuartiers() {
-      document.querySelectorAll('.quartier-cb')
-        .forEach(function (cb) { cb.checked = false; });
-    }
-
-    function getSelectedQuartierIds() {
-      return Array.from(document.querySelectorAll('.quartier-cb:checked'))
-        .map(function (cb) { return parseInt(cb.value); })
-        .filter(function (v) { return !isNaN(v); });
-    }
-
-    // ── Soumission ────────────────────────────────────────────
-
-    document.getElementById('deliveryForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      var priorites = Array.from(
-        document.querySelectorAll('#priorites-group input:checked')
-      ).map(function (b) { return parseInt(b.value); });
-
-      var typesAide = Array.from(
-        document.querySelectorAll('input[name="type_aide"]:checked')
-      ).map(function (b) { return b.value; });
-
-      var quartiers = getSelectedQuartierIds();
-
-      if (priorites.length === 0) {
-        showAlert('error', 'Veuillez sélectionner au moins un niveau de priorité');
-        return;
-      }
-      if (typesAide.length === 0) {
-        showAlert('error', "Veuillez sélectionner au moins un type d'aide");
-        return;
-      }
-      if (quartiers.length === 0) {
-        showAlert('error', 'Veuillez sélectionner au moins un quartier');
-        return;
+      function loadQuartiers() {
+        google.script.run
+          .withSuccessHandler(populateQuartiers)
+          .withFailureHandler(function (e) {
+            document.getElementById("quartiers-loading").textContent =
+              "Erreur de chargement : " + e.message;
+          })
+          .getQuartiersForDeliveryForm();
       }
 
-      setState('loading');
+      function populateQuartiers(quartiers) {
+        var loading = document.getElementById("quartiers-loading");
+        var wrap = document.getElementById("quartiers-wrap");
+        var list = document.getElementById("quartiers-list");
 
-      google.script.run
-        .withSuccessHandler(onGenerateSuccess)
-        .withFailureHandler(function (e) {
-          setState('form');
-          showAlert('error', 'Erreur : ' + e.message);
-        })
-        .generateDeliveriesFromForm({
-          priorites: priorites,
-          types_aide: typesAide,
-          quartiers: quartiers,
-          date_livraison: document.getElementById('date_livraison').value,
-          nombre: parseInt(document.getElementById('nombre').value)
+        if (!quartiers || quartiers.length === 0) {
+          loading.textContent = "Aucun quartier disponible.";
+          return;
+        }
+
+        list.innerHTML = "";
+
+        quartiers.forEach(function (q) {
+          var item = document.createElement("div");
+          item.className = "quartier-item";
+
+          var cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.id = "q_" + q.id;
+          cb.value = q.id;
+          cb.checked = true;
+          cb.className = "quartier-cb";
+
+          var lbl = document.createElement("label");
+          lbl.htmlFor = "q_" + q.id;
+          lbl.textContent = q.nom;
+
+          item.appendChild(cb);
+          item.appendChild(lbl);
+          list.appendChild(item);
         });
-    });
 
-    function onGenerateSuccess(result) {
-      if (!result.success) {
-        setState('form');
-        showAlert('error', 'La génération a échoué : ' + (result.errors.join(', ') || 'Erreur inconnue'));
-        return;
+        loading.style.display = "none";
+        wrap.style.display = "";
       }
 
-      document.getElementById('stat-created').textContent = result.created;
-      document.getElementById('stat-skipped').textContent = result.skipped;
-      document.getElementById('stat-errors').textContent = result.errors.length;
+      // ── Priorités ─────────────────────────────────────────────
 
-      if (result.errors.length > 0) {
-        var ul = document.getElementById('error-list');
-        ul.innerHTML = '';
-        result.errors.forEach(function (err) {
-          var li = document.createElement('li');
-          li.textContent = err;
-          ul.appendChild(li);
+      function selectAllPriorities() {
+        document
+          .querySelectorAll('#priorites-group input[type="checkbox"]')
+          .forEach(function (b) {
+            b.checked = true;
+          });
+      }
+
+      function deselectAllPriorities() {
+        document
+          .querySelectorAll('#priorites-group input[type="checkbox"]')
+          .forEach(function (b) {
+            b.checked = false;
+          });
+      }
+
+      // ── Quartiers ─────────────────────────────────────────────
+
+      function selectAllQuartiers() {
+        document.querySelectorAll(".quartier-cb").forEach(function (cb) {
+          cb.checked = true;
         });
-        document.getElementById('error-details').classList.remove('hidden');
       }
 
-      setState('results');
-    }
+      function deselectAllQuartiers() {
+        document.querySelectorAll(".quartier-cb").forEach(function (cb) {
+          cb.checked = false;
+        });
+      }
 
-    // ── Utilitaires ───────────────────────────────────────────
+      function getSelectedQuartierIds() {
+        return Array.from(document.querySelectorAll(".quartier-cb:checked"))
+          .map(function (cb) {
+            return parseInt(cb.value);
+          })
+          .filter(function (v) {
+            return !isNaN(v);
+          });
+      }
 
-    function setState(s) {
-      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-      document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
-    }
+      // ── Soumission ────────────────────────────────────────────
 
-    function showAlert(type, msg) {
-      var el = document.getElementById('alert-' + type);
-      el.textContent = msg;
-      el.classList.add('alert--visible', 'alert--' + type);
-      setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
-    }
-  </script>
-</body>
+      document
+        .getElementById("deliveryForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
 
+          var priorites = Array.from(
+            document.querySelectorAll("#priorites-group input:checked"),
+          ).map(function (b) {
+            return parseInt(b.value);
+          });
+
+          var typesAide = Array.from(
+            document.querySelectorAll('input[name="type_aide"]:checked'),
+          ).map(function (b) {
+            return b.value;
+          });
+
+          var quartiers = getSelectedQuartierIds();
+
+          if (priorites.length === 0) {
+            showAlert(
+              "error",
+              "Veuillez sélectionner au moins un niveau de priorité",
+            );
+            return;
+          }
+          if (typesAide.length === 0) {
+            showAlert("error", "Veuillez sélectionner au moins un type d'aide");
+            return;
+          }
+          if (quartiers.length === 0) {
+            showAlert("error", "Veuillez sélectionner au moins un quartier");
+            return;
+          }
+
+          setState("loading");
+
+          google.script.run
+            .withSuccessHandler(onGenerateSuccess)
+            .withFailureHandler(function (e) {
+              setState("form");
+              showAlert("error", "Erreur : " + e.message);
+            })
+            .generateDeliveriesFromForm({
+              priorites: priorites,
+              types_aide: typesAide,
+              quartiers: quartiers,
+              date_livraison: document.getElementById("date_livraison").value,
+              nombre: parseInt(document.getElementById("nombre").value),
+            });
+        });
+
+      function onGenerateSuccess(result) {
+        if (!result.success) {
+          setState("form");
+          showAlert(
+            "error",
+            "La génération a échoué : " +
+              (result.errors.join(", ") || "Erreur inconnue"),
+          );
+          return;
+        }
+
+        document.getElementById("stat-created").textContent = result.created;
+        document.getElementById("stat-skipped").textContent = result.skipped;
+        document.getElementById("stat-errors").textContent =
+          result.errors.length;
+
+        if (result.errors.length > 0) {
+          var ul = document.getElementById("error-list");
+          ul.innerHTML = "";
+          result.errors.forEach(function (err) {
+            var li = document.createElement("li");
+            li.textContent = err;
+            ul.appendChild(li);
+          });
+          document.getElementById("error-details").classList.remove("hidden");
+        }
+
+        setState("results");
+      }
+
+      // ── Utilitaires ───────────────────────────────────────────
+
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+        document
+          .getElementById("resultsState")
+          .classList.toggle("results-state--visible", s === "results");
+      }
+
+      function showAlert(type, msg) {
+        var el = document.getElementById("alert-" + type);
+        el.textContent = msg;
+        el.classList.add("alert--visible", "alert--" + type);
+        setTimeout(function () {
+          el.classList.remove("alert--visible");
+        }, 6000);
+      }
+    </script>
+  </body>
 </html>

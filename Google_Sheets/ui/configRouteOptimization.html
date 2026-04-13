@@ -1,145 +1,262 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <?!= include('styles'); ?>
+  </head>
 
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <?!= include('styles'); ?>
-</head>
-
-<body>
-  <div class="page-wrap">
-    <div class="card">
-
-      <div class="form-header">
-        <div class="form-header__icon">🎛️</div>
-        <div class="form-header__text">
-          <h1>Optimisation des Routes</h1>
-          <p>Paramètres du clustering adaptatif</p>
+  <body>
+    <div class="page-wrap">
+      <div class="card">
+        <div class="form-header">
+          <div class="form-header__icon">🎛️</div>
+          <div class="form-header__text">
+            <h1>Optimisation des Routes</h1>
+            <p>Paramètres du clustering adaptatif</p>
+          </div>
         </div>
-      </div>
 
-      <!-- FORM STATE -->
-      <div id="formState">
-        <div class="form-body">
-          <div id="alert-success" class="alert alert--success"></div>
-          <div id="alert-error" class="alert alert--error"></div>
+        <!-- FORM STATE -->
+        <div id="formState">
+          <div class="form-body">
+            <div id="alert-success" class="alert alert--success"></div>
+            <div id="alert-error" class="alert alert--error"></div>
 
-          <form id="optimizationForm">
-
-            <div class="form-section">
-              <div class="form-section__title">🗺️ Clustering géographique</div>
-              <div class="form-group">
-                <label for="distanceProximite">Distance de proximité (km)</label>
-                <input type="number" id="distanceProximite" min="0.5" max="10" step="0.1" required>
-                <div class="help-text">Livraisons à moins de X km = même cluster (recommandé : 3 km)</div>
-              </div>
-              <div class="form-group">
-                <label for="distanceClusterMax">Distance max entre clusters (km)</label>
-                <input type="number" id="distanceClusterMax" min="5" max="50" step="1" required>
-                <div class="help-text">Clusters à moins de X km peuvent être groupés (recommandé : 15 km)</div>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">📍 Livraisons éloignées</div>
-              <div class="form-group">
-                <label for="distanceRegroupeEloignes">Distance pour regroupement (km)</label>
-                <input type="number" id="distanceRegroupeEloignes" min="10" max="100" step="5" required>
-                <div class="help-text">Livraisons &gt; X km du QG sont regroupées ensemble (recommandé : 30 km)</div>
-              </div>
-              <div class="form-group">
-                <label for="distanceLivraisonIsolee">Distance livraison isolée (km)</label>
-                <input type="number" id="distanceLivraisonIsolee" min="20" max="150" step="5" required>
-                <div class="help-text">Avertissement si livraison &gt; X km (recommandé : 50 km)</div>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <div class="form-section__title">🚗 Capacités véhicules (kg)</div>
-              <div class="form-row">
-                <div class="form-group mb-0">
-                  <label for="capaciteBerline">Berline</label>
-                  <input type="number" id="capaciteBerline" min="50" max="500" step="10" required>
+            <form id="optimizationForm">
+              <div class="form-section">
+                <div class="form-section__title">
+                  🗺️ Clustering géographique
                 </div>
-                <div class="form-group mb-0">
-                  <label for="capaciteBreak">Break / Utilitaire</label>
-                  <input type="number" id="capaciteBreak" min="100" max="2000" step="10" required>
+                <div class="form-group">
+                  <label for="distanceProximite"
+                    >Distance de proximité (km)</label
+                  >
+                  <input
+                    type="number"
+                    id="distanceProximite"
+                    min="0.5"
+                    max="10"
+                    step="0.1"
+                    required
+                  />
+                  <div class="help-text">
+                    Livraisons à moins de X km = même cluster (recommandé : 3
+                    km)
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="distanceClusterMax"
+                    >Distance max entre clusters (km)</label
+                  >
+                  <input
+                    type="number"
+                    id="distanceClusterMax"
+                    min="5"
+                    max="50"
+                    step="1"
+                    required
+                  />
+                  <div class="help-text">
+                    Clusters à moins de X km peuvent être groupés (recommandé :
+                    15 km)
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="info-box">
-              <strong>ℹ️ Comment ça marche :</strong><br>
-              Le système regroupe les livraisons proches (clustering), assigne les clusters aux véhicules
-              selon leur capacité, détecte les trajets problématiques et maximise le taux de remplissage.
-            </div>
+              <div class="form-section">
+                <div class="form-section__title">📍 Livraisons éloignées</div>
+                <div class="form-group">
+                  <label for="distanceRegroupeEloignes"
+                    >Distance pour regroupement (km)</label
+                  >
+                  <input
+                    type="number"
+                    id="distanceRegroupeEloignes"
+                    min="10"
+                    max="100"
+                    step="5"
+                    required
+                  />
+                  <div class="help-text">
+                    Livraisons &gt; X km du QG sont regroupées ensemble
+                    (recommandé : 30 km)
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="distanceLivraisonIsolee"
+                    >Distance livraison isolée (km)</label
+                  >
+                  <input
+                    type="number"
+                    id="distanceLivraisonIsolee"
+                    min="20"
+                    max="150"
+                    step="5"
+                    required
+                  />
+                  <div class="help-text">
+                    Avertissement si livraison &gt; X km (recommandé : 50 km)
+                  </div>
+                </div>
+              </div>
 
-          </form>
+              <div class="form-section">
+                <div class="form-section__title">
+                  🚗 Capacités véhicules (kg)
+                </div>
+                <div class="form-row">
+                  <div class="form-group mb-0">
+                    <label for="capaciteBerline">Berline</label>
+                    <input
+                      type="number"
+                      id="capaciteBerline"
+                      min="50"
+                      max="500"
+                      step="10"
+                      required
+                    />
+                  </div>
+                  <div class="form-group mb-0">
+                    <label for="capaciteBreak">Break / Utilitaire</label>
+                    <input
+                      type="number"
+                      id="capaciteBreak"
+                      min="100"
+                      max="2000"
+                      step="10"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="info-box">
+                <strong>ℹ️ Comment ça marche :</strong><br />
+                Le système regroupe les livraisons proches (clustering), assigne
+                les clusters aux véhicules selon leur capacité, détecte les
+                trajets problématiques et maximise le taux de remplissage.
+              </div>
+            </form>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="button"
+              class="btn btn--secondary"
+              onclick="google.script.host.close()"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              form="optimizationForm"
+              class="btn btn--primary"
+            >
+              💾 Enregistrer
+            </button>
+          </div>
         </div>
 
-        <div class="form-footer">
-          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
-          <button type="submit" form="optimizationForm" class="btn btn--primary">💾 Enregistrer</button>
+        <!-- LOADING STATE -->
+        <div id="loadingState" class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-state__text">Sauvegarde en cours…</div>
         </div>
       </div>
-
-      <!-- LOADING STATE -->
-      <div id="loadingState" class="loading-state">
-        <div class="spinner"></div>
-        <div class="loading-state__text">Sauvegarde en cours…</div>
-      </div>
-
     </div>
-  </div>
 
-  <script>
-    window.addEventListener('load', function () {
-      google.script.run
-        .withSuccessHandler(function (config) {
-          if (!config) return;
-          document.getElementById('distanceProximite').value = config.distanceProximite || 3;
-          document.getElementById('distanceClusterMax').value = config.distanceClusterMax || 15;
-          document.getElementById('distanceRegroupeEloignes').value = config.distanceRegroupeEloignes || 30;
-          document.getElementById('distanceLivraisonIsolee').value = config.distanceLivraisonIsolee || 50;
-          document.getElementById('capaciteBerline').value = config.capaciteBerline || 200;
-          document.getElementById('capaciteBreak').value = config.capaciteBreak || 400;
-        })
-        .withFailureHandler(function (e) { showAlert('error', 'Erreur de chargement : ' + e.message); })
-        .getCurrentOptimizationConfig();
-    });
+    <script>
+      window.addEventListener("load", function () {
+        google.script.run
+          .withSuccessHandler(function (config) {
+            if (!config) return;
+            document.getElementById("distanceProximite").value =
+              config.distanceProximite || 3;
+            document.getElementById("distanceClusterMax").value =
+              config.distanceClusterMax || 15;
+            document.getElementById("distanceRegroupeEloignes").value =
+              config.distanceRegroupeEloignes || 30;
+            document.getElementById("distanceLivraisonIsolee").value =
+              config.distanceLivraisonIsolee || 50;
+            document.getElementById("capaciteBerline").value =
+              config.capaciteBerline || 200;
+            document.getElementById("capaciteBreak").value =
+              config.capaciteBreak || 400;
+          })
+          .withFailureHandler(function (e) {
+            showAlert("error", "Erreur de chargement : " + e.message);
+          })
+          .getCurrentOptimizationConfig();
+      });
 
-    document.getElementById('optimizationForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var config = {
-        distanceProximite: parseFloat(document.getElementById('distanceProximite').value),
-        distanceClusterMax: parseFloat(document.getElementById('distanceClusterMax').value),
-        distanceRegroupeEloignes: parseFloat(document.getElementById('distanceRegroupeEloignes').value),
-        distanceLivraisonIsolee: parseFloat(document.getElementById('distanceLivraisonIsolee').value),
-        capaciteBerline: parseFloat(document.getElementById('capaciteBerline').value),
-        capaciteBreak: parseFloat(document.getElementById('capaciteBreak').value)
-      };
-      if (config.distanceProximite >= config.distanceClusterMax) { showAlert('error', 'Distance proximité doit être < distance cluster max'); return; }
-      if (config.capaciteBerline >= config.capaciteBreak) { showAlert('error', 'Capacité berline doit être < capacité break'); return; }
-      setState('loading');
-      google.script.run
-        .withSuccessHandler(function () { setState('form'); showAlert('success', "✅ Configuration enregistrée !"); setTimeout(function () { google.script.host.close(); }, 1800); })
-        .withFailureHandler(function (e) { setState('form'); showAlert('error', e.message); })
-        .saveOptimizationConfig(config);
-    });
+      document
+        .getElementById("optimizationForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          var config = {
+            distanceProximite: parseFloat(
+              document.getElementById("distanceProximite").value,
+            ),
+            distanceClusterMax: parseFloat(
+              document.getElementById("distanceClusterMax").value,
+            ),
+            distanceRegroupeEloignes: parseFloat(
+              document.getElementById("distanceRegroupeEloignes").value,
+            ),
+            distanceLivraisonIsolee: parseFloat(
+              document.getElementById("distanceLivraisonIsolee").value,
+            ),
+            capaciteBerline: parseFloat(
+              document.getElementById("capaciteBerline").value,
+            ),
+            capaciteBreak: parseFloat(
+              document.getElementById("capaciteBreak").value,
+            ),
+          };
+          if (config.distanceProximite >= config.distanceClusterMax) {
+            showAlert(
+              "error",
+              "Distance proximité doit être < distance cluster max",
+            );
+            return;
+          }
+          if (config.capaciteBerline >= config.capaciteBreak) {
+            showAlert("error", "Capacité berline doit être < capacité break");
+            return;
+          }
+          setState("loading");
+          google.script.run
+            .withSuccessHandler(function () {
+              setState("form");
+              showAlert("success", "✅ Configuration enregistrée !");
+              setTimeout(function () {
+                google.script.host.close();
+              }, 1800);
+            })
+            .withFailureHandler(function (e) {
+              setState("form");
+              showAlert("error", e.message);
+            })
+            .saveOptimizationConfig(config);
+        });
 
-    function setState(s) {
-      document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-      document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-    }
+      function setState(s) {
+        document.getElementById("formState").style.display =
+          s === "form" ? "" : "none";
+        document
+          .getElementById("loadingState")
+          .classList.toggle("loading-state--visible", s === "loading");
+      }
 
-    function showAlert(type, msg) {
-      var el = document.getElementById('alert-' + type);
-      el.textContent = msg;
-      el.classList.add('alert--visible', 'alert--' + type);
-      setTimeout(function () { el.classList.remove('alert--visible'); }, 5000);
-    }
-  </script>
-</body>
-
+      function showAlert(type, msg) {
+        var el = document.getElementById("alert-" + type);
+        el.textContent = msg;
+        el.classList.add("alert--visible", "alert--" + type);
+        setTimeout(function () {
+          el.classList.remove("alert--visible");
+        }, 5000);
+      }
+    </script>
+  </body>
 </html>

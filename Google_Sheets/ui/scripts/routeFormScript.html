@@ -1,300 +1,393 @@
 <script>
-    var _tousBenevoles = [];
+  var _etapeCourante = 1;
+  var _tousBenevoles = [];
 
-    window.addEventListener('load', function () {
-        chargerBenevoles();
+  window.addEventListener("load", function () {
+    chargerBenevoles(false);
+  });
+
+  // ============================================================
+  // NAVIGATION
+  // ============================================================
+
+  function goToStep(n) {
+    document.getElementById("step" + _etapeCourante).style.display = "none";
+    document.getElementById("step" + _etapeCourante).classList.remove("active");
+    _etapeCourante = n;
+    var panel = document.getElementById("step" + n);
+    panel.style.display = "flex";
+    panel.classList.add("active");
+    [1, 2].forEach(function (i) {
+      var btn = document.getElementById("stepBtn" + i);
+      btn.classList.remove("active", "done");
+      if (i < n) btn.classList.add("done");
+      if (i === n) btn.classList.add("active");
     });
+  }
 
-    document.getElementById('date_livraison').addEventListener('change', function () {
-        var date = this.value;
-        if (!date) return;
-        rafraichirStatutsDuJour(date);
-        chargerLivraisonsRestantes(date);
-    });
+  function setState(s) {
+    document.getElementById("step1").style.display = "none";
+    document.getElementById("step1").classList.remove("active");
+    document.getElementById("step2").style.display = "none";
+    document.getElementById("step2").classList.remove("active");
+    document.querySelector(".step-nav").style.display =
+      s === "nav" ? "" : "none";
 
-    // ============================================================
-    // CHARGEMENT DES BÉNÉVOLES
-    // ============================================================
+    document.getElementById("loadingState").style.display =
+      s === "loading" ? "flex" : "none";
+    document
+      .getElementById("resultsState")
+      .classList.toggle("results-state--visible", s === "results");
 
-    function chargerBenevoles() {
-        var date = document.getElementById('date_livraison').value || null;
-
-        google.script.run
-            .withSuccessHandler(function (benevoles) {
-                _tousBenevoles = benevoles;
-                appliquerFiltres();
-                document.getElementById('btn-submit').disabled = false;
-            })
-            .withFailureHandler(function (e) {
-                document.getElementById('benevoles-wrap').innerHTML =
-                    '<div class="benevoles-loading">Erreur : ' + e.message + '</div>';
-            })
-            .getVolunteersForPlanningForm(date);
+    if (s === "nav") {
+      goToStep(_etapeCourante);
     }
+  }
 
-    /**
-     * Met à jour uniquement les colonnes statut/livraisons du jour
-     * sans recharger la liste complète des bénévoles.
-     */
-    function rafraichirStatutsDuJour(date) {
-        google.script.run
-            .withSuccessHandler(function (benevoles) {
-                var statutsMap = {};
-                benevoles.forEach(function (b) {
-                    statutsMap[String(b.id)] = {
-                        has_route_today: b.has_route_today,
-                        route_statut: b.route_statut,
-                        livraisons_faites: b.livraisons_faites
-                    };
-                });
+  // ============================================================
+  // ÉTAPE 1 — VALIDATION CONFIG
+  // ============================================================
 
-                _tousBenevoles = _tousBenevoles.map(function (b) {
-                    var maj = statutsMap[String(b.id)];
-                    if (!maj) return b;
-                    return Object.assign({}, b, maj);
-                });
+  function onDateChange() {
+    var date = document.getElementById("date_livraison").value;
+    if (!date) return;
+    google.script.run
+      .withSuccessHandler(function (count) {
+        document.getElementById("livraisons-restantes-count").textContent =
+          count;
+        document.getElementById("livraisons-restantes-wrap").style.display = "";
+      })
+      .withFailureHandler(function () {})
+      .getUnassignedDeliveryCountForDate(date);
+  }
 
-                appliquerFiltres();
-            })
-            .withFailureHandler(function () { })
-            .getVolunteersForPlanningForm(date);
+  function validerConfig() {
+    var date = document.getElementById("date_livraison").value;
+    if (!date) {
+      showAlert(1, "Veuillez sélectionner une date de livraison.");
+      return;
     }
+    document.getElementById("stepBtn2").disabled = false;
+    // Rafraîchit les statuts du jour si la date change
+    rafraichirStatutsDuJour(date);
+    goToStep(2);
+  }
 
-    function chargerLivraisonsRestantes(date) {
-        google.script.run
-            .withSuccessHandler(function (count) {
-                document.getElementById('livraisons-restantes-count').textContent = count;
-                document.getElementById('livraisons-restantes-wrap').style.display = '';
-            })
-            .withFailureHandler(function () { })
-            .getUnassignedDeliveryCountForDate(date);
-    }
+  // ============================================================
+  // ÉTAPE 2 — BÉNÉVOLES
+  // ============================================================
 
-    // ============================================================
-    // FILTRES
-    // ============================================================
+  function chargerBenevoles(forceRefresh) {
+    var date = document.getElementById("date_livraison").value || null;
+    document.getElementById("benevoles-wrap").innerHTML =
+      '<div class="loading-state loading-state--visible" style="padding:32px 0;"><div class="spinner"></div>' +
+      '<div class="loading-state__text">' +
+      (forceRefresh ? "Actualisation…" : "Chargement…") +
+      "</div></div>";
+    document.getElementById("btn-refresh").disabled = true;
 
-    function appliquerFiltres() {
-        var filtreDispo = document.getElementById('filtre-dispo').value;
-        var afficherAdmins = document.getElementById('filtre-admin').checked;
-
-        var filtres = _tousBenevoles.filter(function (b) {
-            if (!afficherAdmins && b.admin) return false;
-            if (filtreDispo && !b.disponibilites.includes(filtreDispo)) return false;
-            return true;
-        });
-
-        renderBenevoles(filtres);
-    }
-
-    function toggleAdmin() {
-        var cb = document.getElementById('filtre-admin');
-        cb.checked = !cb.checked;
+    google.script.run
+      .withSuccessHandler(function (benevoles) {
+        _tousBenevoles = benevoles;
         appliquerFiltres();
-    }
+        document.getElementById("btn-refresh").disabled = false;
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById("benevoles-wrap").innerHTML =
+          '<div style="padding:20px;text-align:center;color:var(--error-text);">Erreur : ' +
+          e.message +
+          "</div>";
+        document.getElementById("btn-refresh").disabled = false;
+      })
+      .getVolunteersForPlanningForm(date, forceRefresh);
+  }
 
-    // ============================================================
-    // RENDU DU TABLEAU
-    // ============================================================
+  function actualiserBenevoles() {
+    document.getElementById("btn-refresh").disabled = true;
+    google.script.run
+      .withSuccessHandler(function () {
+        chargerBenevoles(true);
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById("btn-refresh").disabled = false;
+        showAlert(2, "Erreur actualisation : " + e.message);
+      })
+      .invalidateBenevolesUserCache();
+  }
 
-    function renderBenevoles(benevoles) {
-        var wrap = document.getElementById('benevoles-wrap');
-        var counter = document.getElementById('benevoles-counter');
-
-        counter.textContent = benevoles.length + ' bénévole' + (benevoles.length > 1 ? 's' : '');
-
-        if (benevoles.length === 0) {
-            wrap.innerHTML = '<div class="benevoles-loading">Aucun bénévole correspond aux filtres</div>';
-            return;
-        }
-
-        var html = '';
-        html += '<div class="select-all-row">';
-        html += '<input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">';
-        html += '<label for="select-all" style="cursor:pointer;">Tout sélectionner / désélectionner</label>';
-        html += '</div>';
-        html += '<div class="benevoles-table-wrap">';
-        html += '<table class="benevoles-table">';
-        html += '<thead><tr>';
-        html += '<th></th><th>Bénévole</th><th>Disponibilités</th><th>Véhicule</th><th>Capacité</th><th>Statut du jour</th><th>Fait</th>';
-        html += '</tr></thead><tbody>';
-
+  function rafraichirStatutsDuJour(date) {
+    if (!date) return;
+    google.script.run
+      .withSuccessHandler(function (benevoles) {
+        var statutsMap = {};
         benevoles.forEach(function (b) {
-            var statutClass = 'statut-none';
-            var statutLabel = '—';
-
-            if (b.route_statut) {
-                var s = (b.route_statut || '').toLowerCase();
-                if (s.indexOf('cours') !== -1) { statutClass = 'statut-en-cours'; statutLabel = '🚚 En cours'; }
-                else if (s.indexOf('termin') !== -1) { statutClass = 'statut-terminee'; statutLabel = '✅ Terminée'; }
-                else if (s.indexOf('brouillon') !== -1) { statutClass = 'statut-brouillon'; statutLabel = '📝 Brouillon'; }
-                else { statutLabel = b.route_statut; }
-            }
-
-            var dispoTags = (b.disponibilites || []).map(function (d) {
-                return '<span class="dispo-tag">' + d + '</span>';
-            }).join('');
-
-            if (!dispoTags) dispoTags = '<span style="color:var(--muted-light);font-size:11px;">—</span>';
-
-            var nomLabel = b.prenom + ' ' + b.nom;
-            if (b.admin) nomLabel += '<span class="admin-badge">admin</span>';
-            if (b.is_tmp_vehicle) nomLabel += ' <span style="font-size:11px;">🔑</span>';
-
-            var vehiculeLabel = b.vehicule_type || '—';
-
-            html += '<tr>';
-            html += '<td><input type="checkbox" class="benevole-cb" value="' + b.id + '"></td>';
-            html += '<td><strong>' + nomLabel + '</strong></td>';
-            html += '<td>' + dispoTags + '</td>';
-            html += '<td>' + vehiculeLabel + '</td>';
-            html += '<td class="mono">' + (b.vehicule_capacite ? b.vehicule_capacite + ' kg' : '—') + '</td>';
-            html += '<td><span class="statut-badge ' + statutClass + '">' + statutLabel + '</span></td>';
-            html += '<td class="mono">' + (b.has_route_today ? b.livraisons_faites : '—') + '</td>';
-            html += '</tr>';
+          statutsMap[String(b.id)] = {
+            has_route_today: b.has_route_today,
+            route_statut: b.route_statut,
+            livraisons_faites: b.livraisons_faites,
+          };
         });
+        _tousBenevoles = _tousBenevoles.map(function (b) {
+          var maj = statutsMap[String(b.id)];
+          return maj ? Object.assign({}, b, maj) : b;
+        });
+        appliquerFiltres();
+      })
+      .withFailureHandler(function () {})
+      .getVolunteersForPlanningForm(date, false);
+  }
 
-        html += '</tbody></table></div>';
-        wrap.innerHTML = html;
-    }
+  function appliquerFiltres() {
+    var filtreDispo = document.getElementById("filtre-dispo").value;
+    var afficherAdmins = document.getElementById("filtre-admin").checked;
 
-    // ============================================================
-    // SÉLECTION
-    // ============================================================
-
-    function toggleSelectAll(checked) {
-        document.querySelectorAll('.benevole-cb').forEach(function (cb) { cb.checked = checked; });
-    }
-
-    function getSelectedBenevoleIds() {
-        return Array.from(document.querySelectorAll('.benevole-cb:checked')).map(function (cb) { return cb.value; });
-    }
-
-    function toggleRelivre() {
-        var cb = document.getElementById('relivre');
-        cb.checked = !cb.checked;
-    }
-
-    // ============================================================
-    // SOUMISSION
-    // ============================================================
-
-    document.getElementById('routeForm').addEventListener('submit', function (e) {
-        e.preventDefault();
-
-        var selectedIds = getSelectedBenevoleIds();
-        if (selectedIds.length === 0) {
-            showAlert('error', 'Veuillez sélectionner au moins un bénévole.');
-            return;
-        }
-
-        var date = document.getElementById('date_livraison').value;
-        if (!date) {
-            showAlert('error', 'Veuillez sélectionner une date de livraison.');
-            return;
-        }
-
-        var params = {
-            date_livraison: date,
-            max_livraisons: parseInt(document.getElementById('max_livraisons').value),
-            occasion: document.querySelector('input[name="occasion"]:checked').value,
-            poids_moyen_kg: parseFloat(document.getElementById('poids_moyen_kg').value),
-            poids_moyen_hotel_kg: parseFloat(document.getElementById('poids_moyen_hotel_kg').value) || 5,
-            relivre: document.getElementById('relivre').checked,
-            vehicules_pretes: [],
-            binomes: [],
-            selected_benevole_ids: selectedIds
-        };
-
-        setState('loading');
-
-        google.script.run
-            .withSuccessHandler(onPlanSuccess)
-            .withFailureHandler(function (e) {
-                setState('form');
-                showAlert('error', 'Erreur : ' + e.message);
-            })
-            .planRoutesFromForm(params);
+    var filtres = _tousBenevoles.filter(function (b) {
+      if (!afficherAdmins && b.admin) return false;
+      if (filtreDispo && !b.disponibilites.includes(filtreDispo)) return false;
+      return true;
     });
 
-    function onPlanSuccess(result) {
-        if (!result.success) {
-            setState('form');
-            showAlert('error', 'Échec : ' + (result.errors.join(', ') || 'Erreur inconnue'));
-            return;
+    renderBenevoles(filtres);
+  }
+
+  function renderBenevoles(benevoles) {
+    var wrap = document.getElementById("benevoles-wrap");
+    document.getElementById("benevoles-counter").textContent =
+      benevoles.length + " bénévole" + (benevoles.length > 1 ? "s" : "");
+
+    if (benevoles.length === 0) {
+      wrap.innerHTML =
+        '<div style="padding:24px;text-align:center;color:var(--muted);">Aucun bénévole</div>';
+      return;
+    }
+
+    var html = '<table class="sel-table"><thead><tr>';
+    html +=
+      "<th></th><th>Bénévole</th><th>Disponibilités</th><th>Véhicule</th><th>Capacité</th><th>Route aujourd'hui</th><th>Fait</th>";
+    html += "</tr></thead><tbody>";
+
+    benevoles.forEach(function (b) {
+      var dispoTags =
+        (b.disponibilites || [])
+          .map(function (d) {
+            return '<span class="dispo-tag">' + d + "</span>";
+          })
+          .join("") ||
+        '<span style="color:var(--muted-light);font-size:11px;">—</span>';
+
+      var routeLabel = "—";
+      var s = (b.route_statut || "").toLowerCase();
+      if (b.has_route_today) {
+        var bg = "#fef3c7",
+          col = "#d97706";
+        if (s.indexOf("termin") !== -1) {
+          bg = "#d1fae5";
+          col = "#059669";
         }
-        populateResults(result);
-        setState('results');
+        routeLabel =
+          '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:' +
+          bg +
+          ";color:" +
+          col +
+          ';">' +
+          (b.route_statut || "?") +
+          "</span>";
+      }
+
+      var nomLabel = b.prenom + " " + b.nom;
+      if (b.admin) nomLabel += ' <span class="admin-badge">admin</span>';
+      if (b.is_tmp_vehicle) nomLabel += " 🔑";
+
+      html += "<tr>";
+      html +=
+        '<td><input type="checkbox" class="benevole-cb" value="' +
+        b.id +
+        '" onchange="onCheck()"></td>';
+      html += "<td><strong>" + nomLabel + "</strong></td>";
+      html += "<td>" + dispoTags + "</td>";
+      html += "<td>" + (b.vehicule_type || "—") + "</td>";
+      html +=
+        '<td class="mono">' +
+        (b.vehicule_capacite ? b.vehicule_capacite + " kg" : "—") +
+        "</td>";
+      html += "<td>" + routeLabel + "</td>";
+      html +=
+        '<td class="mono">' +
+        (b.has_route_today ? b.livraisons_faites : "—") +
+        "</td>";
+      html += "</tr>";
+    });
+
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+    onCheck();
+  }
+
+  function toggleSelectAll(checked) {
+    document.querySelectorAll(".benevole-cb").forEach(function (cb) {
+      cb.checked = checked;
+    });
+    onCheck();
+  }
+
+  function onCheck() {
+    var count = getSelectedIds().length;
+    document.getElementById("benevoles-selected-count").textContent = count;
+    document.getElementById("btn-planifier").disabled = count === 0;
+  }
+
+  function getSelectedIds() {
+    return Array.from(document.querySelectorAll(".benevole-cb:checked")).map(
+      function (cb) {
+        return cb.value;
+      },
+    );
+  }
+
+  // ============================================================
+  // PLANIFICATION
+  // ============================================================
+
+  function planifier() {
+    var selectedIds = getSelectedIds();
+    if (selectedIds.length === 0) {
+      showAlert(2, "Veuillez sélectionner au moins un bénévole.");
+      return;
     }
 
-    // ============================================================
-    // RÉSULTATS
-    // ============================================================
-
-    function populateResults(result) {
-        var routes = result.routes || [];
-        var warnings = result.warnings || [];
-
-        var poidsTotal = routes.reduce(function (s, r) { return s + (r.poids_total_kg || 0); }, 0);
-        var distTotal = routes.reduce(function (s, r) { return s + (r.distance_totale_km || 0); }, 0);
-        var livTotal = routes.reduce(function (s, r) { return s + (r.nb_livraisons || 0); }, 0);
-        var benevoles = new Set(routes.map(function (r) { return r.id_benevole; })).size;
-        var avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
-
-        document.getElementById('stat-routes').textContent = result.created;
-        document.getElementById('stat-deliveries').textContent = livTotal;
-        document.getElementById('stat-poids').textContent = Math.round(poidsTotal) + ' kg';
-        document.getElementById('stat-benevoles').textContent = benevoles;
-        document.getElementById('stat-distance').textContent = Math.round(distTotal) + ' km';
-        document.getElementById('stat-avg').textContent = avgLiv;
-        document.getElementById('stat-warnings').textContent = warnings.length;
-        document.getElementById('results-subtitle').textContent =
-            result.created + ' route(s) générée(s) pour le ' + document.getElementById('date_livraison').value;
-
-        var tbody = document.getElementById('breakdown-tbody');
-        tbody.innerHTML = '';
-        routes.forEach(function (r) {
-            var tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td><span class="mono badge badge--cyan">' + r.id_route + '</span></td>' +
-                '<td><strong>' + (r.benevole_nom || r.id_benevole || '—') + '</strong></td>' +
-                '<td class="mono">' + (r.nb_livraisons || '—') + '</td>' +
-                '<td class="mono">' + (r.poids_total_kg ? Math.round(r.poids_total_kg) + ' kg' : '—') + '</td>' +
-                '<td class="mono">' + (r.distance_totale_km ? Math.round(r.distance_totale_km * 10) / 10 + ' km' : '—') + '</td>' +
-                '<td><span class="badge badge--green">✓ Brouillon</span></td>';
-            tbody.appendChild(tr);
-        });
-
-        if (routes.length === 0) {
-            document.getElementById('breakdown-section').style.display = 'none';
-        }
-
-        if (warnings.length > 0) {
-            var ul = document.getElementById('warnings-list');
-            ul.innerHTML = '';
-            warnings.forEach(function (w) {
-                var li = document.createElement('li');
-                li.textContent = w.message || w;
-                ul.appendChild(li);
-            });
-            document.getElementById('warnings-box').classList.remove('hidden');
-        }
+    var date = document.getElementById("date_livraison").value;
+    if (!date) {
+      showAlert(2, "Veuillez sélectionner une date.");
+      return;
     }
 
-    // ============================================================
-    // UTILITAIRES
-    // ============================================================
+    var params = {
+      date_livraison: date,
+      max_livraisons: parseInt(document.getElementById("max_livraisons").value),
+      occasion: document.querySelector('input[name="occasion"]:checked').value,
+      poids_moyen_kg: parseFloat(
+        document.getElementById("poids_moyen_kg").value,
+      ),
+      poids_moyen_hotel_kg:
+        parseFloat(document.getElementById("poids_moyen_hotel_kg").value) || 0,
+      vehicules_pretes: [],
+      binomes: [],
+      selected_benevole_ids: selectedIds,
+    };
 
-    function setState(s) {
-        document.getElementById('formState').style.display = s === 'form' ? '' : 'none';
-        document.getElementById('loadingState').classList.toggle('loading-state--visible', s === 'loading');
-        document.getElementById('resultsState').classList.toggle('results-state--visible', s === 'results');
-    }
+    setState("loading");
 
-    function showAlert(type, msg) {
-        var el = document.getElementById('alert-' + type);
-        el.textContent = msg;
-        el.classList.add('alert--visible', 'alert--' + type);
-        setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
+    google.script.run
+      .withSuccessHandler(onPlanSuccess)
+      .withFailureHandler(function (e) {
+        setState("nav");
+        showAlert(2, "Erreur : " + e.message);
+      })
+      .planRoutesFromForm(params);
+  }
+
+  function onPlanSuccess(result) {
+    if (!result.success) {
+      setState("nav");
+      showAlert(
+        2,
+        "Échec : " + (result.errors.join(", ") || "Erreur inconnue"),
+      );
+      return;
     }
+    populateResults(result);
+    setState("results");
+  }
+
+  // ============================================================
+  // AFFICHAGE RÉSULTATS
+  // ============================================================
+
+  function populateResults(result) {
+    var routes = result.routes || [];
+    var warnings = result.warnings || [];
+    var poidsTotal = routes.reduce(function (s, r) {
+      return s + (r.poids_total_kg || 0);
+    }, 0);
+    var distTotal = routes.reduce(function (s, r) {
+      return s + (r.distance_totale_km || 0);
+    }, 0);
+    var livTotal = routes.reduce(function (s, r) {
+      return s + (r.nb_livraisons || 0);
+    }, 0);
+    var benevoles = new Set(
+      routes.map(function (r) {
+        return r.id_benevole;
+      }),
+    ).size;
+    var avgLiv = routes.length ? (livTotal / routes.length).toFixed(1) : 0;
+
+    document.getElementById("stat-routes").textContent = result.created;
+    document.getElementById("stat-deliveries").textContent = livTotal;
+    document.getElementById("stat-poids").textContent =
+      Math.round(poidsTotal) + " kg";
+    document.getElementById("stat-benevoles").textContent = benevoles;
+    document.getElementById("stat-distance").textContent =
+      Math.round(distTotal) + " km";
+    document.getElementById("stat-avg").textContent = avgLiv;
+    document.getElementById("stat-warnings").textContent = warnings.length;
+    document.getElementById("results-subtitle").textContent =
+      result.created +
+      " route(s) générée(s) pour le " +
+      document.getElementById("date_livraison").value;
+
+    var tbody = document.getElementById("breakdown-tbody");
+    tbody.innerHTML = "";
+    routes.forEach(function (r) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td><span class="mono badge badge--cyan">' +
+        r.id_route +
+        "</span></td>" +
+        "<td><strong>" +
+        (r.benevole_nom || r.id_benevole || "—") +
+        "</strong></td>" +
+        '<td class="mono">' +
+        (r.nb_livraisons || "—") +
+        "</td>" +
+        '<td class="mono">' +
+        (r.poids_total_kg ? Math.round(r.poids_total_kg) + " kg" : "—") +
+        "</td>" +
+        '<td class="mono">' +
+        (r.distance_totale_km
+          ? Math.round(r.distance_totale_km * 10) / 10 + " km"
+          : "—") +
+        "</td>" +
+        '<td><span class="badge badge--green">✓ Brouillon</span></td>';
+      tbody.appendChild(tr);
+    });
+
+    if (routes.length === 0)
+      document.getElementById("breakdown-section").style.display = "none";
+
+    if (warnings.length > 0) {
+      var ul = document.getElementById("warnings-list");
+      ul.innerHTML = "";
+      warnings.forEach(function (w) {
+        var li = document.createElement("li");
+        li.textContent = w.message || w;
+        ul.appendChild(li);
+      });
+      document.getElementById("warnings-box").classList.remove("hidden");
+    }
+  }
+
+  // ============================================================
+  // UTILITAIRES
+  // ============================================================
+
+  function showAlert(step, msg) {
+    var el = document.getElementById("alert-error-" + step);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add("alert--visible", "alert--error");
+    setTimeout(function () {
+      el.classList.remove("alert--visible");
+    }, 6000);
+  }
 </script>

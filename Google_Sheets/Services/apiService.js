@@ -2,23 +2,50 @@
  * ====================================================================
  * API_SERVICE.GS - Communication avec les APIs Externes
  * ====================================================================
+ * Modifications :
+ * - Cache utilisateur (CacheService.getUserCache) pour les bénévoles
+ * - getVolunteersWithVehicle() utilise le cache utilisateur
+ * - invalidateBenevolesCache() pour le bouton "Actualiser" des formulaires
  */
 
 class ApiError extends Error {
   constructor(message, statusCode = null, apiName = null) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.statusCode = statusCode;
     this.apiName = apiName;
     this.timestamp = new Date();
   }
 }
 
-function callApiWithRetry(url, options = {}, cacheKey = null, cacheDuration = 300) {
+/**
+ * Clé de cache utilisateur pour la liste des bénévoles avec véhicule.
+ * @const {string}
+ */
+const CACHE_KEY_BENEVOLES = "benevoles_with_vehicle";
+
+// ============================================================
+// APPEL API GÉNÉRIQUE
+// ============================================================
+
+/**
+ * Appelle une URL avec retry exponentiel et cache script optionnel.
+ * @param {string}  url
+ * @param {Object}  options
+ * @param {string|null} cacheKey
+ * @param {number}  cacheDuration - En secondes
+ * @returns {Object}
+ */
+function callApiWithRetry(
+  url,
+  options = {},
+  cacheKey = null,
+  cacheDuration = 300,
+) {
   if (cacheKey) {
     const cached = getCachedResponse(cacheKey);
     if (cached) {
-      Logger.log(`[API] Réponse depuis le cache: ${cacheKey}`);
+      Logger.log(`[API] 📦 Réponse depuis le cache script: ${cacheKey}`);
       return cached;
     }
   }
@@ -28,31 +55,38 @@ function callApiWithRetry(url, options = {}, cacheKey = null, cacheDuration = 30
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      Logger.log(`[API] Tentative ${attempt}/${maxRetries} — ${url.substring(0, 60)}…`);
+      Logger.log(
+        `[API] Tentative ${attempt}/${maxRetries} — ${url.substring(0, 60)}…`,
+      );
 
       const response = UrlFetchApp.fetch(url, {
         muteHttpExceptions: true,
-        ...options
+        ...options,
       });
 
       const statusCode = response.getResponseCode();
       const contentText = response.getContentText();
 
       if (statusCode < 200 || statusCode >= 300) {
-        throw new ApiError(`Erreur HTTP ${statusCode}: ${contentText}`, statusCode);
+        throw new ApiError(
+          `Erreur HTTP ${statusCode}: ${contentText}`,
+          statusCode,
+        );
       }
 
       let data;
       try {
         data = JSON.parse(contentText);
       } catch (parseError) {
-        throw new ApiError(`Erreur parsing JSON: ${parseError.message}`, statusCode);
+        throw new ApiError(
+          `Erreur parsing JSON: ${parseError.message}`,
+          statusCode,
+        );
       }
 
       if (cacheKey) setCachedResponse(cacheKey, data, cacheDuration);
 
       return data;
-
     } catch (error) {
       lastError = error;
       Logger.log(`[API] Tentative ${attempt} échouée: ${error.message}`);
@@ -66,24 +100,32 @@ function callApiWithRetry(url, options = {}, cacheKey = null, cacheDuration = 30
 
   throw new ApiError(
     `Échec après ${maxRetries} tentatives: ${lastError.message}`,
-    lastError.statusCode
+    lastError.statusCode,
   );
 }
 
+/**
+ * Construit une URL avec paramètres de requête.
+ * @param {string} baseUrl
+ * @param {Object} params
+ * @returns {string}
+ */
 function buildUrl(baseUrl, params = {}) {
   const queryParts = [];
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== '') {
-      queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+    if (value !== undefined && value !== null && value !== "") {
+      queryParts.push(
+        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+      );
     }
   }
   if (queryParts.length === 0) return baseUrl;
-  const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}${queryParts.join('&')}`;
+  const separator = baseUrl.includes("?") ? "&" : "?";
+  return `${baseUrl}${separator}${queryParts.join("&")}`;
 }
 
 // ============================================================
-// CACHE
+// CACHE SCRIPT (générique)
 // ============================================================
 
 const cache = CacheService.getScriptCache();
@@ -102,7 +144,7 @@ function setCachedResponse(key, data, duration = 300) {
   try {
     cache.put(key, JSON.stringify(data), duration);
   } catch (e) {
-    Logger.log(`[CACHE] Erreur mise en cache: ${e.message}`);
+    Logger.log(`[CACHE] Erreur mise en cache script: ${e.message}`);
   }
 }
 
@@ -112,7 +154,72 @@ function invalidateCache(key) {
 
 function invalidateAllCache() {
   cache.removeAll();
-  Logger.log('[CACHE] Tout le cache invalidé');
+  Logger.log("[CACHE] 🗑️ Tout le cache script invalidé");
+}
+
+// ============================================================
+// CACHE UTILISATEUR (bénévoles)
+// ============================================================
+
+/**
+ * Retourne le cache utilisateur (par admin connecté).
+ * @returns {GoogleAppsScript.Cache.Cache}
+ */
+function getUserCache() {
+  return CacheService.getUserCache();
+}
+
+/**
+ * Récupère les bénévoles depuis le cache utilisateur.
+ * @returns {Array|null}
+ */
+function getBenevolesCaches() {
+  try {
+    const cached = getUserCache().get(CACHE_KEY_BENEVOLES);
+    if (!cached) return null;
+    const data = JSON.parse(cached);
+    Logger.log(
+      `[CACHE] 👤 Bénévoles récupérés depuis le cache utilisateur (${data.length})`,
+    );
+    return data;
+  } catch (e) {
+    Logger.log(`[CACHE] ⚠️ Erreur lecture cache bénévoles: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * Sauvegarde les bénévoles dans le cache utilisateur.
+ * @param {Array} benevoles
+ */
+function setBenevolesCaches(benevoles) {
+  try {
+    getUserCache().put(
+      CACHE_KEY_BENEVOLES,
+      JSON.stringify(benevoles),
+      CONFIG.API_BENEVOLES.CACHE_DURATION,
+    );
+    Logger.log(
+      `[CACHE] 👤 ${benevoles.length} bénévole(s) mis en cache utilisateur`,
+    );
+  } catch (e) {
+    Logger.log(`[CACHE] ⚠️ Erreur écriture cache bénévoles: ${e.message}`);
+  }
+}
+
+/**
+ * Invalide le cache utilisateur des bénévoles.
+ * Appelée par le bouton "Actualiser" des formulaires.
+ */
+function invalidateBenevolesCache() {
+  try {
+    getUserCache().remove(CACHE_KEY_BENEVOLES);
+    Logger.log("[CACHE] 🗑️ Cache utilisateur bénévoles invalidé");
+    return { success: true };
+  } catch (e) {
+    Logger.log(`[CACHE] ❌ Erreur invalidation cache bénévoles: ${e.message}`);
+    return { success: false, error: e.message };
+  }
 }
 
 // ============================================================
@@ -120,23 +227,39 @@ function invalidateAllCache() {
 // ============================================================
 
 function pingFamilyApi() {
-  const url = buildUrl(CONFIG.API_FAMILLES.URL, { action: CONFIG.API_FAMILLES.ENDPOINTS.PING });
+  const url = buildUrl(CONFIG.API_FAMILLES.URL, {
+    action: CONFIG.API_FAMILLES.ENDPOINTS.PING,
+  });
   return callApiWithRetry(url, {}, null, 0);
 }
 
 function getAllValidatedFamilies(filters = {}) {
-  const params = { action: CONFIG.API_FAMILLES.ENDPOINTS.ALL_FAMILIES, apiKey: CONFIG.API_FAMILLES.KEY, ...filters };
+  const params = {
+    action: CONFIG.API_FAMILLES.ENDPOINTS.ALL_FAMILIES,
+    apiKey: CONFIG.API_FAMILLES.KEY,
+    ...filters,
+  };
   const url = buildUrl(CONFIG.API_FAMILLES.URL, params);
-  return callApiWithRetry(url, {}, `families_${JSON.stringify(filters)}`, CONFIG.API_FAMILLES.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `families_${JSON.stringify(filters)}`,
+    CONFIG.API_FAMILLES.CACHE_DURATION,
+  );
 }
 
 function getFamilyById(familyId) {
   const url = buildUrl(CONFIG.API_FAMILLES.URL, {
     action: CONFIG.API_FAMILLES.ENDPOINTS.GET_FAMILY,
     id: familyId,
-    apiKey: CONFIG.API_FAMILLES.KEY
+    apiKey: CONFIG.API_FAMILLES.KEY,
   });
-  return callApiWithRetry(url, {}, `family_${familyId}`, CONFIG.API_FAMILLES.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `family_${familyId}`,
+    CONFIG.API_FAMILLES.CACHE_DURATION,
+  );
 }
 
 // ============================================================
@@ -144,82 +267,101 @@ function getFamilyById(familyId) {
 // ============================================================
 
 function pingVolunteerApi() {
-  const url = buildUrl(CONFIG.API_BENEVOLES.URL, { action: CONFIG.API_BENEVOLES.ENDPOINTS.PING });
+  const url = buildUrl(CONFIG.API_BENEVOLES.URL, {
+    action: CONFIG.API_BENEVOLES.ENDPOINTS.PING,
+  });
   return callApiWithRetry(url, {}, null, 0);
 }
 
 function listVolunteers(filters = {}) {
-  const params = { action: CONFIG.API_BENEVOLES.ENDPOINTS.LIST_VOLUNTEERS, apiKey: CONFIG.API_BENEVOLES.KEY, ...filters };
+  const params = {
+    action: CONFIG.API_BENEVOLES.ENDPOINTS.LIST_VOLUNTEERS,
+    apiKey: CONFIG.API_BENEVOLES.KEY,
+    ...filters,
+  };
   const url = buildUrl(CONFIG.API_BENEVOLES.URL, params);
-  return callApiWithRetry(url, {}, `volunteers_${JSON.stringify(filters)}`, CONFIG.API_BENEVOLES.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `volunteers_${JSON.stringify(filters)}`,
+    CONFIG.API_BENEVOLES.CACHE_DURATION,
+  );
 }
 
 function getVolunteerById(volunteerId) {
   const url = buildUrl(CONFIG.API_BENEVOLES.URL, {
     action: CONFIG.API_BENEVOLES.ENDPOINTS.GET_VOLUNTEER,
     id: volunteerId,
-    apiKey: CONFIG.API_BENEVOLES.KEY
+    apiKey: CONFIG.API_BENEVOLES.KEY,
   });
-  return callApiWithRetry(url, {}, `volunteer_${volunteerId}`, CONFIG.API_BENEVOLES.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `volunteer_${volunteerId}`,
+    CONFIG.API_BENEVOLES.CACHE_DURATION,
+  );
 }
 
-function getVolunteerAvailability(volunteerId) {
-  const url = buildUrl(CONFIG.API_BENEVOLES.URL, {
-    action: CONFIG.API_BENEVOLES.ENDPOINTS.GET_AVAILABILITY,
-    volunteerId: volunteerId,
-    apiKey: CONFIG.API_BENEVOLES.KEY
-  });
-  return callApiWithRetry(url, {}, `availability_${volunteerId}`, 60);
-}
-
-/**
- * Récupère les bénévoles disponibles pour un créneau donné.
- * @param {string} disponibilite - 'Matin', 'Après-midi' ou 'Soir'
- * @returns {Object}
- */
 function getAvailableVolunteers(disponibilite, courtDelaiOnly = false) {
   const url = buildUrl(CONFIG.API_BENEVOLES.URL, {
     action: CONFIG.API_BENEVOLES.ENDPOINTS.GET_AVAILABLE_VOLUNTEERS,
     disponibilite: disponibilite,
     courtDelaiOnly: courtDelaiOnly,
-    apiKey: CONFIG.API_BENEVOLES.KEY
+    apiKey: CONFIG.API_BENEVOLES.KEY,
   });
-  return callApiWithRetry(url, {}, `available_${disponibilite}_${courtDelaiOnly}`, 60);
+  return callApiWithRetry(
+    url,
+    {},
+    `available_${disponibilite}_${courtDelaiOnly}`,
+    60,
+  );
 }
 
 /**
- * Récupère tous les bénévoles avec leurs créneaux de disponibilité,
- * enrichis avec les données de véhicule. Appelle les 3 créneaux en parallèle
- * et fusionne les résultats en dédupliquant par id.
+ * Récupère tous les bénévoles avec un véhicule valide (capacité > 0).
+ * Utilise le cache utilisateur pour éviter de rappeler l'API à chaque ouverture
+ * de formulaire. Le cache est partagé entre Planifier Routes et Créer Route Manuelle.
  *
- * @returns {Array<Object>} Bénévoles avec vehicule.capaciteKg > 0 et champ disponibilites[]
+ * @param {boolean} forceRefresh - Ignore le cache si true
+ * @returns {Array<Object>} Bénévoles enrichis avec leur véhicule
  */
-function getVolunteersWithVehicle() {
-  const creneaux = ['Matin', 'Après-midi', 'Soir'];
+function getVolunteersWithVehicle(forceRefresh = false) {
+  // Vérification du cache utilisateur
+  if (!forceRefresh) {
+    const cached = getBenevolesCaches();
+    if (cached) return cached;
+  }
 
-  const responses = creneaux.map(creneau => {
+  Logger.log("[API] 🔄 Chargement des bénévoles depuis l'API (3 créneaux)...");
+  const creneaux = ["Matin", "Après-midi", "Soir"];
+
+  const responses = creneaux.map((creneau) => {
     try {
       const resp = getAvailableVolunteers(creneau);
-      return { creneau, volunteers: resp && resp.volunteers ? resp.volunteers : [] };
+      return {
+        creneau,
+        volunteers: resp && resp.volunteers ? resp.volunteers : [],
+      };
     } catch (e) {
-      Logger.log(`[API] Erreur créneau ${creneau}: ${e.message}`);
+      Logger.log(`[API] ⚠️ Erreur créneau ${creneau}: ${e.message}`);
       return { creneau, volunteers: [] };
     }
   });
 
   const vehiclesResponse = getVehicleTypes();
   if (!vehiclesResponse || !vehiclesResponse.vehicles) {
-    Logger.log('[API] Impossible de récupérer les types de véhicules');
+    Logger.log("[API] ❌ Impossible de récupérer les types de véhicules");
     return [];
   }
 
   const vehiclesMap = {};
-  vehiclesResponse.vehicles.forEach(v => { vehiclesMap[v.id] = v; });
+  vehiclesResponse.vehicles.forEach((v) => {
+    vehiclesMap[v.id] = v;
+  });
 
   const byId = {};
-
   responses.forEach(({ creneau, volunteers }) => {
-    volunteers.forEach(benevole => {
+    volunteers.forEach((benevole) => {
       if (!byId[benevole.id]) {
         byId[benevole.id] = { ...benevole, disponibilites: [] };
       }
@@ -230,40 +372,38 @@ function getVolunteersWithVehicle() {
   });
 
   const result = [];
-
   for (const benevole of Object.values(byId)) {
     const vehiculeId = benevole.id_vehicule || benevole.idVehicule;
-
-    if (!vehiculeId) {
-      Logger.log(`[API] ${benevole.nom} ignoré — pas de véhicule renseigné`);
-      continue;
-    }
+    if (!vehiculeId) continue;
 
     const vehicule = vehiclesMap[vehiculeId];
-    if (!vehicule) {
-      Logger.log(`[API] ${benevole.nom} ignoré — véhicule id=${vehiculeId} introuvable`);
-      continue;
-    }
+    if (!vehicule) continue;
 
     const capaciteKg = parseFloat(vehicule.capaciteKg) || 0;
-    if (capaciteKg === 0) {
-      Logger.log(`[API] ${benevole.nom} ignoré — véhicule "${vehicule.type}" (capaciteKg=0)`);
-      continue;
-    }
+    if (capaciteKg === 0) continue;
 
     result.push({ ...benevole, vehicule });
   }
 
-  Logger.log(`[API] ${result.length} bénévoles avec véhicule valide (3 créneaux fusionnés)`);
+  Logger.log(`[API] ✅ ${result.length} bénévoles avec véhicule valide`);
+
+  // Mise en cache utilisateur
+  setBenevolesCaches(result);
+
   return result;
 }
 
 function getVehicleTypes() {
   const url = buildUrl(CONFIG.API_BENEVOLES.URL, {
     action: CONFIG.API_BENEVOLES.ENDPOINTS.GET_VEHICLES,
-    apiKey: CONFIG.API_BENEVOLES.KEY
+    apiKey: CONFIG.API_BENEVOLES.KEY,
   });
-  return callApiWithRetry(url, {}, 'vehicle_types', CONFIG.API_BENEVOLES.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    "vehicle_types",
+    CONFIG.API_BENEVOLES.CACHE_DURATION,
+  );
 }
 
 // ============================================================
@@ -273,59 +413,95 @@ function getVehicleTypes() {
 function pingGeoApi() {
   const url = buildUrl(CONFIG.API_GEO.URL, {
     action: CONFIG.API_GEO.ENDPOINTS.PING,
-    'X-Api-Key': CONFIG.API_GEO.KEY
+    "X-Api-Key": CONFIG.API_GEO.KEY,
   });
   return callApiWithRetry(url, {}, null, 0);
 }
 
 function geocodeAddress(adresse, ville = null, codePostal = null) {
-  const params = { action: CONFIG.API_GEO.ENDPOINTS.GEOCODE, adresse, 'X-Api-Key': CONFIG.API_GEO.KEY };
+  const params = {
+    action: CONFIG.API_GEO.ENDPOINTS.GEOCODE,
+    adresse,
+    "X-Api-Key": CONFIG.API_GEO.KEY,
+  };
   if (ville) params.ville = ville;
   if (codePostal) params.codePostal = codePostal;
   const url = buildUrl(CONFIG.API_GEO.URL, params);
-  return callApiWithRetry(url, {}, `geocode_${adresse}_${ville}_${codePostal}`, CONFIG.API_GEO.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `geocode_${adresse}_${ville}_${codePostal}`,
+    CONFIG.API_GEO.CACHE_DURATION,
+  );
 }
 
 function resolveLocation(lat, lng) {
   const url = buildUrl(CONFIG.API_GEO.URL, {
     action: CONFIG.API_GEO.ENDPOINTS.RESOLVE_LOCATION,
-    lat, lng,
-    'X-Api-Key': CONFIG.API_GEO.KEY
+    lat,
+    lng,
+    "X-Api-Key": CONFIG.API_GEO.KEY,
   });
-  return callApiWithRetry(url, {}, `location_${lat}_${lng}`, CONFIG.API_GEO.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `location_${lat}_${lng}`,
+    CONFIG.API_GEO.CACHE_DURATION,
+  );
 }
 
 function calculateDistance(lat1, lng1, lat2, lng2) {
   const url = buildUrl(CONFIG.API_GEO.URL, {
     action: CONFIG.API_GEO.ENDPOINTS.CALCULATE_DISTANCE,
-    lat1, lng1, lat2, lng2,
-    'X-Api-Key': CONFIG.API_GEO.KEY
+    lat1,
+    lng1,
+    lat2,
+    lng2,
+    "X-Api-Key": CONFIG.API_GEO.KEY,
   });
-  return callApiWithRetry(url, {}, `distance_${lat1}_${lng1}_${lat2}_${lng2}`, CONFIG.API_GEO.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `distance_${lat1}_${lng1}_${lat2}_${lng2}`,
+    CONFIG.API_GEO.CACHE_DURATION,
+  );
 }
 
 function getAllQuartiers(idSecteur = null) {
-  const params = { action: CONFIG.API_GEO.ENDPOINTS.GET_QUARTIERS, 'X-Api-Key': CONFIG.API_GEO.KEY };
+  const params = {
+    action: CONFIG.API_GEO.ENDPOINTS.GET_QUARTIERS,
+    "X-Api-Key": CONFIG.API_GEO.KEY,
+  };
   if (idSecteur) params.idSecteur = idSecteur;
   const url = buildUrl(CONFIG.API_GEO.URL, params);
-  return callApiWithRetry(url, {}, `quartiers_${idSecteur || 'all'}`, CONFIG.API_GEO.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `quartiers_${idSecteur || "all"}`,
+    CONFIG.API_GEO.CACHE_DURATION,
+  );
 }
 
 function getQuartierById(quartierId) {
   const url = buildUrl(CONFIG.API_GEO.URL, {
     action: CONFIG.API_GEO.ENDPOINTS.GET_QUARTIER,
     id: quartierId,
-    'X-Api-Key': CONFIG.API_GEO.KEY
+    "X-Api-Key": CONFIG.API_GEO.KEY,
   });
-  return callApiWithRetry(url, {}, `quartier_${quartierId}`, CONFIG.API_GEO.CACHE_DURATION);
+  return callApiWithRetry(
+    url,
+    {},
+    `quartier_${quartierId}`,
+    CONFIG.API_GEO.CACHE_DURATION,
+  );
 }
 
 function getAllVilles() {
   const url = buildUrl(CONFIG.API_GEO.URL, {
     action: CONFIG.API_GEO.ENDPOINTS.GET_VILLES,
-    'X-Api-Key': CONFIG.API_GEO.KEY
+    "X-Api-Key": CONFIG.API_GEO.KEY,
   });
-  return callApiWithRetry(url, {}, 'villes_all', CONFIG.API_GEO.CACHE_DURATION);
+  return callApiWithRetry(url, {}, "villes_all", CONFIG.API_GEO.CACHE_DURATION);
 }
 
 // ============================================================
@@ -337,23 +513,35 @@ function checkAllApis() {
 
   try {
     const r = pingFamilyApi();
-    results.apis.familles = { status: 'ok', version: r.version || 'inconnu', message: r.message || '' };
+    results.apis.familles = {
+      status: "ok",
+      version: r.version || "inconnu",
+      message: r.message || "",
+    };
   } catch (error) {
-    results.apis.familles = { status: 'erreur', message: error.message };
+    results.apis.familles = { status: "erreur", message: error.message };
   }
 
   try {
     const r = pingVolunteerApi();
-    results.apis.benevoles = { status: 'ok', version: r.version || 'inconnu', message: r.message || '' };
+    results.apis.benevoles = {
+      status: "ok",
+      version: r.version || "inconnu",
+      message: r.message || "",
+    };
   } catch (error) {
-    results.apis.benevoles = { status: 'erreur', message: error.message };
+    results.apis.benevoles = { status: "erreur", message: error.message };
   }
 
   try {
     const r = pingGeoApi();
-    results.apis.geo = { status: 'ok', version: r.version || 'inconnu', message: r.message || '' };
+    results.apis.geo = {
+      status: "ok",
+      version: r.version || "inconnu",
+      message: r.message || "",
+    };
   } catch (error) {
-    results.apis.geo = { status: 'erreur', message: error.message };
+    results.apis.geo = { status: "erreur", message: error.message };
   }
 
   return results;
@@ -361,9 +549,11 @@ function checkAllApis() {
 
 function logApiStatus() {
   const status = checkAllApis();
-  Logger.log('=== STATUT DES APIS ===');
+  Logger.log("=== STATUT DES APIS ===");
   for (const [nom, s] of Object.entries(status.apis)) {
-    Logger.log(`${s.status === 'ok' ? '✅' : '❌'} ${nom.toUpperCase()} — ${s.message}`);
+    Logger.log(
+      `${s.status === "ok" ? "✅" : "❌"} ${nom.toUpperCase()} — ${s.message}`,
+    );
   }
 }
 
@@ -372,52 +562,68 @@ function logApiStatus() {
 // ============================================================
 
 function callBatchGeocode(addresses) {
-  const apiKey = PropertiesService.getScriptProperties().getProperty('GEO_API_KEY');
-  const baseUrl = PropertiesService.getScriptProperties().getProperty('GEO_API_URL');
-  if (!apiKey || !baseUrl) throw new Error('Configuration API GEO manquante');
+  const apiKey =
+    PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
+  const baseUrl =
+    PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
+  if (!apiKey || !baseUrl) throw new Error("Configuration API GEO manquante");
 
   const options = {
-    method: 'post',
+    method: "post",
     muteHttpExceptions: true,
-    headers: { 'Content-Type': 'application/json' },
-    payload: JSON.stringify({ action: 'batchgeocode', adresses: addresses.map(addr => ({ adresse: addr })) })
+    headers: { "Content-Type": "application/json" },
+    payload: JSON.stringify({
+      action: "batchgeocode",
+      adresses: addresses.map((addr) => ({ adresse: addr })),
+    }),
   };
 
-  const response = UrlFetchApp.fetch(baseUrl + '?X-Api-Key=' + apiKey, options);
-  if (response.getResponseCode() !== 200) throw new Error('API GEO erreur: HTTP ' + response.getResponseCode());
+  const response = UrlFetchApp.fetch(baseUrl + "?X-Api-Key=" + apiKey, options);
+  if (response.getResponseCode() !== 200)
+    throw new Error("API GEO erreur: HTTP " + response.getResponseCode());
   return JSON.parse(response.getContentText());
 }
 
 function callBatchResolveLocation(coordinates) {
-  const apiKey = PropertiesService.getScriptProperties().getProperty('GEO_API_KEY');
-  const baseUrl = PropertiesService.getScriptProperties().getProperty('GEO_API_URL');
-  if (!apiKey || !baseUrl) throw new Error('Configuration API GEO manquante');
+  const apiKey =
+    PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
+  const baseUrl =
+    PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
+  if (!apiKey || !baseUrl) throw new Error("Configuration API GEO manquante");
 
   const options = {
-    method: 'post',
+    method: "post",
     muteHttpExceptions: true,
-    headers: { 'Content-Type': 'application/json' },
-    payload: JSON.stringify({ action: 'batchresolvelocation', coordinates })
+    headers: { "Content-Type": "application/json" },
+    payload: JSON.stringify({ action: "batchresolvelocation", coordinates }),
   };
 
-  const response = UrlFetchApp.fetch(baseUrl + '?X-Api-Key=' + apiKey, options);
-  if (response.getResponseCode() !== 200) throw new Error('API GEO erreur: HTTP ' + response.getResponseCode());
+  const response = UrlFetchApp.fetch(baseUrl + "?X-Api-Key=" + apiKey, options);
+  if (response.getResponseCode() !== 200)
+    throw new Error("API GEO erreur: HTTP " + response.getResponseCode());
   return JSON.parse(response.getContentText());
 }
 
 function callBatchCalculateDistance(reference, coordinates) {
-  const apiKey = PropertiesService.getScriptProperties().getProperty('GEO_API_KEY');
-  const baseUrl = PropertiesService.getScriptProperties().getProperty('GEO_API_URL');
-  if (!apiKey || !baseUrl) throw new Error('Configuration API GEO manquante');
+  const apiKey =
+    PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
+  const baseUrl =
+    PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
+  if (!apiKey || !baseUrl) throw new Error("Configuration API GEO manquante");
 
   const options = {
-    method: 'post',
+    method: "post",
     muteHttpExceptions: true,
-    headers: { 'Content-Type': 'application/json' },
-    payload: JSON.stringify({ action: 'batchcalculatedistance', reference, coordinates })
+    headers: { "Content-Type": "application/json" },
+    payload: JSON.stringify({
+      action: "batchcalculatedistance",
+      reference,
+      coordinates,
+    }),
   };
 
-  const response = UrlFetchApp.fetch(baseUrl + '?X-Api-Key=' + apiKey, options);
-  if (response.getResponseCode() !== 200) throw new Error('API GEO erreur: HTTP ' + response.getResponseCode());
+  const response = UrlFetchApp.fetch(baseUrl + "?X-Api-Key=" + apiKey, options);
+  if (response.getResponseCode() !== 200)
+    throw new Error("API GEO erreur: HTTP " + response.getResponseCode());
   return JSON.parse(response.getContentText());
 }

@@ -1,476 +1,640 @@
 <script>
-    var _etapeCourante = 1;
-    var _toutesRoutes = [];
-    var _tousBenevoles = [];
-    var _routeSelectionnee = null;
-    var _actionChoisie = null;
-    var _benevoleReassign = null;
-    var _benevolesplit = new Set();
+  var _etapeCourante = 1;
+  var _toutesRoutes = [];
+  var _tousBenevoles = [];
+  var _routeSelectionnee = null;
+  var _actionChoisie = null;
+  var _benevoleReassign = null;
+  var _benevolesplit = new Set();
 
-    window.addEventListener('load', function () {
-        chargerRoutes();
-        chargerBenevoles();
+  window.addEventListener("load", function () {
+    chargerRoutes();
+    chargerBenevoles();
+  });
+
+  // ============================================================
+  // NAVIGATION
+  // ============================================================
+
+  function goToStep(n) {
+    document.getElementById("step" + _etapeCourante).style.display = "none";
+    document.getElementById("step" + _etapeCourante).classList.remove("active");
+    _etapeCourante = n;
+    var panel = document.getElementById("step" + n);
+    panel.style.display = "flex";
+    panel.classList.add("active");
+    [1, 2].forEach(function (i) {
+      var btn = document.getElementById("stepBtn" + i);
+      btn.classList.remove("active", "done");
+      if (i < n) btn.classList.add("done");
+      if (i === n) btn.classList.add("active");
+    });
+  }
+
+  function afficherChargement(texte) {
+    document.getElementById("step" + _etapeCourante).style.display = "none";
+    document.getElementById("stepNav").style.display = "none";
+    document.getElementById("loading-text").textContent =
+      texte || "Traitement en cours…";
+    document.getElementById("loadingState").style.display = "flex";
+  }
+
+  function afficherResultats() {
+    document.getElementById("loadingState").style.display = "none";
+    document
+      .getElementById("resultsState")
+      .classList.add("results-state--visible");
+  }
+
+  // ============================================================
+  // ÉTAPE 1 — ROUTES
+  // ============================================================
+
+  function chargerRoutes() {
+    google.script.run
+      .withSuccessHandler(function (routes) {
+        _toutesRoutes = routes;
+        filtrerRoutes();
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById("routes-wrap").innerHTML =
+          '<div style="padding:20px;text-align:center;color:var(--error-text);">Erreur : ' +
+          e.message +
+          "</div>";
+      })
+      .getEligibleRoutesForReassign();
+  }
+
+  function filtrerRoutes() {
+    var filtreStatut = document.getElementById("filtre-statut").value;
+    var filtrees = _toutesRoutes.filter(function (r) {
+      if (filtreStatut && normaliserStatut(r.statut) !== filtreStatut)
+        return false;
+      return true;
+    });
+    renderRoutes(filtrees);
+  }
+
+  function normaliserStatut(statut) {
+    var s = (statut || "").trim();
+    if (s === "Prete" || s === "Prête" || s === "Prête") return "Prete";
+    return s;
+  }
+
+  function renderRoutes(routes) {
+    var wrap = document.getElementById("routes-wrap");
+    document.getElementById("routes-counter").textContent =
+      routes.length + " route" + (routes.length > 1 ? "s" : "");
+
+    if (routes.length === 0) {
+      wrap.innerHTML =
+        '<div class="empty-state" style="padding:40px;"><div class="empty-state__icon">📭</div><h3>Aucune route éligible</h3><p>Seules les routes en statut Brouillon, Confirmée ou Prête peuvent être réassignées.</p></div>';
+      return;
+    }
+
+    var STATUT_STYLE = {
+      Brouillon: "background:#eff6ff;color:#3b82f6;",
+      Confirmée: "background:#fef3c7;color:#d97706;",
+      Prete: "background:#d1fae5;color:#059669;",
+    };
+
+    var html = '<table class="sel-table"><thead><tr>';
+    html +=
+      "<th></th><th>Route</th><th>Bénévole</th><th>Date</th><th>Livraisons</th><th>Poids</th><th>Distance</th><th>Statut</th>";
+    html += "</tr></thead><tbody>";
+
+    routes.forEach(function (r) {
+      var isSelected =
+        _routeSelectionnee && _routeSelectionnee.id_route === r.id_route;
+      var statutNorm = normaliserStatut(r.statut);
+      var statutStyle =
+        STATUT_STYLE[statutNorm] || "background:#f3f4f6;color:#6b7280;";
+
+      html +=
+        '<tr class="' +
+        (isSelected ? "selected" : "") +
+        '" onclick="selectionnerRoute(' +
+        JSON.stringify(r).replace(/"/g, "&quot;") +
+        ', this)">';
+      html +=
+        '<td><input type="radio" name="route_radio" value="' +
+        r.id_route +
+        '" ' +
+        (isSelected ? "checked" : "") +
+        ' style="accent-color:var(--c2);"></td>';
+      html += '<td><strong class="mono">' + r.id_route + "</strong></td>";
+      html += "<td>" + (r.benevole_nom || r.id_benevole) + "</td>";
+      html += '<td class="text-muted">' + (r.date_debut || "—") + "</td>";
+      html += '<td class="mono">' + r.nb_livraisons + "</td>";
+      html += '<td class="mono">' + Math.round(r.poids_total_kg) + " kg</td>";
+      html +=
+        '<td class="mono">' +
+        Math.round(r.distance_totale_km * 10) / 10 +
+        " km</td>";
+      html +=
+        '<td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;' +
+        statutStyle +
+        '">' +
+        r.statut +
+        "</span></td>";
+      html += "</tr>";
     });
 
-    // ============================================================
-    // NAVIGATION
-    // ============================================================
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+  }
 
-    function goToStep(n) {
-        document.getElementById('step' + _etapeCourante).style.display = 'none';
-        document.getElementById('step' + _etapeCourante).classList.remove('active');
-        _etapeCourante = n;
-        var panel = document.getElementById('step' + n);
-        panel.style.display = 'flex';
-        panel.classList.add('active');
-        [1, 2].forEach(function (i) {
-            var btn = document.getElementById('stepBtn' + i);
-            btn.classList.remove('active', 'done');
-            if (i < n) btn.classList.add('done');
-            if (i === n) btn.classList.add('active');
-        });
+  function selectionnerRoute(route, tr) {
+    _routeSelectionnee = route;
+    document.querySelectorAll("#routes-wrap tbody tr").forEach(function (row) {
+      row.classList.remove("selected");
+    });
+    tr.classList.add("selected");
+    var radio = tr.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+
+    var summary = document.getElementById("route-summary");
+    summary.style.display = "flex";
+    document.getElementById("route-selected-id").textContent = route.id_route;
+    document.getElementById("route-selected-info").textContent =
+      (route.benevole_nom || route.id_benevole) +
+      " · " +
+      route.nb_livraisons +
+      " livraisons · " +
+      Math.round(route.poids_total_kg) +
+      " kg";
+
+    document.getElementById("btnStep1Next").disabled = false;
+  }
+
+  function validerEtape1() {
+    if (!_routeSelectionnee) {
+      showAlert(1, "Veuillez sélectionner une route.");
+      return;
+    }
+    document.getElementById("stepBtn2").disabled = false;
+    afficherInfoRoute();
+    goToStep(2);
+  }
+
+  // ============================================================
+  // ÉTAPE 2 — ACTION
+  // ============================================================
+
+  function afficherInfoRoute() {
+    var r = _routeSelectionnee;
+    var bar = document.getElementById("route-info-bar");
+    bar.innerHTML =
+      '<div class="ri-item">Route : <strong>' +
+      r.id_route +
+      "</strong></div>" +
+      '<div class="ri-item">Bénévole : <strong>' +
+      (r.benevole_nom || r.id_benevole) +
+      "</strong></div>" +
+      '<div class="ri-item">Date : <strong>' +
+      (r.date_debut || "—") +
+      "</strong></div>" +
+      '<div class="ri-item">Livraisons : <strong>' +
+      r.nb_livraisons +
+      "</strong></div>" +
+      '<div class="ri-item">Poids : <strong>' +
+      Math.round(r.poids_total_kg) +
+      " kg</strong></div>" +
+      '<div class="ri-item">Statut : <strong>' +
+      r.statut +
+      "</strong></div>";
+  }
+
+  function choisirAction(action) {
+    _actionChoisie = action;
+    document
+      .getElementById("card-reassign")
+      .classList.toggle("selected", action === "reassign");
+    document
+      .getElementById("card-split")
+      .classList.toggle("selected", action === "split");
+
+    document
+      .getElementById("panel-reassign")
+      .classList.toggle("active", action === "reassign");
+    document
+      .getElementById("panel-split")
+      .classList.toggle("active", action === "split");
+
+    document.getElementById("choix-action").style.marginBottom = "12px";
+    _benevoleReassign = null;
+    _benevolesplit.clear();
+    majBoutonExecuter();
+
+    if (action === "reassign") {
+      filtrerBenevolesReassign();
+    } else {
+      filtrerBenevolesplit();
+    }
+  }
+
+  // ============================================================
+  // BÉNÉVOLES — PARTAGÉ
+  // ============================================================
+
+  function chargerBenevoles() {
+    google.script.run
+      .withSuccessHandler(function (benevoles) {
+        _tousBenevoles = benevoles;
+        filtrerBenevolesReassign();
+        filtrerBenevolesplit();
+      })
+      .withFailureHandler(function (e) {
+        Logger.log("Erreur chargement bénévoles : " + e.message);
+      })
+      .getVolunteersForPlanningForm(null);
+  }
+
+  function _benevolesFiltres(filtreDispoId) {
+    var filtreDispo = document.getElementById(filtreDispoId).value;
+    return _tousBenevoles.filter(function (b) {
+      if (
+        _routeSelectionnee &&
+        String(b.id) === String(_routeSelectionnee.id_benevole)
+      )
+        return false;
+      if (filtreDispo && !b.disponibilites.includes(filtreDispo)) return false;
+      return true;
+    });
+  }
+
+  // ============================================================
+  // BÉNÉVOLES — RÉASSIGNATION (radio)
+  // ============================================================
+
+  function filtrerBenevolesReassign() {
+    var filtres = _benevolesFiltres("filtre-dispo-reassign");
+    document.getElementById("benevoles-reassign-counter").textContent =
+      filtres.length + " bénévole" + (filtres.length > 1 ? "s" : "");
+    renderBenevolesReassign(filtres);
+  }
+
+  function renderBenevolesReassign(benevoles) {
+    var wrap = document.getElementById("benevoles-reassign-wrap");
+
+    if (benevoles.length === 0) {
+      wrap.innerHTML =
+        '<div style="padding:24px;text-align:center;color:var(--muted);">Aucun bénévole disponible</div>';
+      return;
     }
 
-    function afficherChargement(texte) {
-        document.getElementById('step' + _etapeCourante).style.display = 'none';
-        document.getElementById('stepNav').style.display = 'none';
-        document.getElementById('loading-text').textContent = texte || 'Traitement en cours…';
-        document.getElementById('loadingState').style.display = 'flex';
+    var html = '<table class="sel-table"><thead><tr>';
+    html +=
+      "<th></th><th>Bénévole</th><th>Disponibilités</th><th>Véhicule</th><th>Capacité</th><th>Route aujourd'hui</th>";
+    html += "</tr></thead><tbody>";
+
+    benevoles.forEach(function (b) {
+      var isSelected =
+        _benevoleReassign && String(_benevoleReassign.id) === String(b.id);
+      var dispoTags =
+        (b.disponibilites || [])
+          .map(function (d) {
+            return '<span class="dispo-tag">' + d + "</span>";
+          })
+          .join("") ||
+        '<span class="text-muted" style="font-size:11px;">—</span>';
+
+      var routeLabel = b.has_route_today
+        ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fef3c7;color:#d97706;">' +
+          (b.route_statut || "?") +
+          "</span>"
+        : '<span class="text-muted" style="font-size:12px;">—</span>';
+
+      var nomLabel = b.prenom + " " + b.nom;
+      if (b.admin) nomLabel += ' <span class="admin-badge">admin</span>';
+      if (b.is_tmp_vehicle) nomLabel += " 🔑";
+
+      html +=
+        '<tr class="' +
+        (isSelected ? "selected" : "") +
+        '" onclick="selectionnerBenevoleReassign(' +
+        JSON.stringify(b).replace(/"/g, "&quot;") +
+        ', this)">';
+      html +=
+        '<td><input type="radio" name="reassign_radio" value="' +
+        b.id +
+        '" ' +
+        (isSelected ? "checked" : "") +
+        ' style="accent-color:var(--c2);"></td>';
+      html += "<td><strong>" + nomLabel + "</strong></td>";
+      html += "<td>" + dispoTags + "</td>";
+      html += "<td>" + (b.vehicule_type || "—") + "</td>";
+      html +=
+        '<td class="mono">' +
+        (b.vehicule_capacite ? b.vehicule_capacite + " kg" : "—") +
+        "</td>";
+      html += "<td>" + routeLabel + "</td>";
+      html += "</tr>";
+    });
+
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+  }
+
+  function selectionnerBenevoleReassign(benevole, tr) {
+    _benevoleReassign = benevole;
+    document
+      .querySelectorAll("#benevoles-reassign-wrap tbody tr")
+      .forEach(function (row) {
+        row.classList.remove("selected");
+      });
+    tr.classList.add("selected");
+    var radio = tr.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+
+    var summary = document.getElementById("reassign-summary");
+    summary.style.display = "flex";
+    document.getElementById("reassign-selected-nom").textContent =
+      benevole.prenom + " " + benevole.nom;
+    document.getElementById("reassign-selected-vehicule").textContent =
+      (benevole.vehicule_type || "—") +
+      " · " +
+      (benevole.vehicule_capacite || "—") +
+      " kg";
+    majBoutonExecuter();
+  }
+
+  // ============================================================
+  // BÉNÉVOLES — DIVISION (checkbox)
+  // ============================================================
+
+  function filtrerBenevolesplit() {
+    var filtres = _benevolesFiltres("filtre-dispo-split");
+    document.getElementById("benevoles-split-counter").textContent =
+      filtres.length + " bénévole" + (filtres.length > 1 ? "s" : "");
+    renderBenevolesplit(filtres);
+  }
+
+  function renderBenevolesplit(benevoles) {
+    var wrap = document.getElementById("benevoles-split-wrap");
+
+    if (benevoles.length === 0) {
+      wrap.innerHTML =
+        '<div style="padding:24px;text-align:center;color:var(--muted);">Aucun bénévole disponible</div>';
+      return;
     }
 
-    function afficherResultats() {
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('resultsState').classList.add('results-state--visible');
+    var html = '<table class="sel-table"><thead><tr>';
+    html +=
+      "<th></th><th>Bénévole</th><th>Disponibilités</th><th>Véhicule</th><th>Capacité</th><th>Route aujourd'hui</th>";
+    html += "</tr></thead><tbody>";
+
+    benevoles.forEach(function (b) {
+      var isChecked = _benevolesplit.has(String(b.id));
+      var dispoTags =
+        (b.disponibilites || [])
+          .map(function (d) {
+            return '<span class="dispo-tag">' + d + "</span>";
+          })
+          .join("") ||
+        '<span class="text-muted" style="font-size:11px;">—</span>';
+
+      var routeLabel = b.has_route_today
+        ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fef3c7;color:#d97706;">' +
+          (b.route_statut || "?") +
+          "</span>"
+        : '<span class="text-muted" style="font-size:12px;">—</span>';
+
+      var nomLabel = b.prenom + " " + b.nom;
+      if (b.admin) nomLabel += ' <span class="admin-badge">admin</span>';
+      if (b.is_tmp_vehicle) nomLabel += " 🔑";
+
+      html +=
+        '<tr class="' +
+        (isChecked ? "selected" : "") +
+        '" onclick="toggleBenevolesplit(\'' +
+        b.id +
+        "', this)\">";
+      html +=
+        '<td><input type="checkbox" class="split-cb" value="' +
+        b.id +
+        '" ' +
+        (isChecked ? "checked" : "") +
+        ' style="accent-color:var(--c2);" onclick="event.stopPropagation(); toggleBenevolesplit(\'' +
+        b.id +
+        "', this.closest('tr'))\"></td>";
+      html += "<td><strong>" + nomLabel + "</strong></td>";
+      html += "<td>" + dispoTags + "</td>";
+      html += "<td>" + (b.vehicule_type || "—") + "</td>";
+      html +=
+        '<td class="mono">' +
+        (b.vehicule_capacite ? b.vehicule_capacite + " kg" : "—") +
+        "</td>";
+      html += "<td>" + routeLabel + "</td>";
+      html += "</tr>";
+    });
+
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+    majSommaireSplit();
+  }
+
+  function toggleBenevolesplit(id, tr) {
+    var sid = String(id);
+    if (_benevolesplit.has(sid)) {
+      _benevolesplit.delete(sid);
+      tr.classList.remove("selected");
+      var cb = tr.querySelector(".split-cb");
+      if (cb) cb.checked = false;
+    } else {
+      _benevolesplit.add(sid);
+      tr.classList.add("selected");
+      var cb = tr.querySelector(".split-cb");
+      if (cb) cb.checked = true;
+    }
+    majSommaireSplit();
+    majBoutonExecuter();
+  }
+
+  function majSommaireSplit() {
+    document.getElementById("split-selected-count").textContent =
+      _benevolesplit.size;
+  }
+
+  function majBoutonExecuter() {
+    var actif = false;
+    if (_actionChoisie === "reassign") actif = !!_benevoleReassign;
+    if (_actionChoisie === "split") actif = _benevolesplit.size >= 2;
+    document.getElementById("btnExecuter").disabled = !actif;
+  }
+
+  // ============================================================
+  // EXÉCUTION
+  // ============================================================
+
+  function executer() {
+    if (_actionChoisie === "reassign") executerReassign();
+    else if (_actionChoisie === "split") executerSplit();
+  }
+
+  function executerReassign() {
+    if (!_benevoleReassign) {
+      showAlert(2, "Veuillez sélectionner un bénévole.");
+      return;
+    }
+    afficherChargement("Réassignation en cours…");
+    google.script.run
+      .withSuccessHandler(function (result) {
+        renderResultatsReassign(result);
+        afficherResultats();
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById("loadingState").style.display = "none";
+        document.getElementById("stepNav").style.display = "";
+        document.getElementById("step2").style.display = "flex";
+        showAlert(2, "Erreur : " + e.message);
+      })
+      .reassignRouteFromForm({
+        id_route: _routeSelectionnee.id_route,
+        id_benevole: _benevoleReassign.id,
+      });
+  }
+
+  function executerSplit() {
+    if (_benevolesplit.size < 2) {
+      showAlert(2, "Sélectionnez au moins 2 bénévoles pour diviser la route.");
+      return;
+    }
+    afficherChargement("Division de la route en cours…");
+    google.script.run
+      .withSuccessHandler(function (result) {
+        renderResultatsSplit(result);
+        afficherResultats();
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById("loadingState").style.display = "none";
+        document.getElementById("stepNav").style.display = "";
+        document.getElementById("step2").style.display = "flex";
+        showAlert(2, "Erreur : " + e.message);
+      })
+      .splitRouteFromForm({
+        id_route: _routeSelectionnee.id_route,
+        benevole_ids: Array.from(_benevolesplit),
+      });
+  }
+
+  // ============================================================
+  // AFFICHAGE RÉSULTATS
+  // ============================================================
+
+  function renderResultatsReassign(result) {
+    document.getElementById("res-titre").textContent = "✅ Route réassignée";
+    document.getElementById("res-sous-titre").textContent =
+      "Route " + result.id_route + " → " + result.benevole_nom;
+
+    var html = '<div class="kpi-grid">';
+    html +=
+      '<div class="kpi-card"><div class="kpi-card__value">' +
+      result.id_route +
+      '</div><div class="kpi-card__label">Route</div></div>';
+    html +=
+      '<div class="kpi-card"><div class="kpi-card__value">' +
+      result.nb_livraisons +
+      '</div><div class="kpi-card__label">Livraisons</div></div>';
+    html +=
+      '<div class="kpi-card"><div class="kpi-card__value">' +
+      Math.round(result.poids_total_kg) +
+      ' kg</div><div class="kpi-card__label">Poids</div></div>';
+    html +=
+      '<div class="kpi-card"><div class="kpi-card__value">' +
+      Math.round(result.distance_totale_km * 10) / 10 +
+      ' km</div><div class="kpi-card__label">Distance</div></div>';
+    html += "</div>";
+
+    if (result.nb_surplus > 0) {
+      html +=
+        '<div class="alert alert--warning alert--visible" style="margin-bottom:12px;">⚠️ ' +
+        result.nb_surplus +
+        " livraison(s) remise(s) en Non Assignée (capacité insuffisante).</div>";
+    }
+    if (result.nb_extras > 0) {
+      html +=
+        '<div class="alert alert--info alert--visible" style="margin-bottom:12px;">ℹ️ ' +
+        result.nb_extras +
+        " livraison(s) proche(s) ajoutée(s) grâce au véhicule plus grand.</div>";
+    }
+    if (result.email_envoye) {
+      html +=
+        '<div class="alert alert--success alert--visible" style="margin-bottom:12px;">📧 Email renvoyé au nouveau bénévole.</div>';
+    }
+    if (result.lien_maps) {
+      html +=
+        '<a href="' +
+        result.lien_maps +
+        '" target="_blank" class="link-btn">🗺️ Voir l\'itinéraire Google Maps</a>';
     }
 
-    // ============================================================
-    // ÉTAPE 1 — ROUTES
-    // ============================================================
+    document.getElementById("res-body").innerHTML = html;
+  }
 
-    function chargerRoutes() {
-        google.script.run
-            .withSuccessHandler(function (routes) {
-                _toutesRoutes = routes;
-                filtrerRoutes();
-            })
-            .withFailureHandler(function (e) {
-                document.getElementById('routes-wrap').innerHTML =
-                    '<div style="padding:20px;text-align:center;color:var(--error-text);">Erreur : ' + e.message + '</div>';
-            })
-            .getEligibleRoutesForReassign();
+  function renderResultatsSplit(result) {
+    document.getElementById("res-titre").textContent = "✅ Route divisée";
+    document.getElementById("res-sous-titre").textContent =
+      "Route " +
+      result.id_route_originale +
+      " annulée · " +
+      result.nouvelles_routes.length +
+      " nouvelle(s) route(s) créée(s)";
+
+    var html = "";
+
+    if (result.nb_non_assignees > 0) {
+      html +=
+        '<div class="alert alert--warning alert--visible" style="margin-bottom:12px;">⚠️ ' +
+        result.nb_non_assignees +
+        " livraison(s) remise(s) en Non Assignée (capacité insuffisante).</div>";
     }
 
-    function filtrerRoutes() {
-        var filtreStatut = document.getElementById('filtre-statut').value;
-        var filtrees = _toutesRoutes.filter(function (r) {
-            if (filtreStatut && normaliserStatut(r.statut) !== filtreStatut) return false;
-            return true;
-        });
-        renderRoutes(filtrees);
-    }
+    html +=
+      '<div class="data-table-wrap"><div class="data-table-title">📋 Nouvelles routes créées</div>';
+    html +=
+      '<table class="data-table"><thead><tr><th>Route</th><th>Bénévole</th><th>Livraisons</th><th>Poids</th><th>Distance</th><th>Email</th><th>Maps</th></tr></thead><tbody>';
 
-    function normaliserStatut(statut) {
-        var s = (statut || '').trim();
-        if (s === 'Prete' || s === 'Prête' || s === 'Prête') return 'Prete';
-        return s;
-    }
+    result.nouvelles_routes.forEach(function (r) {
+      html += "<tr>";
+      html +=
+        '<td><span class="mono badge badge--cyan">' +
+        r.id_route +
+        "</span></td>";
+      html += "<td><strong>" + r.benevole_nom + "</strong></td>";
+      html += '<td class="mono">' + r.nb_livraisons + "</td>";
+      html += '<td class="mono">' + Math.round(r.poids_total_kg) + " kg</td>";
+      html +=
+        '<td class="mono">' +
+        Math.round(r.distance_totale_km * 10) / 10 +
+        " km</td>";
+      html += "<td>" + (r.email_envoye ? "📧 Envoyé" : "—") + "</td>";
+      html +=
+        "<td>" +
+        (r.lien_maps
+          ? '<a href="' +
+            r.lien_maps +
+            '" target="_blank" style="color:var(--c2);font-weight:600;">🗺️</a>'
+          : "—") +
+        "</td>";
+      html += "</tr>";
+    });
 
-    function renderRoutes(routes) {
-        var wrap = document.getElementById('routes-wrap');
-        document.getElementById('routes-counter').textContent =
-            routes.length + ' route' + (routes.length > 1 ? 's' : '');
+    html += "</tbody></table></div>";
+    document.getElementById("res-body").innerHTML = html;
+  }
 
-        if (routes.length === 0) {
-            wrap.innerHTML = '<div class="empty-state" style="padding:40px;"><div class="empty-state__icon">📭</div><h3>Aucune route éligible</h3><p>Seules les routes en statut Brouillon, Confirmée ou Prête peuvent être réassignées.</p></div>';
-            return;
-        }
+  // ============================================================
+  // UTILITAIRES
+  // ============================================================
 
-        var STATUT_STYLE = {
-            'Brouillon': 'background:#eff6ff;color:#3b82f6;',
-            'Confirmée': 'background:#fef3c7;color:#d97706;',
-            'Prete': 'background:#d1fae5;color:#059669;'
-        };
-
-        var html = '<table class="sel-table"><thead><tr>';
-        html += '<th></th><th>Route</th><th>Bénévole</th><th>Date</th><th>Livraisons</th><th>Poids</th><th>Distance</th><th>Statut</th>';
-        html += '</tr></thead><tbody>';
-
-        routes.forEach(function (r) {
-            var isSelected = _routeSelectionnee && _routeSelectionnee.id_route === r.id_route;
-            var statutNorm = normaliserStatut(r.statut);
-            var statutStyle = STATUT_STYLE[statutNorm] || 'background:#f3f4f6;color:#6b7280;';
-
-            html += '<tr class="' + (isSelected ? 'selected' : '') + '" onclick="selectionnerRoute(' + JSON.stringify(r).replace(/"/g, '&quot;') + ', this)">';
-            html += '<td><input type="radio" name="route_radio" value="' + r.id_route + '" ' + (isSelected ? 'checked' : '') + ' style="accent-color:var(--c2);"></td>';
-            html += '<td><strong class="mono">' + r.id_route + '</strong></td>';
-            html += '<td>' + (r.benevole_nom || r.id_benevole) + '</td>';
-            html += '<td class="text-muted">' + (r.date_debut || '—') + '</td>';
-            html += '<td class="mono">' + r.nb_livraisons + '</td>';
-            html += '<td class="mono">' + Math.round(r.poids_total_kg) + ' kg</td>';
-            html += '<td class="mono">' + Math.round(r.distance_totale_km * 10) / 10 + ' km</td>';
-            html += '<td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;' + statutStyle + '">' + r.statut + '</span></td>';
-            html += '</tr>';
-        });
-
-        html += '</tbody></table>';
-        wrap.innerHTML = html;
-    }
-
-    function selectionnerRoute(route, tr) {
-        _routeSelectionnee = route;
-        document.querySelectorAll('#routes-wrap tbody tr').forEach(function (row) {
-            row.classList.remove('selected');
-        });
-        tr.classList.add('selected');
-        var radio = tr.querySelector('input[type="radio"]');
-        if (radio) radio.checked = true;
-
-        var summary = document.getElementById('route-summary');
-        summary.style.display = 'flex';
-        document.getElementById('route-selected-id').textContent = route.id_route;
-        document.getElementById('route-selected-info').textContent =
-            (route.benevole_nom || route.id_benevole) + ' · ' + route.nb_livraisons + ' livraisons · ' + Math.round(route.poids_total_kg) + ' kg';
-
-        document.getElementById('btnStep1Next').disabled = false;
-    }
-
-    function validerEtape1() {
-        if (!_routeSelectionnee) { showAlert(1, 'Veuillez sélectionner une route.'); return; }
-        document.getElementById('stepBtn2').disabled = false;
-        afficherInfoRoute();
-        goToStep(2);
-    }
-
-    // ============================================================
-    // ÉTAPE 2 — ACTION
-    // ============================================================
-
-    function afficherInfoRoute() {
-        var r = _routeSelectionnee;
-        var bar = document.getElementById('route-info-bar');
-        bar.innerHTML =
-            '<div class="ri-item">Route : <strong>' + r.id_route + '</strong></div>' +
-            '<div class="ri-item">Bénévole : <strong>' + (r.benevole_nom || r.id_benevole) + '</strong></div>' +
-            '<div class="ri-item">Date : <strong>' + (r.date_debut || '—') + '</strong></div>' +
-            '<div class="ri-item">Livraisons : <strong>' + r.nb_livraisons + '</strong></div>' +
-            '<div class="ri-item">Poids : <strong>' + Math.round(r.poids_total_kg) + ' kg</strong></div>' +
-            '<div class="ri-item">Statut : <strong>' + r.statut + '</strong></div>';
-    }
-
-    function choisirAction(action) {
-        _actionChoisie = action;
-        document.getElementById('card-reassign').classList.toggle('selected', action === 'reassign');
-        document.getElementById('card-split').classList.toggle('selected', action === 'split');
-
-        document.getElementById('panel-reassign').classList.toggle('active', action === 'reassign');
-        document.getElementById('panel-split').classList.toggle('active', action === 'split');
-
-        document.getElementById('choix-action').style.marginBottom = '12px';
-        _benevoleReassign = null;
-        _benevolesplit.clear();
-        majBoutonExecuter();
-
-        if (action === 'reassign') {
-            filtrerBenevolesReassign();
-        } else {
-            filtrerBenevolesplit();
-        }
-    }
-
-    // ============================================================
-    // BÉNÉVOLES — PARTAGÉ
-    // ============================================================
-
-    function chargerBenevoles() {
-        google.script.run
-            .withSuccessHandler(function (benevoles) {
-                _tousBenevoles = benevoles;
-                filtrerBenevolesReassign();
-                filtrerBenevolesplit();
-            })
-            .withFailureHandler(function (e) {
-                Logger.log('Erreur chargement bénévoles : ' + e.message);
-            })
-            .getVolunteersForPlanningForm(null);
-    }
-
-    function _benevolesFiltres(filtreDispoId) {
-        var filtreDispo = document.getElementById(filtreDispoId).value;
-        return _tousBenevoles.filter(function (b) {
-            if (_routeSelectionnee && String(b.id) === String(_routeSelectionnee.id_benevole)) return false;
-            if (filtreDispo && !b.disponibilites.includes(filtreDispo)) return false;
-            return true;
-        });
-    }
-
-    // ============================================================
-    // BÉNÉVOLES — RÉASSIGNATION (radio)
-    // ============================================================
-
-    function filtrerBenevolesReassign() {
-        var filtres = _benevolesFiltres('filtre-dispo-reassign');
-        document.getElementById('benevoles-reassign-counter').textContent =
-            filtres.length + ' bénévole' + (filtres.length > 1 ? 's' : '');
-        renderBenevolesReassign(filtres);
-    }
-
-    function renderBenevolesReassign(benevoles) {
-        var wrap = document.getElementById('benevoles-reassign-wrap');
-
-        if (benevoles.length === 0) {
-            wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);">Aucun bénévole disponible</div>';
-            return;
-        }
-
-        var html = '<table class="sel-table"><thead><tr>';
-        html += '<th></th><th>Bénévole</th><th>Disponibilités</th><th>Véhicule</th><th>Capacité</th><th>Route aujourd\'hui</th>';
-        html += '</tr></thead><tbody>';
-
-        benevoles.forEach(function (b) {
-            var isSelected = _benevoleReassign && String(_benevoleReassign.id) === String(b.id);
-            var dispoTags = (b.disponibilites || []).map(function (d) {
-                return '<span class="dispo-tag">' + d + '</span>';
-            }).join('') || '<span class="text-muted" style="font-size:11px;">—</span>';
-
-            var routeLabel = b.has_route_today
-                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fef3c7;color:#d97706;">' + (b.route_statut || '?') + '</span>'
-                : '<span class="text-muted" style="font-size:12px;">—</span>';
-
-            var nomLabel = b.prenom + ' ' + b.nom;
-            if (b.admin) nomLabel += ' <span class="admin-badge">admin</span>';
-            if (b.is_tmp_vehicle) nomLabel += ' 🔑';
-
-            html += '<tr class="' + (isSelected ? 'selected' : '') + '" onclick="selectionnerBenevoleReassign(' + JSON.stringify(b).replace(/"/g, '&quot;') + ', this)">';
-            html += '<td><input type="radio" name="reassign_radio" value="' + b.id + '" ' + (isSelected ? 'checked' : '') + ' style="accent-color:var(--c2);"></td>';
-            html += '<td><strong>' + nomLabel + '</strong></td>';
-            html += '<td>' + dispoTags + '</td>';
-            html += '<td>' + (b.vehicule_type || '—') + '</td>';
-            html += '<td class="mono">' + (b.vehicule_capacite ? b.vehicule_capacite + ' kg' : '—') + '</td>';
-            html += '<td>' + routeLabel + '</td>';
-            html += '</tr>';
-        });
-
-        html += '</tbody></table>';
-        wrap.innerHTML = html;
-    }
-
-    function selectionnerBenevoleReassign(benevole, tr) {
-        _benevoleReassign = benevole;
-        document.querySelectorAll('#benevoles-reassign-wrap tbody tr').forEach(function (row) {
-            row.classList.remove('selected');
-        });
-        tr.classList.add('selected');
-        var radio = tr.querySelector('input[type="radio"]');
-        if (radio) radio.checked = true;
-
-        var summary = document.getElementById('reassign-summary');
-        summary.style.display = 'flex';
-        document.getElementById('reassign-selected-nom').textContent = benevole.prenom + ' ' + benevole.nom;
-        document.getElementById('reassign-selected-vehicule').textContent =
-            (benevole.vehicule_type || '—') + ' · ' + (benevole.vehicule_capacite || '—') + ' kg';
-        majBoutonExecuter();
-    }
-
-    // ============================================================
-    // BÉNÉVOLES — DIVISION (checkbox)
-    // ============================================================
-
-    function filtrerBenevolesplit() {
-        var filtres = _benevolesFiltres('filtre-dispo-split');
-        document.getElementById('benevoles-split-counter').textContent =
-            filtres.length + ' bénévole' + (filtres.length > 1 ? 's' : '');
-        renderBenevolesplit(filtres);
-    }
-
-    function renderBenevolesplit(benevoles) {
-        var wrap = document.getElementById('benevoles-split-wrap');
-
-        if (benevoles.length === 0) {
-            wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);">Aucun bénévole disponible</div>';
-            return;
-        }
-
-        var html = '<table class="sel-table"><thead><tr>';
-        html += '<th></th><th>Bénévole</th><th>Disponibilités</th><th>Véhicule</th><th>Capacité</th><th>Route aujourd\'hui</th>';
-        html += '</tr></thead><tbody>';
-
-        benevoles.forEach(function (b) {
-            var isChecked = _benevolesplit.has(String(b.id));
-            var dispoTags = (b.disponibilites || []).map(function (d) {
-                return '<span class="dispo-tag">' + d + '</span>';
-            }).join('') || '<span class="text-muted" style="font-size:11px;">—</span>';
-
-            var routeLabel = b.has_route_today
-                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fef3c7;color:#d97706;">' + (b.route_statut || '?') + '</span>'
-                : '<span class="text-muted" style="font-size:12px;">—</span>';
-
-            var nomLabel = b.prenom + ' ' + b.nom;
-            if (b.admin) nomLabel += ' <span class="admin-badge">admin</span>';
-            if (b.is_tmp_vehicle) nomLabel += ' 🔑';
-
-            html += '<tr class="' + (isChecked ? 'selected' : '') + '" onclick="toggleBenevolesplit(\'' + b.id + '\', this)">';
-            html += '<td><input type="checkbox" class="split-cb" value="' + b.id + '" ' + (isChecked ? 'checked' : '') + ' style="accent-color:var(--c2);" onclick="event.stopPropagation(); toggleBenevolesplit(\'' + b.id + '\', this.closest(\'tr\'))"></td>';
-            html += '<td><strong>' + nomLabel + '</strong></td>';
-            html += '<td>' + dispoTags + '</td>';
-            html += '<td>' + (b.vehicule_type || '—') + '</td>';
-            html += '<td class="mono">' + (b.vehicule_capacite ? b.vehicule_capacite + ' kg' : '—') + '</td>';
-            html += '<td>' + routeLabel + '</td>';
-            html += '</tr>';
-        });
-
-        html += '</tbody></table>';
-        wrap.innerHTML = html;
-        majSommaireSplit();
-    }
-
-    function toggleBenevolesplit(id, tr) {
-        var sid = String(id);
-        if (_benevolesplit.has(sid)) {
-            _benevolesplit.delete(sid);
-            tr.classList.remove('selected');
-            var cb = tr.querySelector('.split-cb');
-            if (cb) cb.checked = false;
-        } else {
-            _benevolesplit.add(sid);
-            tr.classList.add('selected');
-            var cb = tr.querySelector('.split-cb');
-            if (cb) cb.checked = true;
-        }
-        majSommaireSplit();
-        majBoutonExecuter();
-    }
-
-    function majSommaireSplit() {
-        document.getElementById('split-selected-count').textContent = _benevolesplit.size;
-    }
-
-    function majBoutonExecuter() {
-        var actif = false;
-        if (_actionChoisie === 'reassign') actif = !!_benevoleReassign;
-        if (_actionChoisie === 'split') actif = _benevolesplit.size >= 2;
-        document.getElementById('btnExecuter').disabled = !actif;
-    }
-
-    // ============================================================
-    // EXÉCUTION
-    // ============================================================
-
-    function executer() {
-        if (_actionChoisie === 'reassign') executerReassign();
-        else if (_actionChoisie === 'split') executerSplit();
-    }
-
-    function executerReassign() {
-        if (!_benevoleReassign) { showAlert(2, 'Veuillez sélectionner un bénévole.'); return; }
-        afficherChargement('Réassignation en cours…');
-        google.script.run
-            .withSuccessHandler(function (result) {
-                renderResultatsReassign(result);
-                afficherResultats();
-            })
-            .withFailureHandler(function (e) {
-                document.getElementById('loadingState').style.display = 'none';
-                document.getElementById('stepNav').style.display = '';
-                document.getElementById('step2').style.display = 'flex';
-                showAlert(2, 'Erreur : ' + e.message);
-            })
-            .reassignRouteFromForm({
-                id_route: _routeSelectionnee.id_route,
-                id_benevole: _benevoleReassign.id
-            });
-    }
-
-    function executerSplit() {
-        if (_benevolesplit.size < 2) { showAlert(2, 'Sélectionnez au moins 2 bénévoles pour diviser la route.'); return; }
-        afficherChargement('Division de la route en cours…');
-        google.script.run
-            .withSuccessHandler(function (result) {
-                renderResultatsSplit(result);
-                afficherResultats();
-            })
-            .withFailureHandler(function (e) {
-                document.getElementById('loadingState').style.display = 'none';
-                document.getElementById('stepNav').style.display = '';
-                document.getElementById('step2').style.display = 'flex';
-                showAlert(2, 'Erreur : ' + e.message);
-            })
-            .splitRouteFromForm({
-                id_route: _routeSelectionnee.id_route,
-                benevole_ids: Array.from(_benevolesplit)
-            });
-    }
-
-    // ============================================================
-    // AFFICHAGE RÉSULTATS
-    // ============================================================
-
-    function renderResultatsReassign(result) {
-        document.getElementById('res-titre').textContent = '✅ Route réassignée';
-        document.getElementById('res-sous-titre').textContent =
-            'Route ' + result.id_route + ' → ' + result.benevole_nom;
-
-        var html = '<div class="kpi-grid">';
-        html += '<div class="kpi-card"><div class="kpi-card__value">' + result.id_route + '</div><div class="kpi-card__label">Route</div></div>';
-        html += '<div class="kpi-card"><div class="kpi-card__value">' + result.nb_livraisons + '</div><div class="kpi-card__label">Livraisons</div></div>';
-        html += '<div class="kpi-card"><div class="kpi-card__value">' + Math.round(result.poids_total_kg) + ' kg</div><div class="kpi-card__label">Poids</div></div>';
-        html += '<div class="kpi-card"><div class="kpi-card__value">' + Math.round(result.distance_totale_km * 10) / 10 + ' km</div><div class="kpi-card__label">Distance</div></div>';
-        html += '</div>';
-
-        if (result.nb_surplus > 0) {
-            html += '<div class="alert alert--warning alert--visible" style="margin-bottom:12px;">⚠️ ' + result.nb_surplus + ' livraison(s) remise(s) en Non Assignée (capacité insuffisante).</div>';
-        }
-        if (result.nb_extras > 0) {
-            html += '<div class="alert alert--info alert--visible" style="margin-bottom:12px;">ℹ️ ' + result.nb_extras + ' livraison(s) proche(s) ajoutée(s) grâce au véhicule plus grand.</div>';
-        }
-        if (result.email_envoye) {
-            html += '<div class="alert alert--success alert--visible" style="margin-bottom:12px;">📧 Email renvoyé au nouveau bénévole.</div>';
-        }
-        if (result.lien_maps) {
-            html += '<a href="' + result.lien_maps + '" target="_blank" class="link-btn">🗺️ Voir l\'itinéraire Google Maps</a>';
-        }
-
-        document.getElementById('res-body').innerHTML = html;
-    }
-
-    function renderResultatsSplit(result) {
-        document.getElementById('res-titre').textContent = '✅ Route divisée';
-        document.getElementById('res-sous-titre').textContent =
-            'Route ' + result.id_route_originale + ' annulée · ' + result.nouvelles_routes.length + ' nouvelle(s) route(s) créée(s)';
-
-        var html = '';
-
-        if (result.nb_non_assignees > 0) {
-            html += '<div class="alert alert--warning alert--visible" style="margin-bottom:12px;">⚠️ ' + result.nb_non_assignees + ' livraison(s) remise(s) en Non Assignée (capacité insuffisante).</div>';
-        }
-
-        html += '<div class="data-table-wrap"><div class="data-table-title">📋 Nouvelles routes créées</div>';
-        html += '<table class="data-table"><thead><tr><th>Route</th><th>Bénévole</th><th>Livraisons</th><th>Poids</th><th>Distance</th><th>Email</th><th>Maps</th></tr></thead><tbody>';
-
-        result.nouvelles_routes.forEach(function (r) {
-            html += '<tr>';
-            html += '<td><span class="mono badge badge--cyan">' + r.id_route + '</span></td>';
-            html += '<td><strong>' + r.benevole_nom + '</strong></td>';
-            html += '<td class="mono">' + r.nb_livraisons + '</td>';
-            html += '<td class="mono">' + Math.round(r.poids_total_kg) + ' kg</td>';
-            html += '<td class="mono">' + Math.round(r.distance_totale_km * 10) / 10 + ' km</td>';
-            html += '<td>' + (r.email_envoye ? '📧 Envoyé' : '—') + '</td>';
-            html += '<td>' + (r.lien_maps ? '<a href="' + r.lien_maps + '" target="_blank" style="color:var(--c2);font-weight:600;">🗺️</a>' : '—') + '</td>';
-            html += '</tr>';
-        });
-
-        html += '</tbody></table></div>';
-        document.getElementById('res-body').innerHTML = html;
-    }
-
-    // ============================================================
-    // UTILITAIRES
-    // ============================================================
-
-    function showAlert(step, msg) {
-        var el = document.getElementById('alert-error-' + step);
-        if (!el) return;
-        el.textContent = msg;
-        el.classList.add('alert--visible', 'alert--error');
-        setTimeout(function () { el.classList.remove('alert--visible'); }, 6000);
-    }
+  function showAlert(step, msg) {
+    var el = document.getElementById("alert-error-" + step);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add("alert--visible", "alert--error");
+    setTimeout(function () {
+      el.classList.remove("alert--visible");
+    }, 6000);
+  }
 </script>

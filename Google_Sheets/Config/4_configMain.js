@@ -9,33 +9,33 @@
  * @const {Object}
  */
 const CONFIG = {
-    // APIs
-    ...CONFIG_APIS,
+  // APIs
+  ...CONFIG_APIS,
 
-    // HQ et réseau
-    ...CONFIG_HQ,
+  // HQ et réseau
+  ...CONFIG_HQ,
 
-    // Optimisation routes
-    ROUTE_OPTIMIZATION: CONFIG_ROUTE_OPTIMIZATION,
+  // Optimisation routes
+  ROUTE_OPTIMIZATION: CONFIG_ROUTE_OPTIMIZATION,
 
-    // Sheets
-    ...CONFIG_SHEETS,
+  // Sheets
+  ...CONFIG_SHEETS,
 
-    // Drive
-    DRIVE: CONFIG_DRIVE,
+  // Drive
+  DRIVE: CONFIG_DRIVE,
 
-    // Email
-    EMAIL: CONFIG_EMAIL,
+  // Email
+  EMAIL: CONFIG_EMAIL,
 
-    // Tokens et Labels
-    TOKENS: CONFIG_TOKENS,
-    LABELS: CONFIG_LABELS,
+  // Tokens et Labels
+  TOKENS: CONFIG_TOKENS,
+  LABELS: CONFIG_LABELS,
 
-    // Énumérations
-    ENUMS: CONFIG_ENUMS,
+  // Énumérations
+  ENUMS: CONFIG_ENUMS,
 
-    // UI
-    ...CONFIG_UI
+  // UI
+  ...CONFIG_UI,
 };
 
 /**
@@ -43,10 +43,10 @@ const CONFIG = {
  * @returns {boolean}
  */
 function isApiConfigured() {
-    const famillesKey = CONFIG.API_FAMILLES.KEY;
-    const benevolesKey = CONFIG.API_BENEVOLES.KEY;
-    const geoKey = CONFIG.API_GEO.KEY;
-    return !!(famillesKey && benevolesKey && geoKey);
+  const famillesKey = CONFIG.API_FAMILLES.KEY;
+  const benevolesKey = CONFIG.API_BENEVOLES.KEY;
+  const geoKey = CONFIG.API_GEO.KEY;
+  return !!(famillesKey && benevolesKey && geoKey);
 }
 
 /**
@@ -55,8 +55,8 @@ function isApiConfigured() {
  * @param {string} value - Nouvelle valeur
  */
 function setConfigProperty(key, value) {
-    PropertiesService.getScriptProperties().setProperty(key, value);
-    Logger.log(`[CONFIG] Propriété mise à jour: ${key} = ${value}`);
+  PropertiesService.getScriptProperties().setProperty(key, value);
+  Logger.log(`[CONFIG] Propriété mise à jour: ${key} = ${value}`);
 }
 
 /**
@@ -65,5 +65,5 @@ function setConfigProperty(key, value) {
  * @returns {string|null}
  */
 function getConfigProperty(key) {
-    return PropertiesService.getScriptProperties().getProperty(key);
+  return PropertiesService.getScriptProperties().getProperty(key);
 }

@@ -7,20 +7,20 @@
 function showGenerateDeliveriesForm() {
   if (!isApiConfigured()) {
     SpreadsheetApp.getUi().alert(
-      'Configuration Manquante',
+      "Configuration Manquante",
       CONFIG.MESSAGES.ERROR_API_KEY_MISSING,
-      SpreadsheetApp.getUi().ButtonSet.OK
+      SpreadsheetApp.getUi().ButtonSet.OK,
     );
     return;
   }
 
-  const html = HtmlService.createTemplateFromFile('ui/deliveryForm')
+  const html = HtmlService.createTemplateFromFile("ui/deliveryForm")
     .evaluate()
     .setWidth(1200)
     .setHeight(800)
-    .setTitle('📦 Générer des Livraisons');
+    .setTitle("📦 Générer des Livraisons");
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Générer des Livraisons');
+  SpreadsheetApp.getUi().showModalDialog(html, "Générer des Livraisons");
 }
 
 function viewAllDeliveries() {
@@ -43,14 +43,13 @@ function viewAllDeliveries() {
       message += `Distance Moyenne : ${stats.averageDistance} km\n`;
     }
 
-    ui.alert('Statistiques des Livraisons', message, ui.ButtonSet.OK);
+    ui.alert("Statistiques des Livraisons", message, ui.ButtonSet.OK);
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(CONFIG.SHEETS.LIVRAISON);
     if (sheet) ss.setActiveSheet(sheet);
-
   } catch (error) {
-    ui.alert('Erreur', error.message, ui.ButtonSet.OK);
+    ui.alert("Erreur", error.message, ui.ButtonSet.OK);
   }
 }
 
@@ -58,9 +57,9 @@ function searchDelivery() {
   const ui = SpreadsheetApp.getUi();
 
   const response = ui.prompt(
-    'Rechercher une Livraison',
-    'Entrez l\'ID de la livraison (ex: L001) ou l\'ID de la famille :',
-    ui.ButtonSet.OK_CANCEL
+    "Rechercher une Livraison",
+    "Entrez l'ID de la livraison (ex: L001) ou l'ID de la famille :",
+    ui.ButtonSet.OK_CANCEL,
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) return;
@@ -68,7 +67,7 @@ function searchDelivery() {
   const searchTerm = response.getResponseText().trim();
 
   if (!searchTerm) {
-    ui.alert('Erreur', 'Veuillez entrer un ID de recherche', ui.ButtonSet.OK);
+    ui.alert("Erreur", "Veuillez entrer un ID de recherche", ui.ButtonSet.OK);
     return;
   }
 
@@ -83,7 +82,11 @@ function searchDelivery() {
     }
 
     if (!delivery) {
-      ui.alert('Introuvable', `Aucune livraison trouvée pour "${searchTerm}"`, ui.ButtonSet.OK);
+      ui.alert(
+        "Introuvable",
+        `Aucune livraison trouvée pour "${searchTerm}"`,
+        ui.ButtonSet.OK,
+      );
       return;
     }
 
@@ -93,9 +96,9 @@ function searchDelivery() {
     message += `Quartier : ${delivery.id_quartier}\n`;
     message += `Adresse : ${delivery.adresse}\n`;
     message += `Personnes : ${delivery.nombre_personnes}\n`;
-    message += `Avec enfant : ${delivery.avec_enfant ? 'Oui' : 'Non'}\n`;
+    message += `Avec enfant : ${delivery.avec_enfant ? "Oui" : "Non"}\n`;
     message += `Statut : ${delivery.statut}\n`;
-    message += `Conditionnement : ${delivery.statut_conditionnement || 'En attente'}\n`;
+    message += `Conditionnement : ${delivery.statut_conditionnement || "En attente"}\n`;
     message += `Priorité : ${delivery.priorite}\n`;
     message += `Type : ${delivery.type_aide}\n`;
 
@@ -103,17 +106,18 @@ function searchDelivery() {
       message += `\nBesoins spéciaux :\n${delivery.besoins_speciaux}\n`;
     }
 
-    ui.alert('Détails de la Livraison', message, ui.ButtonSet.OK);
+    ui.alert("Détails de la Livraison", message, ui.ButtonSet.OK);
 
     const sheet = getSheet(CONFIG.SHEETS.LIVRAISON);
     const rowIndex = delivery._rowIndex;
     if (rowIndex) {
-      sheet.setActiveRange(sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()));
+      sheet.setActiveRange(
+        sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()),
+      );
       SpreadsheetApp.getActiveSpreadsheet().setActiveSheet(sheet);
     }
-
   } catch (error) {
-    ui.alert('Erreur', error.message, ui.ButtonSet.OK);
+    ui.alert("Erreur", error.message, ui.ButtonSet.OK);
   }
 }
 
@@ -121,9 +125,9 @@ function updateDeliveryStatuses() {
   const ui = SpreadsheetApp.getUi();
 
   const response = ui.alert(
-    'Mettre à Jour les Statuts',
-    'Cette fonction permet de synchroniser les statuts des livraisons.\n\nContinuer ?',
-    ui.ButtonSet.YES_NO
+    "Mettre à Jour les Statuts",
+    "Cette fonction permet de synchroniser les statuts des livraisons.\n\nContinuer ?",
+    ui.ButtonSet.YES_NO,
   );
 
   if (response !== ui.Button.YES) return;
@@ -131,16 +135,16 @@ function updateDeliveryStatuses() {
   try {
     const stats = countDeliveriesByStatus();
 
-    let message = 'Statuts actuels :\n\n';
+    let message = "Statuts actuels :\n\n";
     Object.entries(stats).forEach(([status, count]) => {
       message += `${status} : ${count}\n`;
     });
 
-    message += '\nLes statuts sont mis à jour automatiquement lors de la gestion des routes.';
-    ui.alert('Statuts des Livraisons', message, ui.ButtonSet.OK);
-
+    message +=
+      "\nLes statuts sont mis à jour automatiquement lors de la gestion des routes.";
+    ui.alert("Statuts des Livraisons", message, ui.ButtonSet.OK);
   } catch (error) {
-    ui.alert('Erreur', error.message, ui.ButtonSet.OK);
+    ui.alert("Erreur", error.message, ui.ButtonSet.OK);
   }
 }
 
@@ -148,13 +152,13 @@ function updateDeliveryStatuses() {
  * Ouvre le formulaire de génération de la feuille de conditionnement.
  */
 function showPackagingForm() {
-  const html = HtmlService.createTemplateFromFile('ui/packagingForm')
+  const html = HtmlService.createTemplateFromFile("ui/packagingForm")
     .evaluate()
     .setWidth(1200)
     .setHeight(800)
-    .setTitle('📦 Feuille de Préparation');
+    .setTitle("📦 Feuille de Préparation");
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Feuille de Préparation');
+  SpreadsheetApp.getUi().showModalDialog(html, "Feuille de Préparation");
 }
 
 /**
@@ -164,7 +168,9 @@ function showPackagingForm() {
  */
 function generatePackagingSheetFromForm(params) {
   try {
-    Logger.log(`[MENU] 📦 Génération feuille conditionnement: ${JSON.stringify(params)}`);
+    Logger.log(
+      `[MENU] 📦 Génération feuille conditionnement: ${JSON.stringify(params)}`,
+    );
     return generatePackagingSheet(params);
   } catch (error) {
     Logger.log(`[MENU] ❌ Erreur: ${error.message}`);
@@ -180,11 +186,10 @@ function getQuartiersForDeliveryForm() {
       return [];
     }
 
-    return response.quartiers.map(q => ({
+    return response.quartiers.map((q) => ({
       id: q.id,
-      nom: q.nom
+      nom: q.nom,
     }));
-
   } catch (error) {
     Logger.log(`[FORM] ❌ Erreur récupération quartiers: ${error.message}`);
     return [];
@@ -198,7 +203,7 @@ function getQuartiersForDeliveryForm() {
  */
 function generateDeliveriesFromForm(filters) {
   try {
-    Logger.log('[FORM] 📝 Génération depuis formulaire...');
+    Logger.log("[FORM] 📝 Génération depuis formulaire...");
     Logger.log(`[FORM] Filtres: ${JSON.stringify(filters)}`);
 
     const result = generateDeliveries(filters);
@@ -206,10 +211,11 @@ function generateDeliveriesFromForm(filters) {
     // Strip heavy deliveries array before sending back to UI
     const { deliveries, ...lightResult } = result;
 
-    Logger.log(`[FORM] ✅ Génération terminée: ${lightResult.created} créées, ${lightResult.skipped} ignorées`);
+    Logger.log(
+      `[FORM] ✅ Génération terminée: ${lightResult.created} créées, ${lightResult.skipped} ignorées`,
+    );
 
     return lightResult;
-
   } catch (error) {
     Logger.log(`[FORM] ❌ Erreur: ${error.message}`);
     throw error;
