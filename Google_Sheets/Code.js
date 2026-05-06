@@ -6,7 +6,8 @@ function onOpen() {
     .addSubMenu(
       ui
         .createMenu("📋 Livraisons")
-        .addItem("➕ Générer Livraisons", "showGenerateDeliveriesForm")
+        .addItem("➕ Générer Livraisons - Auto", "showGenerateDeliveriesForm")
+        .addItem("➕ Générer Livraisons - Manuellement", "showManualDeliveryForm")
         .addSeparator()
         .addItem("📊 Voir Toutes les Livraisons", "viewAllDeliveries")
         .addItem("🔍 Rechercher Livraison", "searchDelivery")
@@ -41,10 +42,7 @@ function onOpen() {
         .addItem("📧 Configurer Emails", "showEmailConfig")
         .addSeparator()
         .addItem("🏢 Adresse QG (Headquarters)", "showHqAddressConfig")
-        .addItem(
-          "🎛️ Paramètres Optimisation Routes",
-          "showRouteOptimizationConfig",
-        )
+        .addItem("🎛️ Paramètres Optimisation Routes", "showRouteOptimizationConfig")
         .addSeparator()
         .addItem("🚗 Gérer Véhicules Temporaires", "ouvrirGestionVehiculesTmp")
         .addSeparator()

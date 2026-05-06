@@ -1,0 +1,486 @@
+<script>
+  var _etapeCourante = 1;
+  var _toutesLessFamilles = [];
+  var _famillesSelectionnees = new Map();
+  var _tabActif = 'liste';
+
+  var PRIO_COULEURS = {
+    1: '#ef4444',
+    2: '#f97316',
+    3: '#eab308',
+    4: '#3b82f6',
+    5: '#94a3b8',
+  };
+
+  window.addEventListener('load', function () {
+    var demain = new Date();
+    demain.setDate(demain.getDate() + 1);
+    document.getElementById('date_livraison').value = demain.toISOString().split('T')[0];
+    chargerFamilles();
+  });
+
+  // ============================================================
+  // NAVIGATION
+  // ============================================================
+
+  function goToStep(n) {
+    document.getElementById('step' + _etapeCourante).style.display = 'none';
+    document.getElementById('step' + _etapeCourante).classList.remove('active');
+    _etapeCourante = n;
+    var panel = document.getElementById('step' + n);
+    panel.style.display = 'flex';
+    panel.classList.add('active');
+    [1, 2, 3].forEach(function (i) {
+      var btn = document.getElementById('stepBtn' + i);
+      btn.classList.remove('active', 'done');
+      if (i < n) btn.classList.add('done');
+      if (i === n) btn.classList.add('active');
+    });
+  }
+
+  function setState(s) {
+    ['step1', 'step2', 'step3'].forEach(function (id) {
+      document.getElementById(id).style.display = 'none';
+      document.getElementById(id).classList.remove('active');
+    });
+    document.getElementById('stepNav').style.display =
+      s === 'loading' || s === 'results' ? 'none' : '';
+    document.getElementById('loadingState').style.display = s === 'loading' ? 'flex' : 'none';
+    document
+      .getElementById('resultsState')
+      .classList.toggle('results-state--visible', s === 'results');
+    if (s === 'nav') goToStep(_etapeCourante);
+  }
+
+  // ============================================================
+  // ÉTAPE 1 — VALIDATION PARAMÈTRES
+  // ============================================================
+
+  function validerEtape1() {
+    var date = document.getElementById('date_livraison').value;
+    if (!date) {
+      showAlert(1, 'Veuillez sélectionner une date.');
+      return;
+    }
+    var types = Array.from(document.querySelectorAll('input[name="type_aide"]:checked'));
+    if (types.length === 0) {
+      showAlert(1, "Veuillez sélectionner au moins un type d'aide.");
+      return;
+    }
+    document.getElementById('stepBtn2').disabled = false;
+    goToStep(2);
+  }
+
+  // ============================================================
+  // ÉTAPE 2 — CHARGEMENT ET AFFICHAGE FAMILLES
+  // ============================================================
+
+  function chargerFamilles() {
+    google.script.run
+      .withSuccessHandler(function (familles) {
+        _toutesLessFamilles = familles;
+        peuplerFiltreQuartier(familles);
+        filtrerFamilles();
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById('families-wrap').innerHTML =
+          '<div style="padding:20px;text-align:center;color:var(--error-text);">Erreur : ' +
+          e.message +
+          '</div>';
+      })
+      .getAllFamiliesForManualForm();
+  }
+
+  function peuplerFiltreQuartier(familles) {
+    var quartiers = {};
+    familles.forEach(function (f) {
+      if (f.idQuartier) quartiers[f.idQuartier] = true;
+    });
+    var sel = document.getElementById('filtre-quartier-famille');
+    Object.keys(quartiers)
+      .sort()
+      .forEach(function (q) {
+        var opt = document.createElement('option');
+        opt.value = q;
+        opt.textContent = q;
+        sel.appendChild(opt);
+      });
+  }
+
+  function filtrerFamilles() {
+    var recherche = document.getElementById('recherche-famille').value.toLowerCase();
+    var quartier = document.getElementById('filtre-quartier-famille').value;
+    var prio = document.getElementById('filtre-prio-famille').value;
+
+    var filtrees = _toutesLessFamilles.filter(function (f) {
+      if (quartier && f.idQuartier !== quartier) return false;
+      if (prio && String(f.criticite) !== prio) return false;
+      if (recherche) {
+        var hay = (f.id + ' ' + f.nom + ' ' + f.prenom + ' ' + f.adresse).toLowerCase();
+        if (!hay.includes(recherche)) return false;
+      }
+      return true;
+    });
+
+    renderFamilles(filtrees);
+  }
+
+  function renderFamilles(familles) {
+    var wrap = document.getElementById('families-wrap');
+    document.getElementById('famille-counter').textContent =
+      familles.length + ' famille' + (familles.length > 1 ? 's' : '');
+
+    if (familles.length === 0) {
+      wrap.innerHTML =
+        '<div class="empty-state" style="padding:40px;">' +
+        '<div class="empty-state__icon">📭</div>' +
+        '<h3>Aucune famille</h3>' +
+        '<p>Modifiez les filtres pour afficher des résultats.</p>' +
+        '</div>';
+      return;
+    }
+
+    var html = '<table class="sel-table"><thead><tr>';
+    html +=
+      '<th></th><th>ID</th><th>Nom</th><th>Adresse</th><th>Quartier</th><th>Prio.</th><th>Personnes</th>';
+    html += '</tr></thead><tbody>';
+
+    familles.forEach(function (f) {
+      var isChecked = _famillesSelectionnees.has(f.id);
+      var couleur = PRIO_COULEURS[f.criticite] || '#94a3b8';
+      var total = (f.nombreAdulte || 0) + (f.nombreEnfant || 0);
+
+      html +=
+        '<tr class="' +
+        (isChecked ? 'selected' : '') +
+        '" onclick="toggleFamille(\'' +
+        f.id +
+        "', this)\">";
+      html +=
+        '<td><input type="checkbox" class="famille-cb" value="' +
+        f.id +
+        '" ' +
+        (isChecked ? 'checked' : '') +
+        ' style="accent-color:var(--c2);" onclick="event.stopPropagation(); toggleFamille(\'' +
+        f.id +
+        "', this.closest('tr'))\"></td>";
+      html += '<td class="mono">' + f.id + '</td>';
+      html += '<td><strong>' + (f.prenom || '') + ' ' + (f.nom || '') + '</strong></td>';
+      html +=
+        '<td style="font-size:12px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        f.adresse +
+        '</td>';
+      html += '<td>' + (f.idQuartier || '—') + '</td>';
+      html +=
+        '<td><span class="prio-dot" style="background:' +
+        couleur +
+        '"></span>' +
+        f.criticite +
+        '</td>';
+      html += '<td class="mono">' + total + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    majCompteurSelection();
+  }
+
+  function toggleFamille(id, tr) {
+    var famille = _toutesLessFamilles.find(function (f) {
+      return f.id === id;
+    });
+    if (!famille) return;
+
+    if (_famillesSelectionnees.has(id)) {
+      _famillesSelectionnees.delete(id);
+      tr.classList.remove('selected');
+      var cb = tr.querySelector('.famille-cb');
+      if (cb) cb.checked = false;
+    } else {
+      _famillesSelectionnees.set(id, famille);
+      tr.classList.add('selected');
+      var cb = tr.querySelector('.famille-cb');
+      if (cb) cb.checked = true;
+    }
+    majCompteurSelection();
+  }
+
+  function toggleToutesFamilles(checked) {
+    var filtrees = getFamillesFiltrees();
+    filtrees.forEach(function (f) {
+      if (checked) _famillesSelectionnees.set(f.id, f);
+      else _famillesSelectionnees.delete(f.id);
+    });
+    filtrerFamilles();
+  }
+
+  function getFamillesFiltrees() {
+    var recherche = document.getElementById('recherche-famille').value.toLowerCase();
+    var quartier = document.getElementById('filtre-quartier-famille').value;
+    var prio = document.getElementById('filtre-prio-famille').value;
+
+    return _toutesLessFamilles.filter(function (f) {
+      if (quartier && f.idQuartier !== quartier) return false;
+      if (prio && String(f.criticite) !== prio) return false;
+      if (recherche) {
+        var hay = (f.id + ' ' + f.nom + ' ' + f.prenom + ' ' + f.adresse).toLowerCase();
+        if (!hay.includes(recherche)) return false;
+      }
+      return true;
+    });
+  }
+
+  function majCompteurSelection() {
+    var count = _famillesSelectionnees.size;
+    document.getElementById('familles-selected-count').textContent = count;
+    document.getElementById('btnStep2Next').disabled = count === 0;
+  }
+
+  // ============================================================
+  // ÉTAPE 2 — TAB SAISIE IDs
+  // ============================================================
+
+  function switchTab(tab) {
+    _tabActif = tab;
+    document.getElementById('tabBtnListe').classList.toggle('active', tab === 'liste');
+    document.getElementById('tabBtnIds').classList.toggle('active', tab === 'ids');
+    document.getElementById('tabListe').classList.toggle('active', tab === 'liste');
+    document.getElementById('tabIds').classList.toggle('active', tab === 'ids');
+  }
+
+  function validerIds() {
+    var textarea = document.getElementById('ids-textarea').value;
+    var lignes = textarea
+      .split('\n')
+      .map(function (l) {
+        return l.trim();
+      })
+      .filter(function (l) {
+        return l.length > 0;
+      });
+
+    if (lignes.length === 0) {
+      showAlert(2, 'Veuillez saisir au moins un ID.');
+      return;
+    }
+
+    var btn = document.getElementById('btn-valider-ids');
+    btn.disabled = true;
+    btn.textContent = '⏳ Validation…';
+
+    google.script.run
+      .withSuccessHandler(function (data) {
+        btn.disabled = false;
+        btn.textContent = '🔍 Valider les IDs';
+        data.valides.forEach(function (f) {
+          _famillesSelectionnees.set(f.id, f);
+        });
+        majCompteurSelection();
+        renderIdsResult(data);
+        document.getElementById('ids-result-wrap').style.display = '';
+      })
+      .withFailureHandler(function (e) {
+        btn.disabled = false;
+        btn.textContent = '🔍 Valider les IDs';
+        showAlert(2, 'Erreur : ' + e.message);
+      })
+      .validateFamilyIds(lignes);
+  }
+
+  function renderIdsResult(data) {
+    var html = '<table class="sel-table"><thead><tr>';
+    html += '<th>ID</th><th>Nom</th><th>Adresse</th><th>Statut</th>';
+    html += '</tr></thead><tbody>';
+
+    data.valides.forEach(function (f) {
+      html += '<tr>';
+      html += '<td class="mono">' + f.id + '</td>';
+      html += '<td>' + (f.prenom || '') + ' ' + (f.nom || '') + '</td>';
+      html +=
+        '<td style="font-size:12px;color:var(--muted);">' + f.adresse + '</td>';
+      html += '<td class="status-ok">✅ Valide</td>';
+      html += '</tr>';
+    });
+
+    data.introuvables.forEach(function (id) {
+      html += '<tr>';
+      html += '<td class="mono">' + id + '</td>';
+      html += '<td colspan="2" style="color:var(--muted);">—</td>';
+      html += '<td class="status-err">❌ Introuvable</td>';
+      html += '</tr>';
+    });
+
+    data.doublons.forEach(function (id) {
+      html += '<tr>';
+      html += '<td class="mono">' + id + '</td>';
+      html += '<td colspan="2" style="color:var(--muted);">—</td>';
+      html += '<td class="status-warn">⚠️ Doublon ignoré</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('ids-result-table').innerHTML = html;
+  }
+
+  // ============================================================
+  // ÉTAPE 2 — VALIDATION ET PASSAGE À L'ÉTAPE 3
+  // ============================================================
+
+  function validerEtape2() {
+    if (_famillesSelectionnees.size === 0) {
+      showAlert(2, 'Veuillez sélectionner au moins une famille.');
+      return;
+    }
+    document.getElementById('stepBtn3').disabled = false;
+    construireRecap();
+  }
+
+  // ============================================================
+  // ÉTAPE 3 — RÉCAPITULATIF ET VÉRIFICATION
+  // ============================================================
+
+  function construireRecap() {
+    var familles = Array.from(_famillesSelectionnees.values());
+    var date = document.getElementById('date_livraison').value;
+    var occasion = document.querySelector('input[name="occasion"]:checked').value;
+
+    document.getElementById('recap-box').innerHTML =
+      '<strong>Date :</strong> ' +
+      date +
+      ' &nbsp;·&nbsp; <strong>Occasion :</strong> ' +
+      occasion +
+      ' &nbsp;·&nbsp; <strong>Familles :</strong> ' +
+      familles.length;
+
+    setState('loading');
+    document.getElementById('loading-text').textContent = 'Vérification des livraisons actives…';
+
+    var ids = familles.map(function (f) {
+      return f.id;
+    });
+
+    google.script.run
+      .withSuccessHandler(function (activesIds) {
+        setState('nav');
+        goToStep(3);
+        renderReview(familles, activesIds);
+      })
+      .withFailureHandler(function (e) {
+        setState('nav');
+        showAlert(2, 'Erreur lors de la vérification : ' + e.message);
+      })
+      .checkActiveLivraisonsForFamilies(ids);
+  }
+
+  function renderReview(familles, activesIds) {
+    var activesSet = new Set(activesIds || []);
+    var eligible = 0;
+    var warn = 0;
+
+    var html = '';
+    familles.forEach(function (f) {
+      var total = (f.nombreAdulte || 0) + (f.nombreEnfant || 0);
+      var aActive = activesSet.has(f.id);
+      if (aActive) warn++;
+      else eligible++;
+
+      html += '<tr>';
+      html += '<td class="mono">' + f.id + '</td>';
+      html += '<td>' + (f.prenom || '') + ' ' + (f.nom || '') + '</td>';
+      html +=
+        '<td style="font-size:12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        f.adresse +
+        '</td>';
+      html += '<td class="mono">' + total + '</td>';
+
+      if (aActive) {
+        html += '<td class="status-warn">⚠️ Livraison active</td>';
+        html +=
+          '<td style="text-align:center;"><input type="checkbox" class="force-cb" data-id="' +
+          f.id +
+          '" title="Créer quand même" style="accent-color:var(--c2);width:15px;height:15px;cursor:pointer;"></td>';
+      } else {
+        html += '<td class="status-ok">✅ Éligible</td>';
+        html += '<td></td>';
+      }
+
+      html += '</tr>';
+    });
+
+    document.getElementById('review-tbody').innerHTML = html;
+    document.getElementById('rev-eligible').textContent = eligible;
+    document.getElementById('rev-warn').textContent = warn;
+    document.getElementById('rev-err').textContent = '0';
+  }
+
+  // ============================================================
+  // GÉNÉRATION FINALE
+  // ============================================================
+
+  function generer() {
+    var familles = Array.from(_famillesSelectionnees.values());
+
+    var forcedIds = new Set();
+    document.querySelectorAll('.force-cb:checked').forEach(function (cb) {
+      forcedIds.add(cb.dataset.id);
+    });
+
+    var famillesAvecForce = familles.map(function (f) {
+      return Object.assign({}, f, { _force: forcedIds.has(f.id) });
+    });
+
+    var params = {
+      families: famillesAvecForce,
+      date_livraison: document.getElementById('date_livraison').value,
+      occasion: document.querySelector('input[name="occasion"]:checked').value,
+      types_aide: Array.from(
+        document.querySelectorAll('input[name="type_aide"]:checked'),
+      ).map(function (cb) {
+        return cb.value;
+      }),
+    };
+
+    setState('loading');
+    document.getElementById('loading-text').textContent = 'Génération en cours…';
+
+    google.script.run
+      .withSuccessHandler(function (result) {
+        document.getElementById('res-created').textContent = result.created;
+        document.getElementById('res-skipped').textContent = result.skipped;
+        document.getElementById('res-forced').textContent = result.forced;
+        document.getElementById('res-errors').textContent = result.errors.length;
+
+        if (result.errors.length > 0) {
+          var ul = document.getElementById('res-error-list');
+          ul.innerHTML = result.errors
+            .map(function (e) {
+              return '<li>' + e + '</li>';
+            })
+            .join('');
+          document.getElementById('res-error-box').classList.remove('hidden');
+        }
+
+        setState('results');
+      })
+      .withFailureHandler(function (e) {
+        setState('nav');
+        showAlert(3, 'Erreur : ' + e.message);
+      })
+      .generateManualDeliveriesFromForm(params);
+  }
+
+  // ============================================================
+  // UTILITAIRES
+  // ============================================================
+
+  function showAlert(step, msg) {
+    var el = document.getElementById('alert-error-' + step);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('alert--visible', 'alert--error');
+    setTimeout(function () {
+      el.classList.remove('alert--visible');
+    }, 6000);
+  }
+</script>

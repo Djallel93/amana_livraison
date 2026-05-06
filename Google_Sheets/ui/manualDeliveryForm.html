@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+  <base target="_top" />
+  <meta charset="UTF-8" />
+  <?!= include('styles'); ?>
+  <style>
+    .step-nav {
+      display: flex;
+      border-bottom: 2px solid var(--border);
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+
+    .step-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      background: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .step-btn.active {
+      color: var(--c2);
+      border-bottom-color: var(--c2);
+    }
+
+    .step-btn.done {
+      color: #10b981;
+    }
+
+    .step-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .step-panel {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .step-panel.active {
+      display: flex;
+    }
+
+    .form-body-flex {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      padding: 16px 32px;
+    }
+
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 14px;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .tab-btn.active {
+      color: var(--c2);
+      border-bottom-color: var(--c2);
+    }
+
+    .tab-panel {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tab-panel.active {
+      display: flex;
+    }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .table-toolbar input[type="text"] {
+      padding: 6px 10px;
+      font-size: 13px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      width: 180px;
+    }
+
+    .table-toolbar input[type="text"]:focus {
+      outline: none;
+      border-color: var(--c1);
+    }
+
+    .table-toolbar select {
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      width: auto;
+    }
+
+    .table-wrap {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .sel-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .sel-table thead th {
+      background: var(--bg);
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .sel-table tbody tr {
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .sel-table tbody tr:hover {
+      background: var(--bg);
+    }
+
+    .sel-table tbody tr.selected {
+      background: rgba(0, 254, 207, 0.07);
+    }
+
+    .sel-table td {
+      padding: 8px 12px;
+      vertical-align: middle;
+    }
+
+    .sel-table td:first-child {
+      width: 36px;
+      text-align: center;
+    }
+
+    .prio-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .selection-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-2);
+      flex-shrink: 0;
+    }
+
+    .selection-bar .count {
+      color: var(--c2);
+      font-family: "DM Mono", monospace;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .review-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .review-table thead th {
+      background: var(--bg);
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .review-table tbody tr {
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .review-table td {
+      padding: 8px 12px;
+      vertical-align: middle;
+    }
+
+    .status-ok {
+      color: #065f46;
+      font-weight: 600;
+    }
+
+    .status-warn {
+      color: #92400e;
+      font-weight: 600;
+    }
+
+    .status-err {
+      color: #7f1d1d;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-wrap">
+    <div class="card" style="height: 100vh; max-height: 800px">
+      <div class="form-header">
+        <div class="form-header__icon">➕</div>
+        <div class="form-header__text">
+          <h1>Générer Livraisons - Manuellement</h1>
+          <p>Sélectionner les familles et paramétrer les livraisons</p>
+        </div>
+      </div>
+
+      <div class="step-nav" id="stepNav">
+        <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)">⚙️ Paramètres</button>
+        <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled>👨‍👩‍👧 Familles</button>
+        <button class="step-btn" id="stepBtn3" onclick="goToStep(3)" disabled>✅ Confirmation</button>
+      </div>
+
+      <!-- ═══════════ ÉTAPE 1 — PARAMÈTRES ═══════════ -->
+      <div class="step-panel active" id="step1">
+        <div class="form-body" style="overflow-y: auto; flex: 1">
+          <div id="alert-error-1" class="alert alert--error"></div>
+
+          <div class="form-section">
+            <div class="form-section__title">📅 Date et occasion</div>
+            <div class="form-group">
+              <label for="date_livraison">Date de livraison</label>
+              <input type="date" id="date_livraison" required />
+            </div>
+            <div class="form-group mb-0">
+              <label>Occasion</label>
+              <div class="radio-group">
+                <div class="checkbox-row" style="flex: none; padding: 8px 14px">
+                  <input type="radio" id="occ-zakat" name="occasion" value="zakat_el_fitr" checked />
+                  <label for="occ-zakat">🌙 Zakat El Fitr</label>
+                </div>
+                <div class="checkbox-row" style="flex: none; padding: 8px 14px">
+                  <input type="radio" id="occ-recolte" name="occasion" value="recolte" />
+                  <label for="occ-recolte">🌾 Récolte</label>
+                </div>
+                <div class="checkbox-row" style="flex: none; padding: 8px 14px">
+                  <input type="radio" id="occ-ponctuelle" name="occasion" value="ponctuelle" />
+                  <label for="occ-ponctuelle">📦 Ponctuelle</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section__title">💝 Types d'aide</div>
+            <div class="checkbox-grid">
+              <div class="checkbox-item">
+                <input type="checkbox" id="type-zakat" name="type_aide" value="zakat_el_fitr" />
+                <label for="type-zakat">🌙 Zakat El Fitr</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="type-ponctuelle" name="type_aide" value="ponctuelle" checked />
+                <label for="type-ponctuelle">💝 Ponctuelle</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="type-recolte" name="type_aide" value="recolte" />
+                <label for="type-recolte">🌾 Récolte</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="button" class="btn btn--secondary" onclick="google.script.host.close()">Annuler</button>
+          <button type="button" class="btn btn--primary" onclick="validerEtape1()">Suivant →</button>
+        </div>
+      </div>
+
+      <!-- ═══════════ ÉTAPE 2 — SÉLECTION FAMILLES ═══════════ -->
+      <div class="step-panel" id="step2">
+        <div class="form-body-flex">
+          <div id="alert-error-2" class="alert alert--error"></div>
+
+          <div class="tab-bar">
+            <button class="tab-btn active" id="tabBtnListe" onclick="switchTab('liste')">
+              📋 Sélectionner depuis la liste
+            </button>
+            <button class="tab-btn" id="tabBtnIds" onclick="switchTab('ids')">
+              ✏️ Saisir les IDs
+            </button>
+          </div>
+
+          <!-- TAB LISTE -->
+          <div class="tab-panel active" id="tabListe">
+            <div class="table-toolbar">
+              <input type="text" id="recherche-famille" placeholder="🔍 Rechercher…" oninput="filtrerFamilles()" />
+              <select id="filtre-quartier-famille" onchange="filtrerFamilles()">
+                <option value="">Tous les quartiers</option>
+              </select>
+              <select id="filtre-prio-famille" onchange="filtrerFamilles()">
+                <option value="">Toutes priorités</option>
+                <option value="1">1 — Urgent</option>
+                <option value="2">2 — Haute</option>
+                <option value="3">3 — Moyenne</option>
+                <option value="4">4 — Basse</option>
+                <option value="5">5 — Standard</option>
+              </select>
+              <div class="checkbox-row" style="flex: none; padding: 6px 12px"
+                onclick="document.getElementById('select-all-fam').click()">
+                <input type="checkbox" id="select-all-fam" onchange="toggleToutesFamilles(this.checked)" />
+                <label for="select-all-fam">Tout sélectionner</label>
+              </div>
+              <span class="text-muted" id="famille-counter" style="margin-left: auto; font-size: 12px"></span>
+            </div>
+            <div class="table-wrap" id="families-wrap">
+              <div class="loading-state loading-state--visible" style="padding: 32px 0">
+                <div class="spinner"></div>
+                <div class="loading-state__text">Chargement des familles…</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB IDs -->
+          <div class="tab-panel" id="tabIds" style="gap: 12px; padding-top: 4px">
+            <div class="form-group" style="flex-shrink: 0">
+              <label for="ids-textarea">IDs des familles (un par ligne)</label>
+              <textarea id="ids-textarea" style="height: 160px; font-family: 'DM Mono', monospace; font-size: 13px"
+                placeholder="FAM001&#10;FAM002&#10;FAM003"></textarea>
+              <div class="help-text">Un identifiant par ligne. Les doublons et espaces sont ignorés automatiquement.
+              </div>
+            </div>
+            <button type="button" class="btn btn--secondary" id="btn-valider-ids" onclick="validerIds()"
+              style="flex-shrink: 0; align-self: flex-start">
+              🔍 Valider les IDs
+            </button>
+            <div id="ids-result-wrap" style="flex: 1; overflow-y: auto; display: none">
+              <div class="table-wrap" id="ids-result-table"></div>
+            </div>
+          </div>
+
+          <div class="selection-bar">
+            <span>Familles sélectionnées :</span>
+            <span class="count" id="familles-selected-count">0</span>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="button" class="btn btn--secondary" onclick="goToStep(1)">← Retour</button>
+          <button type="button" class="btn btn--primary" id="btnStep2Next" onclick="validerEtape2()" disabled>
+            Suivant →
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══════════ ÉTAPE 3 — CONFIRMATION ═══════════ -->
+      <div class="step-panel" id="step3">
+        <div class="form-body-flex">
+          <div id="alert-error-3" class="alert alert--error"></div>
+          <div class="info-box" id="recap-box" style="margin-bottom: 12px; flex-shrink: 0"></div>
+          <div class="table-wrap">
+            <table class="review-table">
+              <thead>
+                <tr>
+                  <th>ID Famille</th>
+                  <th>Nom</th>
+                  <th>Adresse</th>
+                  <th>Personnes</th>
+                  <th>Statut</th>
+                  <th style="text-align: center">Forcer</th>
+                </tr>
+              </thead>
+              <tbody id="review-tbody"></tbody>
+            </table>
+          </div>
+          <div class="selection-bar" style="margin-top: 8px">
+            <span>✅ Éligibles :</span>
+            <span class="count" id="rev-eligible">0</span>
+            <span style="margin-left: 12px">⚠️ Livraison active :</span>
+            <span class="count" style="color: #d97706" id="rev-warn">0</span>
+            <span style="margin-left: 12px">❌ Introuvables :</span>
+            <span class="count" style="color: #ef4444" id="rev-err">0</span>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="button" class="btn btn--secondary" onclick="goToStep(2)">← Retour</button>
+          <button type="button" class="btn btn--primary" id="btnGenerer" onclick="generer()">
+            ✨ Générer les Livraisons
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══════════ CHARGEMENT ═══════════ -->
+      <div id="loadingState" class="loading-state" style="display: none">
+        <div class="spinner"></div>
+        <div class="loading-state__text" id="loading-text">Traitement en cours…</div>
+        <div class="loading-state__sub">Géocodage des adresses et création des livraisons</div>
+      </div>
+
+      <!-- ═══════════ RÉSULTATS ═══════════ -->
+      <div id="resultsState" class="results-state">
+        <div class="results-header">
+          <h2>✅ Livraisons générées</h2>
+        </div>
+        <div class="results-body">
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="res-created">0</div>
+              <div class="kpi-card__label">Créées</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="res-skipped">0</div>
+              <div class="kpi-card__label">Ignorées</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="res-forced">0</div>
+              <div class="kpi-card__label">Forcées</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card__value" id="res-errors">0</div>
+              <div class="kpi-card__label">Erreurs</div>
+            </div>
+          </div>
+          <div id="res-error-box" class="error-box hidden">
+            <div class="error-box__title">⚠️ Détails des erreurs</div>
+            <ul id="res-error-list"></ul>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button type="button" class="btn btn--primary" onclick="google.script.host.close()">Fermer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <?!= include('ui/scripts/manualDeliveryFormScript'); ?>
+</body>
+
+</html>
