@@ -1,13 +1,3 @@
-/**
- * ====================================================================
- * API_SERVICE.GS - Communication avec les APIs Externes
- * ====================================================================
- * Modifications :
- * - Cache utilisateur (CacheService.getUserCache) pour les bénévoles
- * - getVolunteersWithVehicle() utilise le cache utilisateur
- * - invalidateBenevolesCache() pour le bouton "Actualiser" des formulaires
- */
-
 class ApiError extends Error {
   constructor(message, statusCode = null, apiName = null) {
     super(message);
@@ -18,30 +8,13 @@ class ApiError extends Error {
   }
 }
 
-/**
- * Clé de cache utilisateur pour la liste des bénévoles avec véhicule.
- * @const {string}
- */
 const CACHE_KEY_BENEVOLES = "benevoles_with_vehicle";
 
 // ============================================================
 // APPEL API GÉNÉRIQUE
 // ============================================================
 
-/**
- * Appelle une URL avec retry exponentiel et cache script optionnel.
- * @param {string}  url
- * @param {Object}  options
- * @param {string|null} cacheKey
- * @param {number}  cacheDuration - En secondes
- * @returns {Object}
- */
-function callApiWithRetry(
-  url,
-  options = {},
-  cacheKey = null,
-  cacheDuration = 300,
-) {
+function callApiWithRetry(url, options = {}, cacheKey = null, cacheDuration = 300) {
   if (cacheKey) {
     const cached = getCachedResponse(cacheKey);
     if (cached) {
@@ -55,9 +28,7 @@ function callApiWithRetry(
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      Logger.log(
-        `[API] Tentative ${attempt}/${maxRetries} — ${url.substring(0, 60)}…`,
-      );
+      Logger.log(`[API] Tentative ${attempt}/${maxRetries} — ${url.substring(0, 60)}…`);
 
       const response = UrlFetchApp.fetch(url, {
         muteHttpExceptions: true,
@@ -68,20 +39,14 @@ function callApiWithRetry(
       const contentText = response.getContentText();
 
       if (statusCode < 200 || statusCode >= 300) {
-        throw new ApiError(
-          `Erreur HTTP ${statusCode}: ${contentText}`,
-          statusCode,
-        );
+        throw new ApiError(`Erreur HTTP ${statusCode}: ${contentText}`, statusCode);
       }
 
       let data;
       try {
         data = JSON.parse(contentText);
       } catch (parseError) {
-        throw new ApiError(
-          `Erreur parsing JSON: ${parseError.message}`,
-          statusCode,
-        );
+        throw new ApiError(`Erreur parsing JSON: ${parseError.message}`, statusCode);
       }
 
       if (cacheKey) setCachedResponse(cacheKey, data, cacheDuration);
@@ -104,19 +69,11 @@ function callApiWithRetry(
   );
 }
 
-/**
- * Construit une URL avec paramètres de requête.
- * @param {string} baseUrl
- * @param {Object} params
- * @returns {string}
- */
 function buildUrl(baseUrl, params = {}) {
   const queryParts = [];
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") {
-      queryParts.push(
-        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
-      );
+      queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
     }
   }
   if (queryParts.length === 0) return baseUrl;
@@ -152,35 +109,53 @@ function invalidateCache(key) {
   cache.remove(key);
 }
 
+/**
+ * Vide le cache en supprimant toutes les clés connues une par une.
+ * Apps Script ne permet pas de lister ou vider le cache globalement —
+ * on supprime explicitement les clés utilisées par l'application.
+ */
 function invalidateAllCache() {
-  cache.removeAll();
-  Logger.log("[CACHE] 🗑️ Tout le cache script invalidé");
+  const keysConnues = [
+    `families_${JSON.stringify({ includeHierarchy: false })}`,
+    "vehicle_types",
+    `quartiers_all`,
+    `volunteers_${JSON.stringify({})}`,
+    `available_Matin_false`,
+    `available_Après-midi_false`,
+    `available_Soir_false`,
+    `available_Matin_true`,
+    `available_Après-midi_true`,
+    `available_Soir_true`,
+    "villes_all",
+  ];
+
+  keysConnues.forEach((key) => {
+    try {
+      cache.remove(key);
+    } catch (e) {
+      Logger.log(`[CACHE] ⚠️ Impossible de supprimer la clé "${key}": ${e.message}`);
+    }
+  });
+
+  invalidateBenevolesCache();
+
+  Logger.log(`[CACHE] 🗑️ ${keysConnues.length + 1} clé(s) de cache supprimée(s)`);
 }
 
 // ============================================================
 // CACHE UTILISATEUR (bénévoles)
 // ============================================================
 
-/**
- * Retourne le cache utilisateur (par admin connecté).
- * @returns {GoogleAppsScript.Cache.Cache}
- */
 function getUserCache() {
   return CacheService.getUserCache();
 }
 
-/**
- * Récupère les bénévoles depuis le cache utilisateur.
- * @returns {Array|null}
- */
 function getBenevolesCaches() {
   try {
     const cached = getUserCache().get(CACHE_KEY_BENEVOLES);
     if (!cached) return null;
     const data = JSON.parse(cached);
-    Logger.log(
-      `[CACHE] 👤 Bénévoles récupérés depuis le cache utilisateur (${data.length})`,
-    );
+    Logger.log(`[CACHE] 👤 Bénévoles récupérés depuis le cache utilisateur (${data.length})`);
     return data;
   } catch (e) {
     Logger.log(`[CACHE] ⚠️ Erreur lecture cache bénévoles: ${e.message}`);
@@ -188,10 +163,6 @@ function getBenevolesCaches() {
   }
 }
 
-/**
- * Sauvegarde les bénévoles dans le cache utilisateur.
- * @param {Array} benevoles
- */
 function setBenevolesCaches(benevoles) {
   try {
     getUserCache().put(
@@ -199,18 +170,12 @@ function setBenevolesCaches(benevoles) {
       JSON.stringify(benevoles),
       CONFIG.API_BENEVOLES.CACHE_DURATION,
     );
-    Logger.log(
-      `[CACHE] 👤 ${benevoles.length} bénévole(s) mis en cache utilisateur`,
-    );
+    Logger.log(`[CACHE] 👤 ${benevoles.length} bénévole(s) mis en cache utilisateur`);
   } catch (e) {
     Logger.log(`[CACHE] ⚠️ Erreur écriture cache bénévoles: ${e.message}`);
   }
 }
 
-/**
- * Invalide le cache utilisateur des bénévoles.
- * Appelée par le bouton "Actualiser" des formulaires.
- */
 function invalidateBenevolesCache() {
   try {
     getUserCache().remove(CACHE_KEY_BENEVOLES);
@@ -317,16 +282,7 @@ function getAvailableVolunteers(disponibilite, courtDelaiOnly = false) {
   );
 }
 
-/**
- * Récupère tous les bénévoles avec un véhicule valide (capacité > 0).
- * Utilise le cache utilisateur pour éviter de rappeler l'API à chaque ouverture
- * de formulaire. Le cache est partagé entre Planifier Routes et Créer Route Manuelle.
- *
- * @param {boolean} forceRefresh - Ignore le cache si true
- * @returns {Array<Object>} Bénévoles enrichis avec leur véhicule
- */
 function getVolunteersWithVehicle(forceRefresh = false) {
-  // Vérification du cache utilisateur
   if (!forceRefresh) {
     const cached = getBenevolesCaches();
     if (cached) return cached;
@@ -338,10 +294,7 @@ function getVolunteersWithVehicle(forceRefresh = false) {
   const responses = creneaux.map((creneau) => {
     try {
       const resp = getAvailableVolunteers(creneau);
-      return {
-        creneau,
-        volunteers: resp && resp.volunteers ? resp.volunteers : [],
-      };
+      return { creneau, volunteers: resp && resp.volunteers ? resp.volunteers : [] };
     } catch (e) {
       Logger.log(`[API] ⚠️ Erreur créneau ${creneau}: ${e.message}`);
       return { creneau, volunteers: [] };
@@ -386,8 +339,6 @@ function getVolunteersWithVehicle(forceRefresh = false) {
   }
 
   Logger.log(`[API] ✅ ${result.length} bénévoles avec véhicule valide`);
-
-  // Mise en cache utilisateur
   setBenevolesCaches(result);
 
   return result;
@@ -551,9 +502,7 @@ function logApiStatus() {
   const status = checkAllApis();
   Logger.log("=== STATUT DES APIS ===");
   for (const [nom, s] of Object.entries(status.apis)) {
-    Logger.log(
-      `${s.status === "ok" ? "✅" : "❌"} ${nom.toUpperCase()} — ${s.message}`,
-    );
+    Logger.log(`${s.status === "ok" ? "✅" : "❌"} ${nom.toUpperCase()} — ${s.message}`);
   }
 }
 
@@ -562,10 +511,8 @@ function logApiStatus() {
 // ============================================================
 
 function callBatchGeocode(addresses) {
-  const apiKey =
-    PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
-  const baseUrl =
-    PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
+  const apiKey = PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
+  const baseUrl = PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
   if (!apiKey || !baseUrl) throw new Error("Configuration API GEO manquante");
 
   const options = {
@@ -585,10 +532,8 @@ function callBatchGeocode(addresses) {
 }
 
 function callBatchResolveLocation(coordinates) {
-  const apiKey =
-    PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
-  const baseUrl =
-    PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
+  const apiKey = PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
+  const baseUrl = PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
   if (!apiKey || !baseUrl) throw new Error("Configuration API GEO manquante");
 
   const options = {
@@ -605,10 +550,8 @@ function callBatchResolveLocation(coordinates) {
 }
 
 function callBatchCalculateDistance(reference, coordinates) {
-  const apiKey =
-    PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
-  const baseUrl =
-    PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
+  const apiKey = PropertiesService.getScriptProperties().getProperty("GEO_API_KEY");
+  const baseUrl = PropertiesService.getScriptProperties().getProperty("GEO_API_URL");
   if (!apiKey || !baseUrl) throw new Error("Configuration API GEO manquante");
 
   const options = {

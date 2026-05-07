@@ -214,11 +214,14 @@ function generateDeliveriesFromForm(filters) {
 
 /**
  * Charge toutes les familles validées pour le formulaire manuel.
+ * Bypass systématique du cache pour garantir des données fraîches.
  * @returns {Array<Object>}
  */
 function getAllFamiliesForManualForm() {
   try {
-    Logger.log("[FORM MANUEL] 🔄 Chargement de toutes les familles...");
+    Logger.log("[FORM MANUEL] 🔄 Chargement de toutes les familles (sans cache)...");
+
+    invalidateCache(`families_${JSON.stringify({ includeHierarchy: false })}`);
 
     const response = getAllValidatedFamilies({ includeHierarchy: false });
 
@@ -250,13 +253,15 @@ function getAllFamiliesForManualForm() {
 
 /**
  * Valide une liste d'IDs de familles saisie manuellement.
- * Charge toutes les familles une seule fois puis filtre localement.
+ * Bypass systématique du cache pour garantir des données fraîches.
  * @param {string[]} ids
  * @returns {{ valides: Array, introuvables: string[], doublons: string[] }}
  */
 function validateFamilyIds(ids) {
   try {
-    Logger.log(`[FORM MANUEL] 🔍 Validation de ${ids.length} ID(s)...`);
+    Logger.log(`[FORM MANUEL] 🔍 Validation de ${ids.length} ID(s) (sans cache)...`);
+
+    invalidateCache(`families_${JSON.stringify({ includeHierarchy: false })}`);
 
     const response = getAllValidatedFamilies({ includeHierarchy: false });
 
@@ -316,13 +321,14 @@ function validateFamilyIds(ids) {
 
 /**
  * Vérifie quels IDs de familles ont déjà une livraison active.
- * Retourne uniquement les IDs concernés.
  * @param {string[]} ids
  * @returns {string[]}
  */
 function checkActiveLivraisonsForFamilies(ids) {
   try {
-    Logger.log(`[FORM MANUEL] 🔍 Vérification livraisons actives pour ${ids.length} famille(s)...`);
+    Logger.log(
+      `[FORM MANUEL] 🔍 Vérification livraisons actives pour ${ids.length} famille(s)...`,
+    );
     const actives = ids.filter((id) => hasActiveLivraison(id));
     Logger.log(`[FORM MANUEL] ✅ ${actives.length} famille(s) avec livraison active`);
     return actives;

@@ -63,10 +63,10 @@
       return;
     }
     var types = Array.from(document.querySelectorAll('input[name="type_aide"]:checked'));
-    if (types.length === 0) {
-      showAlert(1, "Veuillez sélectionner au moins un type d'aide.");
-      return;
-    }
+    // if (types.length === 0) {
+    //   showAlert(1, "Veuillez sélectionner au moins un type d'aide.");
+    //   return;
+    // }
     document.getElementById('stepBtn2').disabled = false;
     goToStep(2);
   }

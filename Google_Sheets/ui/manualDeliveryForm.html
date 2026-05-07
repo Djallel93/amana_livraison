@@ -137,6 +137,30 @@
       width: auto;
     }
 
+    .btn-refresh {
+      padding: 6px 12px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-refresh:hover {
+      border-color: var(--c1);
+      color: var(--text);
+    }
+
+    .btn-refresh:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
     .table-wrap {
       flex: 1;
       overflow-y: auto;
@@ -306,24 +330,6 @@
               </div>
             </div>
           </div>
-
-          <div class="form-section">
-            <div class="form-section__title">💝 Types d'aide</div>
-            <div class="checkbox-grid">
-              <div class="checkbox-item">
-                <input type="checkbox" id="type-zakat" name="type_aide" value="zakat_el_fitr" />
-                <label for="type-zakat">🌙 Zakat El Fitr</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="type-ponctuelle" name="type_aide" value="ponctuelle" checked />
-                <label for="type-ponctuelle">💝 Ponctuelle</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="type-recolte" name="type_aide" value="recolte" />
-                <label for="type-recolte">🌾 Récolte</label>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div class="form-footer">
@@ -367,6 +373,9 @@
                 <label for="select-all-fam">Tout sélectionner</label>
               </div>
               <span class="text-muted" id="famille-counter" style="margin-left: auto; font-size: 12px"></span>
+              <button type="button" class="btn-refresh" id="btn-refresh-familles" onclick="chargerFamilles(true)">
+                🔄 Actualiser
+              </button>
             </div>
             <div class="table-wrap" id="families-wrap">
               <div class="loading-state loading-state--visible" style="padding: 32px 0">
@@ -382,7 +391,9 @@
               <label for="ids-textarea">IDs des familles (un par ligne)</label>
               <textarea id="ids-textarea" style="height: 160px; font-family: 'DM Mono', monospace; font-size: 13px"
                 placeholder="FAM001&#10;FAM002&#10;FAM003"></textarea>
-              <div class="help-text">Un identifiant par ligne. Les doublons et espaces sont ignorés automatiquement.
+              <div class="help-text">
+                Un identifiant par ligne. Les doublons et espaces sont ignorés automatiquement.
+                Chaque validation interroge l'API en temps réel.
               </div>
             </div>
             <button type="button" class="btn btn--secondary" id="btn-valider-ids" onclick="validerIds()"
